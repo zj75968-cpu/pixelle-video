@@ -18,7 +18,7 @@ Provides unified access to configuration with automatic validation.
 from pathlib import Path
 from typing import Any, Optional
 from loguru import logger
-from .schema import PixelleVideoConfig
+from .schema import PixelleVideoConfig, LLMConfig
 from .loader import load_config_dict, save_config_dict
 
 
@@ -121,6 +121,27 @@ class ConfigManager:
                 "api_key": api_key,
                 "base_url": base_url,
                 "model": model,
+            }
+        })
+
+    def get_post_model_preset(self, preset_name: str) -> dict:
+        """Get per-page post model preset as dict."""
+        preset = self.config.post_model_presets.get(preset_name, LLMConfig())
+        return {
+            "api_key": preset.api_key,
+            "base_url": preset.base_url,
+            "model": preset.model,
+        }
+
+    def set_post_model_preset(self, preset_name: str, api_key: str, base_url: str, model: str):
+        """Set per-page post model preset."""
+        self.update({
+            "post_model_presets": {
+                preset_name: {
+                    "api_key": api_key,
+                    "base_url": base_url,
+                    "model": model,
+                }
             }
         })
     

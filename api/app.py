@@ -54,6 +54,9 @@ from api.routers import (
     files_router,
     resources_router,
     frame_router,
+    post_router,
+    devices_router,
+    publish_router,
 )
 
 
@@ -67,12 +70,18 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("🚀 Starting Pixelle-Video API...")
     await task_manager.start()
+    from pixelle_video.services.device_manager import device_manager
+    from pixelle_video.services.publish_scheduler import publish_scheduler
+    device_manager.start_auto_sync(interval_seconds=8)
+    publish_scheduler.start_scheduler()
     logger.info("✅ Pixelle-Video API started successfully\n")
     
     yield
     
     # Shutdown
     logger.info("🛑 Shutting down Pixelle-Video API...")
+    device_manager.stop_auto_sync()
+    publish_scheduler.stop_scheduler()
     await task_manager.stop()
     await shutdown_pixelle_video()
     logger.info("✅ Pixelle-Video API shutdown complete")
@@ -133,6 +142,9 @@ app.include_router(tasks_router, prefix=api_config.api_prefix)
 app.include_router(files_router, prefix=api_config.api_prefix)
 app.include_router(resources_router, prefix=api_config.api_prefix)
 app.include_router(frame_router, prefix=api_config.api_prefix)
+app.include_router(post_router, prefix=api_config.api_prefix)
+app.include_router(devices_router, prefix=api_config.api_prefix)
+app.include_router(publish_router, prefix=api_config.api_prefix)
 
 
 @app.get("/")
@@ -153,6 +165,9 @@ async def root():
             "files": f"{api_config.api_prefix}/files",
             "resources": f"{api_config.api_prefix}/resources",
             "frame": f"{api_config.api_prefix}/frame",
+            "post": f"{api_config.api_prefix}/post",
+            "devices": f"{api_config.api_prefix}/devices",
+            "publish": f"{api_config.api_prefix}/publish",
         }
     }
 

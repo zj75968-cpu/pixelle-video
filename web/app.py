@@ -52,9 +52,21 @@ def main():
         title="History",
         icon="📚"
     )
-    
+
+    post_page = st.Page(
+        "pages/3_📝_Post.py",
+        title="图文创作",
+        icon="📝"
+    )
+
+    publish_page = st.Page(
+        "pages/4_📱_Publish.py",
+        title="发布管理",
+        icon="📱"
+    )
+
     # Set up navigation and run
-    pg = st.navigation([home_page, history_page])
+    pg = st.navigation([home_page, history_page, post_page, publish_page])
     pg.run()
 
 

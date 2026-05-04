@@ -1,0 +1,111 @@
+# Xiaohongshu (小红书) UI Element Selectors
+# Used by xhs_publisher.py for uiautomator2-based automation
+#
+# Resource IDs and text selectors for the XHS Android app.
+# Update these if the XHS app layout changes after an update.
+#
+# XHS Package: com.xingin.xhs
+# Tested app version: 8.x
+
+package: com.xingin.xhs
+
+# ---- Bottom navigation ----
+nav_home:
+  resource_id: com.xingin.xhs:id/tab_home
+  text: 首页
+
+nav_explore:
+  resource_id: com.xingin.xhs:id/tab_explore
+  text: 发现
+
+nav_publish:
+  resource_id: com.xingin.xhs:id/tab_add
+  description: 发布
+
+nav_messages:
+  resource_id: com.xingin.xhs:id/tab_message
+  text: 消息
+
+nav_profile:
+  resource_id: com.xingin.xhs:id/tab_me
+  text: 我
+
+# ---- Publish entry ----
+# The "+" (publish) button in the bottom nav
+publish_button:
+  resource_id: com.xingin.xhs:id/tab_add
+  fallback_text: 发布
+
+# ---- Post type selection (after pressing "+") ----
+post_type_image_text:
+  text: 图文
+  resource_id: com.xingin.xhs:id/image_text_tab
+
+post_type_video:
+  text: 视频
+  resource_id: com.xingin.xhs:id/video_tab
+
+# ---- Image picker ----
+album_button:
+  resource_id: com.xingin.xhs:id/album_btn
+  text: 相册
+
+image_grid_item:
+  resource_id: com.xingin.xhs:id/photo_item
+
+image_confirm_button:
+  text: 下一步
+  resource_id: com.xingin.xhs:id/next_btn
+  fallback_texts:
+    - 下一步
+    - 完成
+    - 确定
+
+# ---- Edit screen ----
+title_input:
+  resource_id: com.xingin.xhs:id/title_input
+  hint: 填写标题会有更多赞哦～
+
+body_input:
+  resource_id: com.xingin.xhs:id/desc_input
+  hint: 分享这一刻的想法...
+  fallback_class: android.widget.EditText
+
+hashtag_button:
+  resource_id: com.xingin.xhs:id/topic_btn
+  text: "#话题"
+  fallback_text: 话题
+
+hashtag_search_input:
+  resource_id: com.xingin.xhs:id/search_input
+
+hashtag_first_result:
+  resource_id: com.xingin.xhs:id/topic_item_container
+
+# ---- Publish action ----
+publish_confirm_button:
+  text: 发布
+  resource_id: com.xingin.xhs:id/publish_btn
+  fallback_texts:
+    - 发布笔记
+    - 发 布
+
+# ---- Success indicators ----
+publish_success_toast:
+  text: 发布成功
+
+# ---- Permissions dialog ----
+permission_allow_button:
+  texts:
+    - 允许
+    - 始终允许
+    - ALLOW
+
+# ---- Generic actions ----
+back_button:
+  resource_id: com.xingin.xhs:id/back_btn
+  description: 返回
+
+close_button:
+  description: 关闭
+  resource_id: com.xingin.xhs:id/close_btn

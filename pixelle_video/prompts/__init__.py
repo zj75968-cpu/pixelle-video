@@ -28,6 +28,10 @@ from pixelle_video.prompts.image_generation import (
     DEFAULT_IMAGE_STYLE
 )
 from pixelle_video.prompts.style_conversion import build_style_conversion_prompt
+from pixelle_video.prompts.post_generation import (
+    POST_GENERATION_SYSTEM_PROMPT,
+    build_post_prompt,
+)
 
 
 __all__ = [
@@ -39,6 +43,8 @@ __all__ = [
     # Image builders
     "build_image_prompt_prompt",
     "build_style_conversion_prompt",
+    "POST_GENERATION_SYSTEM_PROMPT",
+    "build_post_prompt",
     
     # Image style presets
     "IMAGE_STYLE_PRESETS",

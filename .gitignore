@@ -62,6 +62,7 @@ test_*.py
 temp/
 tmp/
 .cache/
+ffmpeg-temp/
 
 # MkDocs build output
 site/
@@ -74,3 +75,7 @@ examples/
 repositories/
 
 *.out
+
+# Local ffmpeg artifacts
+ffmpeg-temp/
+ffmpeg-release-essentials.zip

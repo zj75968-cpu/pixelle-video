@@ -15,7 +15,7 @@ Configuration schema with Pydantic models
 
 Single source of truth for all configuration defaults and validation.
 """
-from typing import Optional
+from typing import Dict, Optional
 from pydantic import BaseModel, Field
 
 
@@ -92,6 +92,13 @@ class PixelleVideoConfig(BaseModel):
     """Pixelle-Video main configuration"""
     project_name: str = Field(default="Pixelle-Video", description="Project name")
     llm: LLMConfig = Field(default_factory=LLMConfig)
+    post_model_presets: Dict[str, LLMConfig] = Field(
+        default_factory=lambda: {
+            "post_content": LLMConfig(),
+            "post_image": LLMConfig(),
+        },
+        description="Per-page post model presets persisted for web form",
+    )
     comfyui: ComfyUIConfig = Field(default_factory=ComfyUIConfig)
     template: TemplateConfig = Field(default_factory=TemplateConfig)
     

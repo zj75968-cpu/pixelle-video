@@ -31,6 +31,23 @@ from api.schemas.video import (
     VideoGenerateResponse,
     VideoGenerateAsyncResponse,
 )
+from api.schemas.post import (
+    PostGenerateRequest,
+    PostGenerateAsyncResponse,
+    PostTaskResponse,
+)
+from api.schemas.devices import (
+    DeviceAddRequest,
+    DeviceConnectWiFiRequest,
+    DeviceListResponse,
+    DeviceResponse,
+)
+from api.schemas.publish import (
+    PublishJobRequest,
+    PublishJobResponse,
+    PublishJobListResponse,
+    PublishBatchCreateResponse,
+)
 
 __all__ = [
     # Base
@@ -56,5 +73,19 @@ __all__ = [
     "VideoGenerateRequest",
     "VideoGenerateResponse",
     "VideoGenerateAsyncResponse",
+    # Post
+    "PostGenerateRequest",
+    "PostGenerateAsyncResponse",
+    "PostTaskResponse",
+    # Devices
+    "DeviceAddRequest",
+    "DeviceConnectWiFiRequest",
+    "DeviceListResponse",
+    "DeviceResponse",
+    # Publish
+    "PublishJobRequest",
+    "PublishJobResponse",
+    "PublishJobListResponse",
+    "PublishBatchCreateResponse",
 ]
 

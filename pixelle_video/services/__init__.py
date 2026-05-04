@@ -34,6 +34,9 @@ from pixelle_video.services.video import VideoService
 from pixelle_video.services.frame_processor import FrameProcessor
 from pixelle_video.services.persistence import PersistenceService
 from pixelle_video.services.history_manager import HistoryManager
+from pixelle_video.services.device_manager import DeviceManager, DeviceInfo, device_manager
+from pixelle_video.services.xhs_publisher import XHSPublisher, XHSPublishError
+from pixelle_video.services.publish_scheduler import PublishScheduler, PublishJob, JobStatus, publish_scheduler
 
 # Backward compatibility alias
 ImageService = MediaService
@@ -48,5 +51,14 @@ __all__ = [
     "FrameProcessor",
     "PersistenceService",
     "HistoryManager",
+    "DeviceManager",
+    "DeviceInfo",
+    "device_manager",
+    "XHSPublisher",
+    "XHSPublishError",
+    "PublishScheduler",
+    "PublishJob",
+    "JobStatus",
+    "publish_scheduler",
 ]
 

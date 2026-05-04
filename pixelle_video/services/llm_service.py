@@ -17,12 +17,21 @@ Supports structured output via response_type parameter (Pydantic model).
 """
 
 import json
+import os
 import re
 from typing import Optional, Type, TypeVar, Union
 
+import httpx
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 from loguru import logger
+
+# Strip SOCKS proxy env vars so httpx never tries to use them
+# (avoids "socksio not installed" errors when OS has a SOCKS proxy set).
+for _pv in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY",
+            "http_proxy", "https_proxy", "all_proxy"):
+    if os.environ.get(_pv, "").lower().startswith("socks"):
+        os.environ.pop(_pv, None)
 
 
 T = TypeVar("T", bound=BaseModel)
@@ -108,8 +117,12 @@ class LLMService:
             or self._get_config_value("base_url")
         )
         
-        # Create client
-        client_kwargs = {"api_key": final_api_key}
+        # Create client with a clean httpx client that ignores system proxy
+        # env vars (avoids "socksio not installed" errors with SOCKS proxies).
+        client_kwargs = {
+            "api_key": final_api_key,
+            "http_client": httpx.AsyncClient(proxy=None),
+        }
         if final_base_url:
             client_kwargs["base_url"] = final_base_url
         
