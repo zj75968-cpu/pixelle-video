@@ -917,6 +917,78 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#animatediff-comfyui-local-integration-sd15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AnimateDiff + ComfyUI Local Integration (SD1.5)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AnimateDiff + ComfyUI Local Integration (SD1.5)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-install-comfyui-custom-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Install ComfyUI custom nodes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-prepare-model-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Prepare model files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-enable-in-project-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Enable in project config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-low-vram-starter-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Low-VRAM starter settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Common issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1530,6 +1602,78 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#animatediff-comfyui-local-integration-sd15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AnimateDiff + ComfyUI Local Integration (SD1.5)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="AnimateDiff + ComfyUI Local Integration (SD1.5)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-install-comfyui-custom-nodes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Install ComfyUI custom nodes
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-prepare-model-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Prepare model files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-enable-in-project-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Enable in project config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-low-vram-starter-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Low-VRAM starter settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#5-common-issues" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Common issues
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -1573,16 +1717,10 @@
 <p>Located in <code>workflows/selfhost/</code> or <code>workflows/runninghub/</code></p>
 <p><strong>New Feature</strong>: Supports AI video generation to create dynamic video content.</p>
 <p><strong>Preset Workflows</strong>:
-- <code>runninghub/video_wan2.1_fusionx.json</code>: Cloud workflow (recommended)
-  - Based on WAN 2.1 model
-  - No local setup required, accessed via RunningHub API
-  - Supports Text-to-Video generation</p>
-<ul>
-<li><code>selfhost/video_wan2.1_fusionx.json</code>: Local workflow</li>
-<li>Requires local ComfyUI environment</li>
-<li>Requires installation of corresponding video generation nodes</li>
-<li>Suitable for users with local GPU</li>
-</ul>
+- <code>selfhost/video_animatediff_sd15.json</code>: Local workflow
+  - Requires local ComfyUI environment
+  - Requires AnimateDiff and VideoHelperSuite video nodes
+  - Suitable for users with local GPU</p>
 <p><strong>Use Cases</strong>:
 - Works with <code>video_*.html</code> templates
 - Automatically generates dynamic video backgrounds based on scripts
@@ -1598,6 +1736,62 @@
 <hr />
 <h2 id="more-information">More Information<a class="headerlink" href="#more-information" title="Permanent link">&para;</a></h2>
 <p>Detailed workflow customization guide coming soon.</p>
+<hr />
+<h2 id="animatediff-comfyui-local-integration-sd15">AnimateDiff + ComfyUI Local Integration (SD1.5)<a class="headerlink" href="#animatediff-comfyui-local-integration-sd15" title="Permanent link">&para;</a></h2>
+<p>To generate true dynamic AI video locally, use the new workflow:</p>
+<ul>
+<li><code>selfhost/video_animatediff_sd15.json</code></li>
+</ul>
+<p>It follows the <code>video_</code> naming convention, so it is auto-discovered by the project workflow scanner.</p>
+<h3 id="1-install-comfyui-custom-nodes">1. Install ComfyUI custom nodes<a class="headerlink" href="#1-install-comfyui-custom-nodes" title="Permanent link">&para;</a></h3>
+<p>Install these nodes into your ComfyUI <code>custom_nodes</code> directory:</p>
+<ol>
+<li>ComfyUI-AnimateDiff-Evolved</li>
+<li>ComfyUI-VideoHelperSuite</li>
+<li>ComfyUI-Custom-Scripts (optional, useful for debugging)</li>
+</ol>
+<p>You can also run the Windows helper script from this repository:</p>
+<div class="language-powershell highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nb">cd </span><span class="s2">&quot;D:\vscocde file\github-video-项目\Pixelle-Video&quot;</span>
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">powershell</span> <span class="n">-ExecutionPolicy</span> <span class="n">Bypass</span> <span class="o">-File</span> <span class="p">.\</span><span class="n">scripts</span><span class="p">\</span><span class="n">install_animatediff_comfyui_windows</span><span class="p">.</span><span class="n">ps1</span> <span class="n">-ComfyUIRoot</span> <span class="s2">&quot;D:\ComfyUI_windows_portable\ComfyUI&quot;</span>
+</span></code></pre></div>
+<p>Restart ComfyUI and verify AnimateDiff/VHS nodes are visible.</p>
+<h3 id="2-prepare-model-files">2. Prepare model files<a class="headerlink" href="#2-prepare-model-files" title="Permanent link">&para;</a></h3>
+<p>Minimum required models:</p>
+<ol>
+<li>SD1.5 checkpoint: <code>v1-5-pruned-emaonly.safetensors</code></li>
+<li>AnimateDiff motion module: <code>mm_sd_v15_v2.ckpt</code></li>
+</ol>
+<p>Recommended placement:</p>
+<ol>
+<li>SD checkpoint in ComfyUI checkpoints directory</li>
+<li>motion module in AnimateDiff model directory (commonly <code>models/animatediff_models</code>)</li>
+</ol>
+<p>If your filenames differ from the workflow defaults, open the workflow in ComfyUI, update node values, then save.</p>
+<h3 id="3-enable-in-project-config">3. Enable in project config<a class="headerlink" href="#3-enable-in-project-config" title="Permanent link">&para;</a></h3>
+<p>Update your <code>config.yaml</code>:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nt">comfyui</span><span class="p">:</span>
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="w">  </span><span class="nt">comfyui_url</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">http://127.0.0.1:8188</span>
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">video</span><span class="p">:</span>
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">    </span><span class="nt">default_workflow</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">selfhost/video_animatediff_sd15.json</span>
+</span></code></pre></div>
+<p>If your machine uses a local proxy, set bypass variables before starting the app:</p>
+<div class="language-powershell highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nv">$env:NO_PROXY</span> <span class="p">=</span> <span class="s2">&quot;127.0.0.1,localhost&quot;</span>
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nv">$env:no_proxy</span> <span class="p">=</span> <span class="nv">$env:NO_PROXY</span>
+</span></code></pre></div>
+<h3 id="4-low-vram-starter-settings">4. Low-VRAM starter settings<a class="headerlink" href="#4-low-vram-starter-settings" title="Permanent link">&para;</a></h3>
+<p>For first successful runs on smaller GPUs:</p>
+<ol>
+<li>Resolution: start at <code>512x768</code></li>
+<li>Frame count: <code>16</code> to <code>24</code></li>
+<li>Steps: <code>20</code> to <code>25</code></li>
+</ol>
+<h3 id="5-common-issues">5. Common issues<a class="headerlink" href="#5-common-issues" title="Permanent link">&para;</a></h3>
+<ol>
+<li>Missing <code>ADE_*</code> nodes: AnimateDiff-Evolved not installed or version mismatch.</li>
+<li>Missing motion model: <code>mm_sd_v15_v2.ckpt</code> is missing or in wrong folder.</li>
+<li>Out-of-memory: lower resolution, frame count, and steps.</li>
+<li>Local ComfyUI URL fails (127.0.0.1): check proxy and <code>NO_PROXY</code> settings.</li>
+</ol>
 
 
 
@@ -1620,7 +1814,7 @@
     <span class="md-icon" title="Last update">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
     </span>
-    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-datetime" title="November 12, 2025 12:12:28 UTC">November 12, 2025 12:12:28</span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-datetime" title="May 8, 2026 15:04:21 UTC">May 8, 2026 15:04:21</span>
   </span>
 
     
