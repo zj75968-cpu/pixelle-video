@@ -526,3 +526,81 @@ class DeviceManager:
 
 # Module-level singleton
 device_manager = DeviceManager()
+
+
+# ---------------------------------------------------------------------------
+# Standalone utility: push images to device gallery
+# ---------------------------------------------------------------------------
+
+def push_images_to_gallery(
+    serial: str,
+    local_paths: List[str],
+    push_dir: str = "/sdcard/DCIM/PixelleVideo",
+) -> dict:
+    """Push local image files to an Android device's gallery via ADB.
+
+    Each file is pushed with ``adb push`` then a ``MEDIA_SCANNER_SCAN_FILE``
+    broadcast is sent so the images appear in the device's photo gallery
+    immediately without requiring a reboot.
+
+    Args:
+        serial: ADB device serial (or host:port for WiFi).
+        local_paths: Absolute local paths of the image files to push.
+        push_dir: Destination directory on the device.
+
+    Returns:
+        A dict with keys:
+        - ``success`` (int): number of files pushed successfully.
+        - ``failed`` (list[str]): local paths that failed.
+        - ``device_paths`` (list[str]): device-side paths of pushed files.
+    """
+    def _adb(*args: str) -> str:
+        result = subprocess.run(
+            ["adb", "-s", serial] + list(args),
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"ADB error: {result.stderr.strip()}")
+        return result.stdout.strip()
+
+    # Ensure destination directory exists
+    try:
+        _adb("shell", "mkdir", "-p", push_dir)
+    except Exception as exc:
+        logger.warning(f"push_images_to_gallery: mkdir failed ({exc}), proceeding anyway")
+
+    device_paths: list[str] = []
+    failed: list[str] = []
+
+    for local_path in local_paths:
+        filename = Path(local_path).name
+        device_path = f"{push_dir}/{filename}"
+        try:
+            _adb("push", local_path, device_path)
+            device_paths.append(device_path)
+            logger.info(f"push_images_to_gallery: pushed {local_path} → {device_path}")
+        except Exception as exc:
+            logger.error(f"push_images_to_gallery: failed to push {local_path}: {exc}")
+            failed.append(local_path)
+
+    # Trigger media scanner for successfully pushed files
+    for dp in device_paths:
+        try:
+            _adb(
+                "shell", "am", "broadcast",
+                "-a", "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+                "-d", f"file://{dp}",
+            )
+        except Exception as exc:
+            logger.warning(f"push_images_to_gallery: media scan failed for {dp}: {exc}")
+
+    if device_paths:
+        time.sleep(2)  # Give media scanner time to index
+
+    return {
+        "success": len(device_paths),
+        "failed": failed,
+        "device_paths": device_paths,
+    }

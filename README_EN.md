@@ -50,7 +50,7 @@ Just input a **topic**, and Pixelle-Video will automatically:
 - ✅ **Fully Automatic Generation** - Input a topic, automatically generate complete video
 - ✅ **AI Smart Copywriting** - Intelligently create narration based on topic, no need to write scripts yourself
 - ✅ **AI Generated Images** - Each sentence comes with beautiful AI illustrations
-- ✅ **AI Generated Videos** - Support AI video generation models (like WAN 2.1) to create dynamic video content
+- ✅ **AI Generated Videos** - Support local video workflows to create dynamic video content
 - ✅ **AI Generated Voice** - Support Edge-TTS, Index-TTS and many other mainstream TTS solutions
 - ✅ **Background Music** - Support adding BGM to make videos more atmospheric
 - ✅ **Visual Styles** - Multiple templates to choose from, create unique video styles

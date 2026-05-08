@@ -21,6 +21,9 @@ Key Feature:
 """
 
 from typing import Callable, Optional
+from urllib.parse import parse_qs, urlparse
+import shutil
+from pathlib import Path
 
 import httpx
 from loguru import logger
@@ -40,6 +43,12 @@ class FrameProcessor:
             pixelle_video_core: PixelleVideoCore instance
         """
         self.core = pixelle_video_core
+
+    def _is_video_template(self, frame_template: Optional[str]) -> bool:
+        """Return True when template filename follows video_* naming."""
+        if not frame_template:
+            return False
+        return Path(frame_template).name.lower().startswith("video_")
     
     async def __call__(
         self,
@@ -252,9 +261,15 @@ class FrameProcessor:
                 media_type="video"
             )
             frame.video_path = local_path
-            
-            # Update duration from video if available
-            if media_result.duration:
+
+            # Keep TTS-derived duration for video workflows to preserve A/V sync.
+            # Some providers may return execution time instead of real media duration.
+            if is_video_workflow and frame.duration:
+                logger.debug(
+                    f"  ✓ Video generated: {local_path} "
+                    f"(keep TTS duration: {frame.duration:.2f}s)"
+                )
+            elif media_result.duration:
                 frame.duration = media_result.duration
                 logger.debug(f"  ✓ Video generated: {local_path} (duration: {frame.duration:.2f}s)")
             else:
@@ -273,6 +288,13 @@ class FrameProcessor:
     ):
         """Step 3: Compose frame with subtitle using HTML template"""
         logger.debug(f"  3/4: Composing frame {frame.index}...")
+
+        # For video media with non-video templates, skip HTML composition to preserve
+        # source motion quality and avoid synthetic card-like overlays.
+        if frame.media_type == "video" and not self._is_video_template(config.frame_template):
+            frame.composed_image_path = None
+            logger.debug("  → Skip HTML composition for video media (non-video template)")
+            return
         
         # Generate output path using task_id
         from pixelle_video.utils.os_util import get_task_frame_path
@@ -347,34 +369,40 @@ class FrameProcessor:
         
         # Branch based on media type
         if frame.media_type == "video":
-            # Video workflow: overlay HTML template on video, then add audio
-            logger.debug(f"  → Using video-based composition with HTML overlay")
-            
-            # Step 1: Overlay transparent HTML image on video
-            # The composed_image_path contains the rendered HTML with transparent background
-            temp_video_with_overlay = get_task_frame_path(config.task_id, frame.index, "video") + "_overlay.mp4"
-            
-            video_service.overlay_image_on_video(
-                video=frame.video_path,
-                overlay_image=frame.composed_image_path,
-                output=temp_video_with_overlay,
-                scale_mode="contain"  # Scale video to fit template size (contain mode)
-            )
-            
-            # Step 2: Add narration audio to the overlaid video
-            # Note: The video might have audio (replaced) or be silent (audio added)
-            segment_path = video_service.merge_audio_video(
-                video=temp_video_with_overlay,
-                audio=frame.audio_path,
-                output=output_path,
-                replace_audio=True,  # Replace video audio with narration
-                audio_volume=1.0
-            )
-            
-            # Clean up temp file
-            import os
-            if os.path.exists(temp_video_with_overlay):
-                os.unlink(temp_video_with_overlay)
+            if frame.composed_image_path and self._is_video_template(config.frame_template):
+                # Video template path: keep designed overlays/captions.
+                logger.debug("  → Using video-based composition with HTML overlay")
+
+                temp_video_with_overlay = get_task_frame_path(config.task_id, frame.index, "video") + "_overlay.mp4"
+
+                video_service.overlay_image_on_video(
+                    video=frame.video_path,
+                    overlay_image=frame.composed_image_path,
+                    output=temp_video_with_overlay,
+                    scale_mode="contain"
+                )
+
+                segment_path = video_service.merge_audio_video(
+                    video=temp_video_with_overlay,
+                    audio=frame.audio_path,
+                    output=output_path,
+                    replace_audio=True,
+                    audio_volume=1.0
+                )
+
+                import os
+                if os.path.exists(temp_video_with_overlay):
+                    os.unlink(temp_video_with_overlay)
+            else:
+                # Realism-first path: preserve generated video pixels and only merge narration.
+                logger.debug("  → Using video passthrough (no HTML overlay)")
+                segment_path = video_service.merge_audio_video(
+                    video=frame.video_path,
+                    audio=frame.audio_path,
+                    output=output_path,
+                    replace_audio=True,
+                    audio_volume=1.0
+                )
         
         elif frame.media_type == "image" or frame.media_type is None:
             # Image workflow: Use composed image directly
@@ -422,6 +450,19 @@ class FrameProcessor:
         """Download media (image or video) from URL to local file"""
         from pixelle_video.utils.os_util import get_task_frame_path
         output_path = get_task_frame_path(task_id, frame_index, media_type)
+
+        # Fast path for local ComfyUI view URLs: copy file from local output dir directly.
+        parsed = urlparse(url)
+        if parsed.path == "/view" and parsed.hostname in {"127.0.0.1", "localhost"}:
+            query = parse_qs(parsed.query)
+            filename = (query.get("filename") or [""])[0]
+            subfolder = (query.get("subfolder") or [""])[0]
+            if filename:
+                for root in ("C:/ComfyUI/output", "D:/ComfyUI-Data/output"):
+                    candidate = Path(root) / subfolder / filename
+                    if candidate.exists():
+                        shutil.copy2(candidate, output_path)
+                        return output_path
         
         timeout = httpx.Timeout(connect=10.0, read=60, write=60, pool=60)
         async with httpx.AsyncClient(timeout=timeout) as client:

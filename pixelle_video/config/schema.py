@@ -88,6 +88,21 @@ class TemplateConfig(BaseModel):
     )
 
 
+class XHSPublishConfig(BaseModel):
+    """Xiaohongshu publish automation configuration"""
+    strict_mode: bool = Field(
+        default=True,
+        description=(
+            "Strict mode: raise an error when a UI element cannot be found instead of "
+            "falling back to coordinate taps. Set to false to enable compatible/fallback mode."
+        ),
+    )
+    push_dir: str = Field(
+        default="/sdcard/DCIM/PixelleVideo",
+        description="Device-side directory where images are pushed before publishing",
+    )
+
+
 class PixelleVideoConfig(BaseModel):
     """Pixelle-Video main configuration"""
     project_name: str = Field(default="Pixelle-Video", description="Project name")
@@ -101,6 +116,7 @@ class PixelleVideoConfig(BaseModel):
     )
     comfyui: ComfyUIConfig = Field(default_factory=ComfyUIConfig)
     template: TemplateConfig = Field(default_factory=TemplateConfig)
+    xhs_publish: XHSPublishConfig = Field(default_factory=XHSPublishConfig)
     
     def is_llm_configured(self) -> bool:
         """Check if LLM is properly configured"""

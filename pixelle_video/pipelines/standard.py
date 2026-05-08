@@ -171,54 +171,50 @@ class StandardPipeline(LinearVideoPipeline):
         # Only generate image prompts if template requires media
         if template_requires_media:
             self._report_progress(ctx.progress_callback, "generating_image_prompts", 0.15)
-            
+
             prompt_prefix = ctx.params.get("prompt_prefix")
             min_words = ctx.params.get("min_image_prompt_words", 30)
             max_words = ctx.params.get("max_image_prompt_words", 60)
-            
-            # Override prompt_prefix if provided
-            original_prefix = None
+
+            comfyui_config = self.core.config.get("comfyui", {})
+            prefix_config_key = "video" if template_type == "video" else "image"
+            media_config = comfyui_config.get(prefix_config_key, {})
+            default_prompt_prefix = media_config.get("prompt_prefix", "")
+            prompt_prefix_to_use = prompt_prefix if prompt_prefix is not None else default_prompt_prefix
+
             if prompt_prefix is not None:
-                image_config = self.core.config.get("comfyui", {}).get("image", {})
-                original_prefix = image_config.get("prompt_prefix")
-                image_config["prompt_prefix"] = prompt_prefix
-                logger.info(f"Using custom prompt_prefix: '{prompt_prefix}'")
-            
-            try:
-                # Create progress callback wrapper for image prompt generation
-                def image_prompt_progress(completed: int, total: int, message: str):
-                    batch_progress = completed / total if total > 0 else 0
-                    overall_progress = 0.15 + (batch_progress * 0.15)
-                    self._report_progress(
-                        ctx.progress_callback,
-                        "generating_image_prompts",
-                        overall_progress,
-                        extra_info=message
-                    )
-                
-                # Generate base image prompts
-                base_image_prompts = await generate_image_prompts(
-                    self.llm,
-                    narrations=ctx.narrations,
-                    min_words=min_words,
-                    max_words=max_words,
-                    progress_callback=image_prompt_progress
+                logger.info(f"Using request prompt_prefix override: '{prompt_prefix}'")
+            else:
+                logger.info(
+                    f"Using comfyui.{prefix_config_key}.prompt_prefix for {template_type} template"
                 )
-                
-                # Apply prompt prefix
-                image_config = self.core.config.get("comfyui", {}).get("image", {})
-                prompt_prefix_to_use = prompt_prefix if prompt_prefix is not None else image_config.get("prompt_prefix", "")
-                
-                ctx.image_prompts = []
-                for base_prompt in base_image_prompts:
-                    final_prompt = build_image_prompt(base_prompt, prompt_prefix_to_use)
-                    ctx.image_prompts.append(final_prompt)
-                
-            finally:
-                # Restore original prompt_prefix
-                if original_prefix is not None:
-                    image_config["prompt_prefix"] = original_prefix
-            
+
+            # Create progress callback wrapper for image prompt generation
+            def image_prompt_progress(completed: int, total: int, message: str):
+                batch_progress = completed / total if total > 0 else 0
+                overall_progress = 0.15 + (batch_progress * 0.15)
+                self._report_progress(
+                    ctx.progress_callback,
+                    "generating_image_prompts",
+                    overall_progress,
+                    extra_info=message
+                )
+
+            # Generate base image prompts
+            base_image_prompts = await generate_image_prompts(
+                self.llm,
+                narrations=ctx.narrations,
+                min_words=min_words,
+                max_words=max_words,
+                progress_callback=image_prompt_progress
+            )
+
+            # Apply prompt prefix
+            ctx.image_prompts = []
+            for base_prompt in base_image_prompts:
+                final_prompt = build_image_prompt(base_prompt, prompt_prefix_to_use)
+                ctx.image_prompts.append(final_prompt)
+
             logger.info(f"✅ Generated {len(ctx.image_prompts)} image prompts")
         else:
             # Static template - skip image prompt generation entirely

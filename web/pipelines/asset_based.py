@@ -1,4 +1,4 @@
-# Copyright (C) 2025 AIDC-AI
+﻿# Copyright (C) 2025 AIDC-AI
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -126,7 +126,7 @@ class AssetBasedPipelineUI(PipelineUI):
                             # Check if image or video
                             ext = Path(path).suffix.lower()
                             if ext in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
-                                st.image(file, caption=file.name, use_container_width=True)
+                                st.image(file, caption=file.name, width="stretch")
                             elif ext in [".mp4", ".mov", ".avi", ".mkv", ".webm"]:
                                 st.video(file)
                                 st.caption(file.name)
@@ -300,7 +300,7 @@ class AssetBasedPipelineUI(PipelineUI):
                 st.button(
                     tr("btn.generate"),
                     type="primary",
-                    use_container_width=True,
+                    width="stretch",
                     disabled=True,
                     key="asset_generate_disabled"
                 )
@@ -310,7 +310,7 @@ class AssetBasedPipelineUI(PipelineUI):
             st.info(tr("asset_based.output.ready", count=len(assets)))
             
             # Generate button
-            if st.button(tr("btn.generate"), type="primary", use_container_width=True, key="asset_generate"):
+            if st.button(tr("btn.generate"), type="primary", width="stretch", key="asset_generate"):
                 # Validate
                 if not config_manager.validate():
                     st.error(tr("settings.not_configured"))
@@ -424,11 +424,11 @@ class AssetBasedPipelineUI(PipelineUI):
                             video_bytes = video_file.read()
                             video_filename = os.path.basename(ctx.final_video_path)
                             st.download_button(
-                                label="⬇️ 下载视频" if get_language() == "zh_CN" else "⬇️ Download Video",
+                                label="⬇️ 下载视�?" if get_language() == "zh_CN" else "⬇️ Download Video",
                                 data=video_bytes,
                                 file_name=video_filename,
                                 mime="video/mp4",
-                                use_container_width=True
+                                width="stretch"
                             )
                     else:
                         st.error(tr("status.video_not_found", path=ctx.final_video_path))
@@ -443,4 +443,6 @@ class AssetBasedPipelineUI(PipelineUI):
 
 # Register self
 register_pipeline_ui(AssetBasedPipelineUI)
+
+
 

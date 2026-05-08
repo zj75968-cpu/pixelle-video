@@ -41,20 +41,50 @@ from pixelle_video.utils.os_util import (
 )
 
 
+def _iter_local_ffmpeg_bins(project_root: Path):
+    """Yield candidate local ffmpeg bin directories inside the project."""
+    ffmpeg_temp_root = project_root / "ffmpeg-temp"
+    if ffmpeg_temp_root.exists():
+        for child in ffmpeg_temp_root.iterdir():
+            if child.is_dir():
+                candidate = child / "bin"
+                if candidate.exists() and candidate.is_dir():
+                    yield candidate
+
+    tools_bin = project_root / "tools" / "ffmpeg" / "bin"
+    if tools_bin.exists() and tools_bin.is_dir():
+        yield tools_bin
+
+
 def check_ffmpeg() -> None:
     """
-    Check if FFmpeg is installed on the system
+    Check if FFmpeg is installed on the system.
+
+    If not found in PATH, try common project-local directories.
     
     Raises:
         RuntimeError: If FFmpeg is not found
     """
-    if not shutil.which("ffmpeg"):
-        raise RuntimeError(
-            "FFmpeg not found. Please install it:\n"
-            "  macOS: brew install ffmpeg\n"
-            "  Ubuntu/Debian: apt-get install ffmpeg\n"
-            "  Windows: https://ffmpeg.org/download.html"
-        )
+    if shutil.which("ffmpeg"):
+        return
+
+    project_root = Path(__file__).resolve().parents[2]
+    ffmpeg_name = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+
+    for bin_dir in _iter_local_ffmpeg_bins(project_root):
+        ffmpeg_path = bin_dir / ffmpeg_name
+        if ffmpeg_path.exists():
+            os.environ["PATH"] = f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"
+            logger.info(f"Found local FFmpeg and added to PATH: {ffmpeg_path}")
+            return
+
+    raise RuntimeError(
+        "FFmpeg not found. Please install it:\n"
+        "  macOS: brew install ffmpeg\n"
+        "  Ubuntu/Debian: apt-get install ffmpeg\n"
+        "  Windows: https://ffmpeg.org/download.html\n"
+        "  Or place ffmpeg in: ffmpeg-temp/*/bin or tools/ffmpeg/bin"
+    )
 
 
 # Check FFmpeg availability on module import

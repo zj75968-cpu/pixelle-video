@@ -1,4 +1,4 @@
-# Copyright (C) 2025 AIDC-AI
+﻿# Copyright (C) 2025 AIDC-AI
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,7 +35,7 @@ from web.components.inline_model_config import render_inline_model_config
 from web.utils.async_helpers import run_async
 
 st.set_page_config(
-    page_title="图文创作 - Pixelle-Video",
+    page_title="图文创作 - AI Video Generator",
     page_icon="📝",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -114,7 +114,7 @@ def _apply_model_config(prefix: str, cfg: dict | None):
 
 
 def _apply_history_params_to_form(params: dict):
-    tones = ["种草", "干货", "日记", "搞笑", "情感"]
+    tones = ["种草", "干货", "日常", "搞笑", "情感"]
     template_sizes = ["1080x1080", "1080x1920", "1920x1080"]
     aspect_ratio_options = ["（不指定）", "1:1", "3:4", "4:3", "9:16", "16:9", "2:3", "3:2", "4:5", "5:4", "1:4", "4:1", "1:8", "8:1", "21:9"]
     image_size_options = ["（不指定）", "1K", "2K", "4K", "512px"]
@@ -152,7 +152,7 @@ def render_generate_form() -> dict | None:
 
         topic = st.text_area(
             "创作主题",
-            placeholder="例如：去云南旅行的三天两夜，探索古镇、品尝当地美食…",
+            placeholder="例：去云南旅行的三天两夜，探索古镇、品尝当地美食。",
             height=80,
             key="post_form_topic",
         )
@@ -163,7 +163,7 @@ def render_generate_form() -> dict | None:
         with col2:
             post_tone = st.selectbox(
                 "文风",
-                options=["种草", "干货", "日记", "搞笑", "情感"],
+                options=["种草", "干货", "日常", "搞笑", "情感"],
                 key="post_form_post_tone",
             )
         with col3:
@@ -198,7 +198,7 @@ def render_generate_form() -> dict | None:
                 help="仅 Gemini 3 系列支持，其他模型忽略此参数",
             )
 
-        submitted = st.form_submit_button("🚀 开始生成", use_container_width=True, type="primary")
+        submitted = st.form_submit_button("🚀 开始生成", width="stretch", type="primary")
 
     if submitted:
         if not topic.strip():
@@ -257,7 +257,7 @@ def render_result(result):
                 cols = st.columns(min(3, len(img_files)))
                 for i, img_path in enumerate(img_files):
                     with cols[i % len(cols)]:
-                        st.image(str(img_path), caption=f"图 {i+1}", use_container_width=True)
+                        st.image(str(img_path), caption=f"图 {i+1}", width="stretch")
             else:
                 st.info("图片生成中或未找到图片文件")
         else:
@@ -270,13 +270,90 @@ def render_result(result):
             with open(preview_path, encoding="utf-8") as f:
                 st.components.v1.html(f.read(), height=600, scrolling=True)
 
+    # Auto-push to device gallery
+    st.markdown("---")
+    st.markdown("### 📲 推送到手机相册")
+
+    images_dir = output_dir / "images"
+    img_files_to_push = []
+    if images_dir.exists():
+        img_files_to_push = sorted(images_dir.glob("*.png")) + sorted(images_dir.glob("*.jpg"))
+
+    from pixelle_video.services.device_manager import push_images_to_gallery
+    from pixelle_video.services.device_manager import device_manager as dm
+
+    if not source_topic or not img_files_to_push:
+        st.info("无主题或无生成图片，跳过自动推送。")
+    else:
+        # Suggest devices by topic
+        suggested = dm.suggest_devices_by_topic(source_topic, connected_only=True, threshold=0.0)
+        
+        if not suggested:
+            st.info("💡 未找到相关主题的已连接设备，可在 📱 发布管理 里为设备添加主题标签。")
+        else:
+            col_device, col_auto = st.columns([3, 1])
+            
+            with col_device:
+                # Show suggested devices with scores
+                suggestions_text = "\n".join(
+                    [f"**{dev.name or dev.serial}** (相似度 {score:.0%}) - {reason}"
+                     for dev, score, reason in suggested[:3]]
+                )
+                st.markdown(f"**推荐设备：**\n{suggestions_text}")
+            
+            with col_auto:
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("📤 推送到最优设备", key="auto_push_best", type="primary"):
+                    best_device = suggested[0][0]  # Highest score
+                    with st.spinner(f"正在推送 {len(img_files_to_push)} 张图片到 {best_device.name or best_device.serial}..."):
+                        try:
+                            result = push_images_to_gallery(
+                                serial=best_device.serial,
+                                local_paths=[str(p) for p in img_files_to_push],
+                            )
+                            if result["success"] > 0:
+                                st.success(
+                                    f"成功推送 {result['success']} 张图片到 {best_device.name or best_device.serial} 相册"
+                                )
+                            if result["failed"]:
+                                st.error(f"{len(result['failed'])} 张推送失败")
+                        except Exception as e:
+                            st.error(f"推送失败：{e}")
+            
+            # Manual device selection
+            with st.expander("🔧 手动选择设备推送"):
+                all_devices = [d for d in dm.get_all() if d.connected]
+                if all_devices:
+                    device_options = {f"{d.name or d.serial} ({d.serial})": d.serial for d in all_devices}
+                    selected_label = st.selectbox(
+                        "选择设备",
+                        options=list(device_options.keys()),
+                        key="manual_push_device",
+                    )
+                    if st.button("💾 推送到此设备", key="manual_push_btn"):
+                        selected_serial = device_options[selected_label]
+                        with st.spinner(f"正在推送 {len(img_files_to_push)} 张图片..."):
+                            try:
+                                result = push_images_to_gallery(
+                                    serial=selected_serial,
+                                    local_paths=[str(p) for p in img_files_to_push],
+                                )
+                                if result["success"] > 0:
+                                    st.success(f"成功推送 {result['success']} 张图片")
+                                if result["failed"]:
+                                    st.error(f"{len(result['failed'])} 张推送失败")
+                            except Exception as e:
+                                st.error(f"推送失败：{e}")
+                else:
+                    st.warning("暂无已连接设备，请先在 📱 发布管理 中连接手机。")
+
     # Publish button shortcut
     st.markdown("---")
     col_tip, col_btn = st.columns([3, 1])
     with col_tip:
         st.markdown("**发布到小红书？** 点击右侧按钮前往发布管理创建发布任务")
     with col_btn:
-        if st.button("📱 前往发布管理", use_container_width=True):
+        if st.button("📱 前往发布管理", width="stretch"):
             st.switch_page("pages/4_📱_Publish.py")
 
     # Store result in session for publish page
@@ -303,7 +380,13 @@ def main():
 
     _init_post_form_defaults()
 
-    # ── Per-post independent model overrides (optional) ──────────────────────
+    # Apply pending history params before model widgets are instantiated.
+    pending_history = st.session_state.pop("_pending_history_params", None)
+    if pending_history:
+        _apply_history_params_to_form(pending_history)
+        st.success("已应用历史参数到表单")
+
+    # �?�? Per-post independent model overrides (optional) �?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?
     content_llm = None
     image_llm = None
     with st.expander("⚙️ 文案 / 图片模型配置（可选，不填则使用系统全局配置）", expanded=False):
@@ -321,11 +404,10 @@ def main():
             labels = [item["label"] for item in history_items]
             selected_label = st.selectbox("选择历史参数", options=labels, key="post_history_select")
             chosen = next((item for item in history_items if item["label"] == selected_label), None)
-            if chosen and st.button("应用到表单", use_container_width=True):
-                _apply_history_params_to_form(chosen["params"])
-                st.success(f"已加载历史参数：{chosen['task_id']}")
+            if chosen and st.button("应用到表单", width="stretch"):
+                st.session_state["_pending_history_params"] = chosen["params"]
                 st.rerun()
-    # ─────────────────────────────────────────────────────────────────────────
+    # �?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?
 
     # Generation form
     params = render_generate_form()
@@ -359,7 +441,7 @@ def main():
             st.error("图文流水线未初始化，请检查配置")
             return
 
-        with st.spinner(f"正在为「{pipeline_params['topic']}」生成图文帖子…"):
+        with st.spinner(f"正在为「{pipeline_params['topic']}」生成图文帖子..."):
             try:
                 st.session_state["last_post_params"] = pipeline_params
                 result = run_async(pipeline(**pipeline_params))
@@ -381,3 +463,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+

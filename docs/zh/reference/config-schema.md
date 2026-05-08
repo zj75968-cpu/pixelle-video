@@ -24,7 +24,7 @@ comfyui:
     prompt_prefix: "Minimalist illustration style"
   
   video:
-    default_workflow: "runninghub/video_wan2.1_fusionx.json"
+    default_workflow: "selfhost/video_animatediff_sd15.json"
     prompt_prefix: "Minimalist illustration style"
   
   tts:
@@ -67,8 +67,7 @@ template:
 ### 视频配置
 
 - `default_workflow`: 默认视频生成工作流
-  - `runninghub/video_wan2.1_fusionx.json`: 云端工作流（推荐，无需本地环境）
-  - `selfhost/video_wan2.1_fusionx.json`: 本地工作流（需要本地 ComfyUI 支持）
+  - `selfhost/video_animatediff_sd15.json`: 本地工作流（需要本地 ComfyUI、AnimateDiff 与 VideoHelperSuite 支持）
 - `prompt_prefix`: 视频提示词前缀（用于控制视频生成风格）
 
 ### TTS 配置

@@ -113,15 +113,39 @@ class LLMImageService:
             "Content-Type": "application/json",
         }
 
+        # Try images/generations first (works for OpenAI, Gemini proxies like cdn.12ai.org, etc.)
+        # Fall back to chat/completions if images endpoint returns an error.
         async with httpx.AsyncClient(proxy=None, follow_redirects=True, timeout=120) as http:
             resp = await http.post(url, json=body, headers=headers)
+            data = self._parse_response(resp)
 
+            # If images/generations returned an error, try chat/completions as fallback
+            if isinstance(data, dict) and "error" in data:
+                logger.debug(f"[LLMImageService] images/generations returned error, trying chat/completions fallback")
+                chat_url = self._chat_url(api_base)
+                chat_body = {"model": model, "messages": [{"role": "user", "content": prompt}]}
+                resp2 = await http.post(chat_url, json=chat_body, headers=headers)
+                data2 = self._parse_response(resp2)
+                # Only switch to chat response if it doesn't also have an error
+                if not (isinstance(data2, dict) and "error" in data2):
+                    data = data2
+
+        logger.debug(f"[LLMImageService] response JSON keys: {list(data.keys()) if isinstance(data, dict) else type(data).__name__}")
+
+        return self._extract_image(data, model)
+
+    def _chat_url(self, api_base: str) -> str:
+        """Return the chat/completions URL for a given api_base."""
+        if api_base.endswith("/v1"):
+            return f"{api_base}/chat/completions"
+        return f"{api_base}/v1/chat/completions"
+
+    def _parse_response(self, resp: "httpx.Response") -> object:
+        """Parse an httpx response into a Python object (dict/str)."""
         logger.debug(f"[LLMImageService] raw response status={resp.status_code} url={resp.url}")
-
         try:
-            data = resp.json()
+            return resp.json()
         except Exception:
-            # Non-JSON body — treat as raw text URL / data-URI
             text = resp.text.strip().strip('"')
             if text.startswith("http") or text.startswith("data:"):
                 return text
@@ -130,14 +154,22 @@ class LLMImageService:
                 f"{resp.text[:300]!r}"
             )
 
-        logger.debug(f"[LLMImageService] response JSON keys: {list(data.keys()) if isinstance(data, dict) else type(data).__name__}")
-
-        return self._extract_image(data, model)
-
     def _extract_image(self, data: object, model: str) -> str:
         """
         Walk any response shape and return the first image URL or base64 data-URI.
         """
+        # Surface API-level errors immediately with a readable message
+        if isinstance(data, dict) and "error" in data:
+            err = data["error"]
+            if isinstance(err, dict):
+                msg = err.get("message") or err.get("msg") or str(err)
+                code = err.get("code") or err.get("type") or ""
+                raise ValueError(
+                    f"[LLMImageService] API error for model={model}: {msg}"
+                    + (f" (code: {code})" if code else "")
+                )
+            raise ValueError(f"[LLMImageService] API error for model={model}: {err}")
+
         # Plain JSON string (some providers return just the URL)
         if isinstance(data, str):
             if data.startswith("http") or data.startswith("data:"):
@@ -177,23 +209,63 @@ class LLMImageService:
         if isinstance(choices, list) and choices:
             msg = choices[0].get("message", {})
             content = msg.get("content", "")
-            # content may be a URL or base64 data-URI
+            logger.debug(f"[LLMImageService] choices[0].message.content type={type(content).__name__} preview={str(content)[:200]}")
+            # content may be a URL or base64 data-URI string
             if isinstance(content, str) and (content.startswith("http") or content.startswith("data:")):
-                logger.debug(f"[LLMImageService] extracted image from choices[0].message.content")
+                logger.debug(f"[LLMImageService] extracted image from choices[0].message.content (string)")
                 return content
             # content may be a list of parts (Gemini native format)
             if isinstance(content, list):
                 for part in content:
-                    if isinstance(part, dict) and part.get("type") == "image_url":
+                    if not isinstance(part, dict):
+                        continue
+                    ptype = part.get("type", "")
+                    logger.debug(f"[LLMImageService] content part type={ptype!r} keys={list(part.keys())}")
+                    # type: "image_url"
+                    if ptype == "image_url":
                         url = (part.get("image_url") or {}).get("url", "")
                         if url:
                             return url
-                    if isinstance(part, dict) and part.get("inline_data"):
+                    # type: "image"
+                    if ptype == "image":
+                        img = part.get("image") or {}
+                        if isinstance(img, dict):
+                            if img.get("url"):
+                                return img["url"]
+                            if img.get("data"):
+                                mime = img.get("mime_type", "image/png")
+                                return f"data:{mime};base64,{img['data']}"
+                        if isinstance(img, str) and (img.startswith("http") or img.startswith("data:")):
+                            return img
+                    # inline_data (Gemini native)
+                    if part.get("inline_data"):
                         inline = part["inline_data"]
                         b64 = inline.get("data", "")
                         mime = inline.get("mime_type", "image/png")
                         if b64:
+                            logger.debug(f"[LLMImageService] extracted image from content part inline_data")
                             return f"data:{mime};base64,{b64}"
+                    # scan all string values in part that look like URLs or data URIs
+                    for key, val in part.items():
+                        if isinstance(val, str) and (val.startswith("http") or val.startswith("data:")):
+                            logger.debug(f"[LLMImageService] extracted image from content part key={key}")
+                            return val
+                        if isinstance(val, dict):
+                            inner = val.get("url", "")
+                            if inner and (inner.startswith("http") or inner.startswith("data:")):
+                                return inner
+            # If we reach here, build a useful error showing actual content
+            import json as _json
+            content_preview = (
+                _json.dumps(content, ensure_ascii=False)[:400]
+                if not isinstance(content, str)
+                else content[:400]
+            )
+            raise ValueError(
+                f"[LLMImageService] model={model} returned a chat response but no image was found. "
+                f"The model may not support image generation, or the model name is incorrect. "
+                f"content type={type(content).__name__}, preview: {content_preview}"
+            )
 
         raise ValueError(
             f"[LLMImageService] cannot extract image from response for model={model}. "

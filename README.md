@@ -51,7 +51,7 @@ https://github.com/user-attachments/assets/a42e7457-fcc8-40da-83fc-784c45a8b95d
 - ✅ **全自动生成** - 输入主题，自动生成完整视频
 - ✅ **AI 智能文案** - 根据主题智能创作解说词，无需自己写脚本
 - ✅ **AI 生成配图** - 每句话都配上精美的 AI 插图
-- ✅ **AI 生成视频** - 支持使用 AI 视频生成模型（如 WAN 2.1）创建动态视频内容
+- ✅ **AI 生成视频** - 支持通过本地视频工作流创建动态视频内容
 - ✅ **AI 生成语音** - 支持 Edge-TTS、Index-TTS 等众多主流 TTS 方案
 - ✅ **背景音乐** - 支持添加 BGM，让视频更有氛围
 - ✅ **视觉风格** - 多种模板可选，打造独特视频风格
@@ -178,6 +178,147 @@ Pixelle-Video 采用模块化设计，整个视频生成流程清晰简洁：
 
 
 ## 🚀 快速开始
+
+### ✅ 本机快速跑通（当前工作区）
+
+本仓库已在本机路径 `D:\vscocde file\github-video-项目\Pixelle-Video` 下准备好源码环境，适合直接从源码启动和调试。
+
+#### 1. 环境检查
+
+```powershell
+cd "D:\vscocde file\github-video-项目\Pixelle-Video"
+uv --version
+.\ffmpeg-temp\ffmpeg-8.1-essentials_build\bin\ffmpeg.exe -version
+```
+
+项目自带 FFmpeg 位于 `ffmpeg-temp\ffmpeg-8.1-essentials_build\bin`。如果系统 PATH 中没有 `ffmpeg`，源码运行仍会优先尝试加载这个本地目录。
+
+#### 2. 启动 Pixelle-Video Web
+
+```powershell
+cd "D:\vscocde file\github-video-项目\Pixelle-Video"
+$env:NO_PROXY = "127.0.0.1,localhost"
+$env:no_proxy = $env:NO_PROXY
+uv run streamlit run web/app.py --server.port 8501
+```
+
+打开浏览器访问：
+
+```text
+http://localhost:8501
+```
+
+#### 3. 配置 LLM
+
+在「⚙️ 系统配置（必需）」中填写：
+
+- 快速选择：`DeepSeek` 或 `Custom`
+- API Key：填入你的 DeepSeek API Key
+- Base URL：`https://api.deepseek.com`
+- Model：`deepseek-chat`
+
+点击「🔌 测试」确认 LLM 可用，再点击「💾 保存配置」。
+
+DeepSeek API Key 获取入口：登录 DeepSeek 开放平台，进入 API Keys 页面创建密钥。参考：[DeepSeek API Docs](https://api-docs.deepseek.com/api/deepseek-api/)。
+
+#### 4. 启动并测试 ComfyUI
+
+本机 ComfyUI 服务地址使用：
+
+```text
+http://127.0.0.1:8188
+```
+
+优先启动桌面脚本：
+
+```powershell
+& "C:\Users\Administrator\Desktop\启动 ComfyUI（FLUX）.bat"
+```
+
+如果桌面脚本依赖路径缺失，可用本机安装器修复：
+
+```powershell
+& "C:\Users\Administrator\AppData\Local\@comfyorgcomfyui-electron-updater\installer.exe" /S
+```
+
+服务启动后验证：
+
+```powershell
+Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8188/system_stats
+```
+
+Web 页面中点击「ComfyUI 配置」里的「测试连接」，看到连接成功即可。ComfyUI 本地 API Key 通常留空；只有使用 Comfy Cloud/平台鉴权节点时才需要。Comfy Cloud API Key 可在登录后从 Comfy 平台创建，参考：[Comfy Cloud API Overview](https://docs.comfy.org/development/cloud/overview)。
+
+> 当前本机注意事项：如果 `D:\ComfyUI-Data\models` 或具体模型权重不存在，`selfhost` 生图/生视频工作流可能失败。此时先选择「📄 静态样式」模板跑通主视频流程；修复模型后再切回「🖼️ 生成插图」或「🎬 生成视频」。
+>
+> 如果命令行访问 `system_stats` 正常，但 Web UI 测试 ComfyUI 失败或出现 502，通常是本机代理拦截了 `127.0.0.1`。按第 2 步设置 `NO_PROXY=127.0.0.1,localhost` 后重启 Streamlit。
+>
+> Windows 下如果生成静态模板时报 `HTML rendering failed:`，检查 `web/utils/async_helpers.py` 是否使用 Proactor event loop；Playwright Chromium 渲染 HTML 截图需要支持 subprocess 的事件循环。修改后需重启 Streamlit。
+
+#### 5. 生成一条最小测试视频
+
+1. 在首页打开「⚡ 快速创作」。
+2. 选择「💡 AI 创作」，输入一个短主题，例如：`三个提升专注力的小方法`。
+3. 将分镜数调到 `3`。
+4. 配音合成保持「本地合成」。
+5. 如果 ComfyUI 模型未确认完整，分镜类型选择「📄 静态样式」。
+6. 点击「🎬 生成视频」。
+7. 生成完成后到「📚 History」查看记录，视频文件会保存到 `output/`。
+
+#### 6. 批量生成动态短视频
+
+如果需要一次生成多条可交付的动态 MP4，可使用本仓库的本机批量生成脚本：
+
+```powershell
+cd "D:\vscocde file\github-video-项目\Pixelle-Video"
+uv run python scripts\generate_dynamic_samples.py --count 10
+```
+
+脚本会输出竖屏动态短视频到 `output/dynamic_<时间戳>_*/final.mp4`，并同步生成预览拼图、批量清单和 History 索引。当前本机已生成一批样片：
+
+```text
+output/dynamic_20260507_012313_*/final.mp4
+```
+
+更详细的交付级操作文档见：[动态视频生成操作手册.md](动态视频生成操作手册.md)。这份文档包含启动、配置、ComfyUI 插件、模型文件、生成视频、查看历史和常见错误处理。
+
+#### 7. 批量生成复杂场景动画
+
+如果需要的不是“图形动效模板”，而是有角色、场景、道具、镜头运动和分段动作的复杂 2D 动画，使用：
+
+```powershell
+cd "D:\vscocde file\github-video-项目\Pixelle-Video"
+uv run python scripts\generate_complex_animation_samples.py --count 10
+```
+
+脚本会输出竖屏复杂动画 MP4 到 `output/complex_<时间戳>_*/final.mp4`，并同步生成预览拼图、批量清单和 History 索引。当前本机已生成一批复杂动画样片：
+
+```text
+output/complex_20260507_091150_*/final.mp4
+```
+
+#### 8. 生成 20 秒 ComfyUI 合成版复杂动画
+
+如果需要 20 秒长视频，并且要求最终视频封装走 ComfyUI，可使用：
+
+```powershell
+cd "D:\vscocde file\github-video-项目\Pixelle-Video"
+$env:NO_PROXY = "127.0.0.1,localhost"
+$env:no_proxy = $env:NO_PROXY
+uv run python scripts\generate_comfy_complex_20s.py --duration 20
+```
+
+这个脚本会先生成 20 秒、15fps 的复杂逐帧动画序列，再通过 ComfyUI 的 `VHS_LoadImagesPath`、`VHS_LoadAudio`、`VHS_VideoCombine` 合成 MP4。当前本机已生成：
+
+```text
+output/comfy_complex_20260507_110924_01_journey_20s/final.mp4
+```
+
+> 注意：当前本机仍未安装 AnimateDiff/FLUX 等大模型权重，所以这里使用的是 ComfyUI VideoHelperSuite 做帧序列与音频合成；如需 ComfyUI 直接 AI 生视频，需要先补齐对应模型文件。
+
+#### 9. RunningHub 云端可选方案
+
+如果不想维护本地 ComfyUI，可在「RunningHub 云端」填写 RunningHub API Key，并使用 `runninghub/...` 工作流。RunningHub API Key 可在官网登录后从右上角资料菜单查看，参考：[RunningHub API Instructions](https://www.runninghub.ai/runninghub-api-doc-en/doc-8287463)。
 
 ### 🪟 Windows 一键整合包（推荐 Windows 用户使用）
 

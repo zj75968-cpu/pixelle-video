@@ -32,9 +32,11 @@ Usage:
 
 import asyncio
 import os
+import re
 import shutil
 import tempfile
 import time
+import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import List, Optional
 
@@ -55,9 +57,30 @@ class XHSPublisher:
     Each instance is tied to one device serial.
     """
 
-    def __init__(self, serial: str, push_dir: str = "/sdcard/DCIM/PixelleVideo"):
+    def __init__(self, serial: str, push_dir: str | None = None, strict_mode: bool | None = None):
         self.serial = serial
-        self.push_dir = push_dir
+
+        # Load publish config from config_manager; constructor params take precedence
+        try:
+            from pixelle_video.config import config_manager
+            xhs_cfg = config_manager.config.xhs_publish
+        except Exception:
+            xhs_cfg = None
+
+        if push_dir is not None:
+            self.push_dir = push_dir
+        else:
+            self.push_dir = xhs_cfg.push_dir if xhs_cfg else "/sdcard/DCIM/PixelleVideo"
+
+        if strict_mode is not None:
+            self.strict_mode = strict_mode
+        else:
+            self.strict_mode = xhs_cfg.strict_mode if xhs_cfg is not None else True
+
+        logger.info(
+            f"XHSPublisher initialized: serial={serial}, "
+            f"strict_mode={self.strict_mode}, push_dir={self.push_dir}"
+        )
         self._device = None  # lazy-init
 
     # -------------------------------------------------------------------------
@@ -150,6 +173,18 @@ class XHSPublisher:
             time.sleep(0.5)
         return False
 
+    def _click_text_contains(self, d, *texts: str, timeout: float = 10.0) -> bool:
+        """Try clicking an element by textContains (tries each text in order)."""
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            for text in texts:
+                el = d(textContains=text)
+                if el.exists(timeout=0.5):
+                    el.click()
+                    return True
+            time.sleep(0.5)
+        return False
+
     def _click_resource(self, d, resource_id: str, timeout: float = 10.0) -> bool:
         """Try clicking an element by resource-id."""
         deadline = time.time() + timeout
@@ -197,6 +232,107 @@ class XHSPublisher:
                     el.click()
                     time.sleep(0.5)
 
+    def _dismiss_blocking_dialogs(self, d):
+        """Dismiss known blocking dialogs before entering publish flow."""
+        # Draft resume dialog: "继续编辑图文笔记吗？"
+        if d(textContains="继续编辑图文笔记").exists(timeout=0.8):
+            logger.info("Found draft resume dialog; dismissing it to start fresh publish flow")
+            dismissed = (
+                self._click_text(d, "存草稿", timeout=2)
+                or self._click_desc(d, "关闭", timeout=2)
+                or self._click_text(d, "取消", timeout=2)
+            )
+            if not dismissed:
+                # Last safe action: prefer staying on feed by backing out instead of entering editor
+                try:
+                    d.press("back")
+                except Exception:
+                    pass
+            time.sleep(1)
+    def _is_publish_chooser_screen(self, d) -> bool:
+        """Best-effort check that we are on XHS creation chooser/camera page."""
+        markers = ["图文", "视频", "直播", "拍摄", "相册", "模板", "下一步", "从相册选择", "写文字"]
+        for txt in markers:
+            if d(text=txt).exists(timeout=0.5) or d(textContains=txt).exists(timeout=0.5):
+                return True
+        try:
+            xml = d.dump_hierarchy()
+            return any(m in xml for m in markers)
+        except Exception:
+            return False
+
+    def _parse_bounds(self, bounds: str) -> Optional[tuple[int, int, int, int]]:
+        """Parse Android bounds string like [0,394][354,748]."""
+        m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", bounds or "")
+        if not m:
+            return None
+        return tuple(int(x) for x in m.groups())
+
+    def _is_album_grid_screen(self, d) -> bool:
+        """Detect album picker screen for newer obfuscated XHS builds."""
+        if d(text="草稿箱").exists(timeout=0.5) or d(text="全部").exists(timeout=0.5):
+            return True
+        try:
+            xml = d.dump_hierarchy()
+            if "草稿箱" in xml and "照片" in xml:
+                return True
+            root = ET.fromstring(xml)
+            large_clickable_images = 0
+            for n in root.iter("node"):
+                if n.attrib.get("class") != "android.widget.ImageView":
+                    continue
+                if n.attrib.get("clickable") != "true":
+                    continue
+                b = self._parse_bounds(n.attrib.get("bounds", ""))
+                if not b:
+                    continue
+                l, t, r, bt = b
+                w = r - l
+                h = bt - t
+                if w >= 250 and h >= 250 and t >= 350:
+                    large_clickable_images += 1
+            return large_clickable_images >= 6
+        except Exception:
+            return False
+
+    def _select_images_from_obfuscated_grid(self, d, count: int) -> int:
+        """Select images in newer obfuscated album grids by parsing hierarchy nodes."""
+        try:
+            xml = d.dump_hierarchy()
+            root = ET.fromstring(xml)
+        except Exception as e:
+            logger.warning(f"Failed to parse hierarchy for obfuscated grid: {e}")
+            return 0
+
+        candidates: list[tuple[int, int, int, int]] = []
+        for n in root.iter("node"):
+            if n.attrib.get("class") != "android.widget.ImageView":
+                continue
+            if n.attrib.get("clickable") != "true":
+                continue
+            b = self._parse_bounds(n.attrib.get("bounds", ""))
+            if not b:
+                continue
+            l, t, r, bt = b
+            w = r - l
+            h = bt - t
+            # Filter to gallery cells (large tiles in content area)
+            if w >= 250 and h >= 250 and t >= 350 and bt <= 2305:
+                candidates.append((l, t, r, bt))
+
+        # Stable selection order: top-to-bottom, left-to-right
+        candidates.sort(key=lambda it: (it[1], it[0]))
+        selected = 0
+        for l, t, r, bt in candidates[:count]:
+            cx = (l + r) // 2
+            cy = (t + bt) // 2
+            d.click(cx, cy)
+            selected += 1
+            time.sleep(0.3)
+
+        logger.info(f"Selected {selected} images via obfuscated-grid strategy")
+        return selected
+
     def _adb_wakeup(self) -> None:
         """Wake up the device screen via ADB keyevent WAKEUP (224)."""
         import subprocess
@@ -242,21 +378,37 @@ class XHSPublisher:
 
         # Grant any immediate permissions
         self._grant_permissions(d)
+        self._dismiss_blocking_dialogs(d)
 
-        # Click the "+" publish button — try multiple strategies in order:
-        # 1. Known resource IDs (older / non-obfuscated builds)
-        # 2. Text / description matching
-        # 3. Coordinate fallback: center tab (index 2 of 5) in bottom nav
+        # Strict mode: do not use coordinate fallback.
+        # If key selectors are missing, fail fast to avoid mis-clicking arbitrary UI.
         published = (
             self._click_resource(d, f"{XHS_PACKAGE}:id/tab_add", timeout=6)
             or self._click_resource(d, f"{XHS_PACKAGE}:id/create", timeout=3)
-            or self._click_text(d, "+", "发布", "发笔记", "创作", timeout=6)
             or self._click_desc(d, "发布", "加号", "创作", timeout=6)
-            or self._click_tab_center_bottom(d, tab_index=2, total_tabs=5)
+            or self._click_text(d, "+", "发笔记", "创作", timeout=6)
         )
         if not published:
-            raise XHSPublishError("Could not find the publish (+) button")
+            self._screenshot(d, "open_publish_fail")
+            if self.strict_mode:
+                raise XHSPublishError(
+                    "Could not find the publish (+) button with known selectors; "
+                    "strict mode aborted to avoid random taps"
+                )
+            logger.warning(
+                "Could not find publish (+) button; compatible mode: tapping bottom-center tab"
+            )
+            w, h = self._screen_size(d)
+            d.click(w // 2, int(h * 0.972))
         time.sleep(2)
+        if not self._is_publish_chooser_screen(d):
+            self._screenshot(d, "open_publish_wrong_screen")
+            if self.strict_mode:
+                raise XHSPublishError(
+                    "Tapped publish entry but did not enter creation screen; "
+                    "strict mode aborted"
+                )
+            logger.warning("Did not enter creation screen; compatible mode: continuing anyway")
 
     def _select_image_text_mode(self, d):
         """Select image-text post type (图文).
@@ -266,33 +418,59 @@ class XHSPublisher:
         typically the 2nd item from the left.  Fall back to coordinates if the
         text-based approach fails (happens on obfuscated/updated builds).
         """
-        clicked = self._click_text(d, "图文", timeout=6)
+        # Newer XHS versions show a creation bottom sheet first, with options like:
+        # "从相册选择" / "相机" / "写文字".
+        # Prefer entering via album option when present.
+        clicked = (
+            self._click_text(d, "从相册选择", timeout=4)
+            or self._click_text_contains(d, "相册选择", timeout=4)
+            or self._click_resource(d, f"{XHS_PACKAGE}:id/image_text_tab", timeout=4)
+            or self._click_text(d, "图文", timeout=6)
+            or self._click_text_contains(d, "图文", timeout=6)
+        )
         if not clicked:
-            # Coordinate fallback: '图文' tab is usually ~25% from left, ~92% down
+            self._screenshot(d, "image_text_mode_fail")
+            if self.strict_mode:
+                raise XHSPublishError(
+                    "Could not find 图文 mode tab; strict mode aborted to avoid random taps"
+                )
+            logger.warning(
+                "Could not find 图文 mode tab; compatible mode: tapping left side of screen"
+            )
             w, h = self._screen_size(d)
-            x = int(w * 0.25)
-            y = int(h * 0.92)
-            logger.debug(f"Tapping '图文' by coordinates ({x}, {y})")
-            d.click(x, y)
+            # 图文 tab is typically the leftmost option in the bottom sheet
+            d.click(w // 10, int(h * 0.15))
         time.sleep(1)
 
     def _select_images_from_album(self, d, count: int):
-        """Open album and select the first `count` images (LIFO order in gallery)."""
-        # Open album — try text/resource first, then coordinate fallback
-        opened = (
-            self._click_text(d, "相册", timeout=6)
-            or self._click_resource(d, f"{XHS_PACKAGE}:id/album_btn", timeout=4)
-        )
-        if not opened:
-            # Coordinate fallback: '相册' button is typically bottom-left area
-            w, h = self._screen_size(d)
-            d.click(int(w * 0.12), int(h * 0.88))
-        time.sleep(2)
+        """Open album and select the first `count` images."""
+        # If we're already in the image picker, skip album entry clicks.
+        items = d(resourceId=f"{XHS_PACKAGE}:id/photo_item")
+        already_in_album = items.exists(timeout=1.0) or self._is_album_grid_screen(d)
+        if not already_in_album:
+            # Strict mode: no coordinate fallback for album entry.
+            opened = (
+                self._click_text(d, "相册", timeout=6)
+                or self._click_text_contains(d, "相册", timeout=6)
+                or self._click_resource(d, f"{XHS_PACKAGE}:id/album_btn", timeout=4)
+            )
+            if not opened:
+                self._screenshot(d, "open_album_fail")
+                if self.strict_mode:
+                    raise XHSPublishError(
+                        "Could not open album with known selectors; strict mode aborted"
+                    )
+                logger.warning(
+                    "Could not open album with selectors; compatible mode: tapping album area"
+                )
+                w, h = self._screen_size(d)
+                d.click(w // 10, int(h * 0.22))
+            time.sleep(2)
 
         self._grant_permissions(d)
         time.sleep(1)
 
-        # Select images — the latest images appear at top of gallery
+        # Strategy A: classic resource-id
         items = d(resourceId=f"{XHS_PACKAGE}:id/photo_item")
         selected = 0
         for i in range(min(count, items.count)):
@@ -300,45 +478,71 @@ class XHSPublisher:
             selected += 1
             time.sleep(0.3)
 
+        # Strategy B: obfuscated newer builds
+        if selected == 0 and self._is_album_grid_screen(d):
+            selected = self._select_images_from_obfuscated_grid(d, count)
+
         if selected == 0:
-            # Fallback: just tap positions in a typical grid layout
-            logger.warning("Could not find photo_item; trying coordinate tap")
-            screen = d.window_size()
-            if isinstance(screen, dict):
-                width = int(screen.get("width", 1080))
-                height = int(screen.get("height", 1920))
-            else:
-                width, height = screen
-                width = int(width)
-                height = int(height)
-
-            x_positions = [int(width * 0.2), int(width * 0.5), int(width * 0.8)]
-            start_y = int(height * 0.32)
-            row_step = max(int(height * 0.22), 220)
-
+            self._screenshot(d, "select_photo_item_fail")
+            if self.strict_mode:
+                raise XHSPublishError(
+                    "Could not select images from album grid; strict mode aborted"
+                )
+            logger.warning(
+                "Could not select images from album grid; compatible mode: tapping top-left grid cells"
+            )
+            w, h = self._screen_size(d)
+            # Grid is 3 columns; tap the first `count` cells from top-left
+            cell_w = w // 3
+            cell_h = cell_w  # square cells
+            top_offset = int(h * 0.15)
             for i in range(count):
                 col = i % 3
                 row = i // 3
-                x = x_positions[col]
-                y = min(start_y + row * row_step, int(height * 0.88))
-                d.click(x, y)
-                selected += 1
-                time.sleep(0.35)
+                cx = cell_w * col + cell_w // 2
+                cy = top_offset + cell_h * row + cell_h // 2
+                d.click(cx, cy)
+                time.sleep(0.3)
+            selected = count
 
-        # Confirm selection — text → resource → coordinate fallback
-        w_c, h_c = self._screen_size(d)
+        # Confirm selection — text/resource only in strict mode
         confirmed = (
             self._click_text(d, "下一步", "完成", "确定", timeout=8)
+            or self._click_text_contains(d, "下一步", "完成", "确定", timeout=8)
             or self._click_resource(d, f"{XHS_PACKAGE}:id/next_btn", timeout=5)
         )
         if not confirmed:
-            # Coordinate fallback: "下一步" button is at top-right of album screen
-            logger.debug("Confirming image selection via coordinate tap top-right")
-            d.click(int(w_c * 0.88), int(h_c * 0.055))
+            self._screenshot(d, "confirm_selection_fail")
+            if self.strict_mode:
+                raise XHSPublishError(
+                    "Could not confirm image selection (next_btn/下一步 missing); strict mode aborted"
+                )
+            logger.warning(
+                "Could not confirm selection with selectors; compatible mode: tapping top-right corner"
+            )
+            w, h = self._screen_size(d)
+            d.click(int(w * 0.92), int(h * 0.14))
         time.sleep(2)
+
+    def _ensure_post_edit_screen(self, d):
+        """Ensure we're on the text-edit/publish screen, not media-edit screen."""
+        # If edit inputs already exist, we're good.
+        if d(resourceId=f"{XHS_PACKAGE}:id/title_input").exists(timeout=1) or d(resourceId=f"{XHS_PACKAGE}:id/desc_input").exists(timeout=1):
+            return
+
+        # Some XHS versions have a media editor with a bottom-right "下一步" first.
+        moved = (
+            self._click_text(d, "下一步", timeout=4)
+            or self._click_text_contains(d, "下一步", timeout=4)
+            or self._click_text(d, "继续", "去发布", timeout=3)
+        )
+        if moved:
+            time.sleep(2)
 
     def _fill_title_and_body(self, d, title: str, body: str):
         """Fill in title and body text fields."""
+        self._ensure_post_edit_screen(d)
+
         # Title
         title_el = (
             d(resourceId=f"{XHS_PACKAGE}:id/title_input")
@@ -356,13 +560,15 @@ class XHSPublisher:
         if not body_el.exists(timeout=3):
             # Fallback: get second EditText
             els = d(className="android.widget.EditText")
-            body_el = els[1] if els.count > 1 else els[0]
+            if els.count > 1:
+                body_el = els[1]
+            elif els.count == 1:
+                body_el = els[0]
         if body_el.exists(timeout=3):
             body_el.click()
             body_el.clear_text()
             body_el.set_text(body)
             time.sleep(0.5)
-
     def _add_hashtags(self, d, hashtags: List[str]):
         """Add hashtag topics to the post."""
         for tag in hashtags:
@@ -393,43 +599,101 @@ class XHSPublisher:
                 d.press("enter")
             time.sleep(0.5)
 
+    def _screenshot(self, d, tag: str) -> None:
+        """Save a debug screenshot with a given tag to the system temp dir."""
+        try:
+            import tempfile, datetime
+            ts = datetime.datetime.now().strftime("%H%M%S")
+            path = os.path.join(tempfile.gettempdir(), f"xhs_{tag}_{ts}.png")
+            d.screenshot(path)
+            logger.debug(f"[screenshot] {tag} → {path}")
+        except Exception as e:
+            logger.debug(f"[screenshot] {tag} failed (non-fatal): {e}")
+
     def _publish(self, d):
-        """Click the final publish button."""
+        """Click the final publish button and wait for the page to leave edit state."""
+        self._screenshot(d, "before_publish")
         published = (
             self._click_resource(d, f"{XHS_PACKAGE}:id/publish_btn", timeout=8)
             or self._click_text(d, "发布", "发布笔记", timeout=8)
+            or self._click_text_contains(d, "发布", "发布笔记", timeout=8)
             or self._click_desc(d, "发布", "发布笔记", timeout=5)
         )
         if not published:
-            # Coordinate fallback: "发布" button is typically top-right area
+            self._screenshot(d, "publish_button_fail")
+            if self.strict_mode:
+                raise XHSPublishError(
+                    "Could not find publish button (publish_btn/发布); strict mode aborted"
+                )
+            logger.warning(
+                "Could not find publish button; compatible mode: tapping top-right corner"
+            )
             w, h = self._screen_size(d)
-            logger.warning("Text/resource publish button not found; tapping top-right")
-            d.click(int(w * 0.88), int(h * 0.055))
-        time.sleep(8)
+            d.click(int(w * 0.92), int(h * 0.052))
+        # Wait for success indicator or page change (up to 20s)
+        self._wait_for_text(d, "发布成功", "笔记已发布", "发布中", "上传中", timeout=20)
+        time.sleep(2)
+        self._screenshot(d, "after_publish")
 
-    def _check_success(self, d) -> bool:
-        """Check if publish succeeded by looking for success indicators."""
-        # Text / resource checks
+    def _check_success(self, d, expected_title: Optional[str] = None) -> bool:
+        """Check if publish succeeded by looking for explicit success indicators."""
+        # Most reliable: success toast / confirmation text
         if d(text="发布成功").exists(timeout=5):
+            logger.info("_check_success: found '发布成功' toast")
             return True
         if d(text="笔记已发布").exists(timeout=5):
+            logger.info("_check_success: found '笔记已发布' text")
             return True
-        if d(resourceId=f"{XHS_PACKAGE}:id/tab_home").exists(timeout=5):
-            return True
-        # Broadest fallback: dump UI hierarchy and check for XHS package name
+
+        # Newer XHS builds often return directly to feed without toast.
+        # Use "expected title + 刚刚" as a strong post-publish signal.
+        if expected_title:
+            title_probe = expected_title.strip()[:8]
+            if title_probe and (
+                d(textContains=title_probe).exists(timeout=2)
+                or d(text=title_probe).exists(timeout=2)
+            ):
+                if d(text="刚刚").exists(timeout=2) or d(textContains="刚刚").exists(timeout=2):
+                    logger.info("_check_success: found expected title with '刚刚' in feed")
+                    return True
+
+        # Strict mode: do not treat "back to home" as success by itself.
+        # Home tab visibility is only an indirect signal and can cause false positives.
+
+        # Log current UI state for diagnosis
         try:
             xml = d.dump_hierarchy()
-            if XHS_PACKAGE in xml:
-                logger.info("_check_success: XHS found in UI hierarchy → treating as success")
+            # Look for any success-related text in the full hierarchy
+            for indicator in ["发布成功", "笔记已发布", "发布中", "上传中"]:
+                if indicator in xml:
+                    logger.info(f"_check_success: found '{indicator}' in UI hierarchy")
+                    return indicator in ["发布成功", "笔记已发布"]
+
+            if expected_title:
+                title_probe = expected_title.strip()[:8]
+                if title_probe and title_probe in xml and "刚刚" in xml:
+                    logger.info("_check_success: hierarchy contains expected title + 刚刚")
+                    return True
+
+            # Heuristic fallback for obfuscated builds:
+            # feed re-opened + just-now marker + like text.
+            # Keep this as the last success path to avoid false positives.
+            if (
+                "刚刚" in xml
+                and "赞" in xml
+                and ("首页" in xml or "市集" in xml)
+            ):
+                logger.info("_check_success: heuristic matched (刚刚 + 赞 + feed tabs)")
                 return True
-            else:
-                # Log what app is visible for diagnosis
-                try:
-                    info = d.info
-                    logger.warning(f"_check_success: XHS NOT in hierarchy. d.info={info}")
-                except Exception:
-                    pass
-                logger.warning("_check_success: XHS NOT in UI hierarchy")
+
+            # Check what's currently on screen
+            try:
+                info = d.info
+                logger.warning(f"_check_success: no success indicator found. current activity info: {info}")
+            except Exception:
+                pass
+            # Save a screenshot for manual inspection
+            self._screenshot(d, "check_success_fail")
         except Exception as e:
             logger.warning(f"_check_success: dump_hierarchy failed: {e}")
         return False
@@ -492,22 +756,27 @@ class XHSPublisher:
             # 2. Open XHS and navigate to publish
             logger.info(f"[{self.serial}] Opening XHS publish screen")
             self._open_xhs_publish(d)
+            self._screenshot(d, "01_publish_screen")
 
             # 3. Select image-text mode
             self._select_image_text_mode(d)
+            self._screenshot(d, "02_image_text_mode")
 
             # 4. Select images from gallery
             logger.info(f"[{self.serial}] Selecting {len(images)} images from album")
             self._select_images_from_album(d, len(images))
+            self._screenshot(d, "03_images_selected")
 
             # 5. Fill title and body
             logger.info(f"[{self.serial}] Filling title and body")
             self._fill_title_and_body(d, title, body)
+            self._screenshot(d, "04_content_filled")
 
             # 6. Add hashtags
             if hashtags:
                 logger.info(f"[{self.serial}] Adding {len(hashtags)} hashtags")
                 self._add_hashtags(d, hashtags)
+                self._screenshot(d, "05_hashtags_added")
 
             # 7. Publish
             logger.info(f"[{self.serial}] Submitting post")
@@ -516,7 +785,7 @@ class XHSPublisher:
 
             # 8. Verify success
             self._adb_wakeup()  # ensure screen is on for success check
-            success = self._check_success(d)
+            success = self._check_success(d, expected_title=title)
             if success:
                 logger.info(f"[{self.serial}] ✅ Post published successfully")
             else:

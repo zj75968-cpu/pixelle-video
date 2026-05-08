@@ -1,4 +1,4 @@
-# Copyright (C) 2025 AIDC-AI
+﻿# Copyright (C) 2025 AIDC-AI
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ Manage Android devices and schedule Xiaohongshu posts for publishing.
 
 import sys
 import json
+import hashlib
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -29,10 +30,11 @@ if str(_project_root) not in sys.path:
 
 import streamlit as st
 
-from web.state.session import init_session_state, init_i18n
+from web.state.session import init_session_state, init_i18n, get_pixelle_video
+from web.utils.async_helpers import run_async
 
 st.set_page_config(
-    page_title="发布管理 - Pixelle-Video",
+    page_title="发布管理 - AI Video Generator",
     page_icon="📱",
     layout="wide",
     initial_sidebar_state="collapsed",
@@ -60,6 +62,582 @@ STATUS_BADGE = {
     "cancelled": "⛔ 已取消",
 }
 
+PUBLISH_FORM_KEYS = {
+    "task_id": "publish_form_task_id",
+    "topic": "publish_form_topic",
+    "title": "publish_form_title",
+    "body": "publish_form_body",
+    "hashtags_raw": "publish_form_hashtags_raw",
+    "images_raw": "publish_form_images_raw",
+}
+
+
+def _safe_load_json(file_path: Path) -> dict | None:
+    try:
+        return json.loads(file_path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+
+
+def _init_publish_form_defaults():
+    last = st.session_state.get("last_post_result", {})
+    defaults = {
+        PUBLISH_FORM_KEYS["task_id"]: str(last.get("task_id", "")),
+        PUBLISH_FORM_KEYS["topic"]: str(last.get("topic", "")),
+        PUBLISH_FORM_KEYS["title"]: str(last.get("title", "")),
+        PUBLISH_FORM_KEYS["body"]: str(last.get("body", "")),
+        PUBLISH_FORM_KEYS["hashtags_raw"]: ", ".join(last.get("hashtags", [])),
+        PUBLISH_FORM_KEYS["images_raw"]: "\n".join(last.get("images", [])),
+    }
+    for key, value in defaults.items():
+        st.session_state.setdefault(key, value)
+
+
+def _load_recent_post_history(limit: int = 20) -> list[dict]:
+    output_dir = _project_root / "output"
+    if not output_dir.exists():
+        return []
+
+    items: list[dict] = []
+    task_dirs = sorted([p for p in output_dir.iterdir() if p.is_dir()], reverse=True)
+    for task_dir in task_dirs:
+        post_path = task_dir / "post.json"
+        if not post_path.exists():
+            continue
+
+        post_data = _safe_load_json(post_path)
+        if not isinstance(post_data, dict):
+            continue
+
+        params = _safe_load_json(task_dir / "post_params.json") or {}
+        frames = post_data.get("frames") or []
+        images: list[str] = []
+
+        for frame in frames:
+            if not isinstance(frame, dict):
+                continue
+            image_file = frame.get("image_file")
+            if not image_file:
+                continue
+            image_path = task_dir / "images" / str(image_file)
+            if image_path.exists():
+                images.append(str(image_path))
+
+        if not images:
+            images_dir = task_dir / "images"
+            if images_dir.exists():
+                for pattern in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
+                    images.extend([str(p) for p in sorted(images_dir.glob(pattern)) if p.exists()])
+
+        title = str(post_data.get("title", "(无标题)"))
+        body = str(post_data.get("body", ""))
+        hashtags = post_data.get("hashtags") or []
+        topic = str(params.get("topic", ""))
+        created_at = str(post_data.get("created_at") or params.get("saved_at") or task_dir.name)
+        created_label = created_at[:16].replace("T", " ") if "T" in created_at else created_at
+
+        items.append(
+            {
+                "task_id": task_dir.name,
+                "label": f"{created_label} | {title[:22]} | {task_dir.name}",
+                "topic": topic,
+                "title": title,
+                "body": body,
+                "hashtags": [str(t).lstrip("#") for t in hashtags if str(t).strip()],
+                "images": list(dict.fromkeys(images)),
+                "created_at": created_at,
+            }
+        )
+
+        if len(items) >= limit:
+            break
+
+    return items
+
+
+def _resolve_video_path(task_id: str, task_summary: dict, pixelle_video) -> str:
+    candidate = str(task_summary.get("video_path") or "")
+    if candidate and Path(candidate).exists():
+        return candidate
+
+    detail = run_async(pixelle_video.history.get_task_detail(task_id))
+    if not detail:
+        return ""
+
+    metadata = detail.get("metadata") or {}
+    result = metadata.get("result") or {}
+    candidate = str(result.get("video_path") or "")
+    if candidate and Path(candidate).exists():
+        return candidate
+
+    storyboard = detail.get("storyboard")
+    final_video_path = getattr(storyboard, "final_video_path", "") if storyboard else ""
+    candidate = str(final_video_path or "")
+    if candidate and Path(candidate).exists():
+        return candidate
+
+    return ""
+
+
+def _load_recent_video_history(limit: int = 12) -> list[dict]:
+    pixelle_video = get_pixelle_video()
+    data = run_async(
+        pixelle_video.history.get_task_list(
+            page=1,
+            page_size=limit * 2,
+            status="completed",
+            sort_by="created_at",
+            sort_order="desc",
+        )
+    )
+    tasks = data.get("tasks", []) if isinstance(data, dict) else []
+
+    items: list[dict] = []
+    for task in tasks:
+        task_id = str(task.get("task_id", "")).strip()
+        if not task_id:
+            continue
+
+        video_path = _resolve_video_path(task_id, task, pixelle_video)
+        if not video_path:
+            continue
+
+        title = str(task.get("title") or task_id)
+        created_at = str(task.get("created_at") or task_id)
+        created_label = created_at[:16].replace("T", " ") if "T" in created_at else created_at
+        items.append(
+            {
+                "task_id": task_id,
+                "label": f"{created_label} | {title[:26]} | {task_id}",
+                "title": title,
+                "video_path": video_path,
+                "created_at": created_at,
+            }
+        )
+        if len(items) >= limit:
+            break
+
+    return items
+
+
+def _media_state_key(prefix: str, path: str) -> str:
+    digest = hashlib.md5(path.encode("utf-8")).hexdigest()[:12]
+    return f"{prefix}_{digest}"
+
+
+def _build_image_pool(post_items: list[dict], limit: int = 240) -> list[dict]:
+    pool: list[dict] = []
+    seen: set[str] = set()
+    for item in post_items:
+        for img_path in item.get("images", []):
+            path = str(img_path)
+            if not path or path in seen:
+                continue
+            seen.add(path)
+            pool.append(
+                {
+                    "path": path,
+                    "name": Path(path).name,
+                    "exists": Path(path).exists(),
+                    "task_id": item.get("task_id", ""),
+                    "title": item.get("title", ""),
+                    "topic": item.get("topic", ""),
+                    "created_at": item.get("created_at", ""),
+                }
+            )
+            if len(pool) >= limit:
+                return pool
+    return pool
+
+
+def _build_video_pool(video_items: list[dict], limit: int = 60) -> list[dict]:
+    pool: list[dict] = []
+    seen: set[str] = set()
+    for item in video_items:
+        path = str(item.get("video_path", ""))
+        if not path or path in seen:
+            continue
+        seen.add(path)
+        pool.append(
+            {
+                "path": path,
+                "name": Path(path).name,
+                "exists": Path(path).exists(),
+                "task_id": item.get("task_id", ""),
+                "title": item.get("title", ""),
+                "created_at": item.get("created_at", ""),
+            }
+        )
+        if len(pool) >= limit:
+            break
+    return pool
+
+
+def _apply_selected_images_to_form(mode: str, selected_paths: list[str]):
+    if not selected_paths:
+        st.session_state["publish_history_feedback"] = "请先勾选至少 1 张图片"
+        return
+
+    if mode == "replace":
+        st.session_state[PUBLISH_FORM_KEYS["images_raw"]] = "\n".join(selected_paths)
+        st.session_state["publish_history_feedback"] = f"已覆盖图片路径（{len(selected_paths)} 张）"
+        return
+
+    existing = st.session_state.get(PUBLISH_FORM_KEYS["images_raw"], "")
+    existing_lines = [line.strip() for line in str(existing).splitlines() if line.strip()]
+    merged = list(dict.fromkeys(existing_lines + selected_paths))
+    st.session_state[PUBLISH_FORM_KEYS["images_raw"]] = "\n".join(merged)
+    st.session_state["publish_history_feedback"] = f"已追加图片路径（{len(selected_paths)} 张）"
+
+
+def _parse_created_dt(raw: str) -> datetime | None:
+    text = str(raw or "").strip()
+    if not text:
+        return None
+
+    try:
+        dt = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        if dt.tzinfo is not None:
+            return dt.astimezone().replace(tzinfo=None)
+        return dt
+    except Exception:
+        pass
+
+    # Task-like pattern: 20260504_150645_xxxx
+    try:
+        return datetime.strptime(text[:15], "%Y%m%d_%H%M%S")
+    except Exception:
+        return None
+
+
+def _in_time_range(created_at: str, days: int | None) -> bool:
+    if days is None:
+        return True
+    dt = _parse_created_dt(created_at)
+    if dt is None:
+        return True
+    return dt >= (datetime.now() - timedelta(days=days))
+
+
+def _time_group_label(created_at: str) -> str:
+    dt = _parse_created_dt(created_at)
+    if dt is None:
+        return "未知"
+
+    now = datetime.now()
+    d = (now.date() - dt.date()).days
+    if d == 0:
+        return "今天"
+    if d == 1:
+        return "昨天"
+    if d <= 7:
+        return "近7天"
+    if d <= 30:
+        return "近30天"
+    return "更早"
+
+
+def _group_media_by_time(items: list[dict]) -> list[tuple[str, list[dict]]]:
+    order = ["今天", "昨天", "近7天", "近30天", "更早", "未知"]
+    grouped: dict[str, list[dict]] = {k: [] for k in order}
+
+    for item in items:
+        grouped[_time_group_label(str(item.get("created_at", "")))].append(item)
+
+    result: list[tuple[str, list[dict]]] = []
+    for key in order:
+        if grouped[key]:
+            result.append((key, grouped[key]))
+    return result
+
+
+def _keyword_match(media: dict, fields: list[str], keyword: str) -> bool:
+    if not keyword:
+        return True
+    hay = " ".join([str(media.get(f, "")) for f in fields]).lower()
+    return keyword in hay
+
+
+def _render_history_quick_panel(dm):
+    st.markdown("### ♻️ 历史快速复用")
+    st.caption("统一素材池：直接从全部历史图片和视频中可视化勾选，不需要先选某次任务。")
+
+    feedback = st.session_state.pop("publish_history_feedback", "")
+    if feedback:
+        st.success(feedback)
+
+    post_items = _load_recent_post_history(limit=120)
+    video_items = _load_recent_video_history(limit=40)
+
+    image_pool = _build_image_pool(post_items, limit=240)
+    video_pool = _build_video_pool(video_items, limit=40)
+
+    tab_post, tab_video = st.tabs(["🖼️ 历史图片素材池", "🎬 历史视频素材池"])
+
+    with tab_post:
+        if not image_pool:
+            st.info("暂无可复用的历史图片素材。")
+        else:
+            ctrl1, ctrl2, ctrl3, ctrl4 = st.columns([2, 1, 1, 1])
+            with ctrl1:
+                kw = st.text_input("筛选图片（标题/主题/任务ID/文件名）", key="history_pool_image_kw")
+            with ctrl2:
+                time_scope = st.selectbox(
+                    "时间范围",
+                    options=["全部", "7天内", "30天内", "90天内"],
+                    key="history_pool_image_time_scope",
+                )
+            with ctrl3:
+                density = st.selectbox(
+                    "布局密度",
+                    options=["紧凑", "标准", "舒展"],
+                    index=1,
+                    key="history_pool_image_density",
+                )
+            with ctrl4:
+                sort_order = st.selectbox(
+                    "排序",
+                    options=["最新优先", "最早优先"],
+                    key="history_pool_image_sort_order",
+                )
+
+            days_map = {"全部": None, "7天内": 7, "30天内": 30, "90天内": 90}
+            days = days_map[time_scope]
+            keyword = kw.strip().lower()
+
+            filtered = [
+                media
+                for media in image_pool
+                if _keyword_match(media, ["title", "topic", "task_id", "name"], keyword)
+                and _in_time_range(str(media.get("created_at", "")), days)
+            ]
+
+            filtered.sort(
+                key=lambda x: _parse_created_dt(str(x.get("created_at", ""))) or datetime.min,
+                reverse=(sort_order == "最新优先"),
+            )
+
+            page_size = st.session_state.get("history_pool_image_page_size", 24)
+            visible_count = st.session_state.get("history_pool_image_visible_count", page_size)
+            if visible_count < page_size:
+                visible_count = page_size
+            show_items = filtered[:visible_count]
+
+            st.caption(f"共 {len(image_pool)} 张，筛选后 {len(filtered)} 张，当前展示 {len(show_items)} 张")
+
+            c1, c2 = st.columns([1, 1])
+            with c1:
+                if st.button("✅ 全选筛选结果", key="history_pool_select_all_images"):
+                    for media in filtered:
+                        st.session_state[_media_state_key("history_pool_img_pick", media["path"])] = True
+                    st.rerun()
+            with c2:
+                if st.button("🧹 清空筛选结果", key="history_pool_clear_images"):
+                    for media in filtered:
+                        st.session_state[_media_state_key("history_pool_img_pick", media["path"])] = False
+                    st.rerun()
+
+            col_count = {"紧凑": 5, "标准": 4, "舒展": 3}[density]
+            grouped = _group_media_by_time(show_items)
+
+            for group_name, group_items in grouped:
+                with st.expander(f"📁 {group_name}（{len(group_items)}）", expanded=(group_name in {"今天", "昨天"})):
+                    g1, g2 = st.columns([1, 1])
+                    with g1:
+                        if st.button("本组全选", key=f"history_pool_select_group_{group_name}"):
+                            for media in group_items:
+                                st.session_state[_media_state_key("history_pool_img_pick", media["path"])] = True
+                            st.rerun()
+                    with g2:
+                        if st.button("本组清空", key=f"history_pool_clear_group_{group_name}"):
+                            for media in group_items:
+                                st.session_state[_media_state_key("history_pool_img_pick", media["path"])] = False
+                            st.rerun()
+
+                    cols = st.columns(min(col_count, max(1, len(group_items))))
+                    for i, media in enumerate(group_items):
+                        pick_key = _media_state_key("history_pool_img_pick", media["path"])
+                        st.session_state.setdefault(pick_key, False)
+                        with cols[i % len(cols)]:
+                            if media["exists"]:
+                                st.image(media["path"], caption=media["name"], width="stretch")
+                            else:
+                                st.warning(f"文件缺失：{media['name']}")
+                            st.caption(f"{media['task_id']} | {str(media.get('title', ''))[:14]}")
+                            st.checkbox("使用", key=pick_key)
+
+            if len(show_items) < len(filtered):
+                if st.button(
+                    f"⬇️ 加载更多（+{page_size}）",
+                    key="history_pool_load_more_images",
+                    width="stretch",
+                ):
+                    st.session_state["history_pool_image_visible_count"] = min(
+                        len(filtered),
+                        visible_count + page_size,
+                    )
+                    st.rerun()
+
+            selected_paths = [
+                media["path"]
+                for media in image_pool
+                if media["exists"] and st.session_state.get(_media_state_key("history_pool_img_pick", media["path"]), False)
+            ]
+            st.caption(f"当前已勾选 {len(selected_paths)} 张")
+
+            a1, a2 = st.columns(2)
+            with a1:
+                if st.button("仅图片路径（已选）", key="history_pool_apply_images", width="stretch"):
+                    _apply_selected_images_to_form("replace", selected_paths)
+                    st.rerun()
+            with a2:
+                if st.button("追加图片（已选）", key="history_pool_append_images", width="stretch"):
+                    _apply_selected_images_to_form("append", selected_paths)
+                    st.rerun()
+
+    with tab_video:
+        if not video_pool:
+            st.info("暂无可复用的历史视频素材。")
+        else:
+            ctrl1, ctrl2, ctrl3 = st.columns([2, 1, 1])
+            with ctrl1:
+                kw = st.text_input("筛选视频（标题/任务ID/文件名）", key="history_pool_video_kw")
+            with ctrl2:
+                time_scope = st.selectbox(
+                    "时间范围",
+                    options=["全部", "7天内", "30天内", "90天内"],
+                    key="history_pool_video_time_scope",
+                )
+            with ctrl3:
+                sort_order = st.selectbox(
+                    "排序",
+                    options=["最新优先", "最早优先"],
+                    key="history_pool_video_sort_order",
+                )
+
+            days_map = {"全部": None, "7天内": 7, "30天内": 30, "90天内": 90}
+            days = days_map[time_scope]
+            keyword = kw.strip().lower()
+
+            filtered = [
+                media
+                for media in video_pool
+                if _keyword_match(media, ["title", "task_id", "name"], keyword)
+                and _in_time_range(str(media.get("created_at", "")), days)
+            ]
+
+            filtered.sort(
+                key=lambda x: _parse_created_dt(str(x.get("created_at", ""))) or datetime.min,
+                reverse=(sort_order == "最新优先"),
+            )
+
+            page_size = st.session_state.get("history_pool_video_page_size", 12)
+            visible_count = st.session_state.get("history_pool_video_visible_count", page_size)
+            if visible_count < page_size:
+                visible_count = page_size
+            show_items = filtered[:visible_count]
+
+            st.caption(f"共 {len(video_pool)} 条，筛选后 {len(filtered)} 条，当前展示 {len(show_items)} 条")
+            c1, c2 = st.columns([1, 1])
+            with c1:
+                if st.button("✅ 全选筛选结果", key="history_pool_select_all_videos"):
+                    for media in filtered:
+                        st.session_state[_media_state_key("history_pool_video_pick", media["path"])] = True
+                    st.rerun()
+            with c2:
+                if st.button("🧹 清空筛选结果", key="history_pool_clear_videos"):
+                    for media in filtered:
+                        st.session_state[_media_state_key("history_pool_video_pick", media["path"])] = False
+                    st.rerun()
+
+            grouped = _group_media_by_time(show_items)
+            for group_name, group_items in grouped:
+                with st.expander(f"📁 {group_name}（{len(group_items)}）", expanded=(group_name == "今天")):
+                    for media in group_items:
+                        pick_key = _media_state_key("history_pool_video_pick", media["path"])
+                        preview_key = _media_state_key("history_pool_video_preview", media["path"])
+                        st.session_state.setdefault(pick_key, False)
+                        st.session_state.setdefault(preview_key, False)
+
+                        line1, line2, line3 = st.columns([4, 1, 1])
+                        with line1:
+                            st.markdown(f"**{str(media.get('title', '无标题'))[:36]}**")
+                            st.caption(f"{media['task_id']} | {str(media.get('created_at', ''))[:16]} | {media['name']}")
+                        with line2:
+                            st.checkbox("使用", key=pick_key)
+                        with line3:
+                            if st.session_state.get(preview_key, False):
+                                if st.button("收起", key=f"history_pool_preview_hide_{_media_state_key('btn', media['path'])}"):
+                                    st.session_state[preview_key] = False
+                                    st.rerun()
+                            else:
+                                if st.button("预览", key=f"history_pool_preview_show_{_media_state_key('btn', media['path'])}"):
+                                    st.session_state[preview_key] = True
+                                    st.rerun()
+
+                        if st.session_state.get(preview_key, False):
+                            if media["exists"]:
+                                st.video(media["path"])
+                            else:
+                                st.warning(f"视频文件缺失：{media['name']}")
+                        st.divider()
+
+            if len(show_items) < len(filtered):
+                if st.button(
+                    f"⬇️ 加载更多（+{page_size}）",
+                    key="history_pool_load_more_videos",
+                    width="stretch",
+                ):
+                    st.session_state["history_pool_video_visible_count"] = min(
+                        len(filtered),
+                        visible_count + page_size,
+                    )
+                    st.rerun()
+
+            selected_videos = [
+                media["path"]
+                for media in video_pool
+                if media["exists"] and st.session_state.get(_media_state_key("history_pool_video_pick", media["path"]), False)
+            ]
+            st.caption(f"当前已勾选 {len(selected_videos)} 条视频")
+
+            devices = [d for d in dm.get_all() if d.connected]
+            if not devices:
+                st.warning("当前没有在线设备，无法推送视频到相册。")
+            else:
+                device_options = {f"{d.name or d.serial} ({d.serial})": d.serial for d in devices}
+                target_label = st.selectbox(
+                    "选择目标设备",
+                    options=list(device_options.keys()),
+                    key="publish_history_video_target",
+                )
+                target_serial = device_options[target_label]
+                if st.button("📲 推送已选视频到手机相册", key="push_history_video_pool", type="primary"):
+                    if not selected_videos:
+                        st.warning("请先勾选至少 1 条视频")
+                    else:
+                        from pixelle_video.services.device_manager import push_images_to_gallery
+                        from pixelle_video.config import config_manager
+
+                        push_cfg = getattr(config_manager.config, "xhs_publish", None)
+                        push_dir = (
+                            getattr(push_cfg, "push_dir", "/sdcard/DCIM/PixelleVideo")
+                            if push_cfg
+                            else "/sdcard/DCIM/PixelleVideo"
+                        )
+
+                        with st.spinner(f"正在推送 {len(selected_videos)} 条视频到 {target_serial}..."):
+                            result = push_images_to_gallery(
+                                serial=target_serial,
+                                local_paths=selected_videos,
+                                push_dir=push_dir,
+                            )
+
+                        if result["success"] > 0:
+                            st.success(f"✅ 成功推送 {result['success']} 条视频到相册目录：{push_dir}")
+                        if result["failed"]:
+                            st.error(f"❌ {len(result['failed'])} 条视频推送失败")
+
 
 # ---- Device Management Tab ---------------------------------------------------
 
@@ -78,7 +656,6 @@ def _render_device_cards(dm, devices):
                 st.text(f"状态: {'已连接' if dev.connected else '未连接'}")
                 st.text(f"最后在线: {dev.last_seen or '从未'}")
 
-                # Inline edit name / theme
                 new_name = st.text_input("设备名称", value=dev.name, key=f"name_{dev.serial}")
                 new_theme = st.text_input("内容主题", value=dev.theme, key=f"theme_{dev.serial}")
                 if st.button("保存", key=f"save_{dev.serial}"):
@@ -91,7 +668,7 @@ def _render_device_cards(dm, devices):
                     if st.button("📸 截图", key=f"ss_{dev.serial}"):
                         data = dm.screenshot(dev.serial)
                         if data:
-                            st.image(data, caption="设备截图", use_container_width=True)
+                            st.image(data, caption="设备截图", width="stretch")
                         else:
                             st.error("截图失败")
 
@@ -176,6 +753,134 @@ def render_devices_tab():
                     else:
                         st.error("连接失败，请确认手机已开启 ADB over WiFi")
 
+    # Publish automation settings
+    st.markdown("---")
+    render_publish_settings()
+
+
+def render_publish_settings():
+    """Render XHS publish automation settings panel."""
+    with st.expander("⚙️ 发布自动化设置", expanded=False):
+        from pixelle_video.config import config_manager
+
+        cfg = getattr(config_manager.config, "xhs_publish", None)
+        current_strict = getattr(cfg, "strict_mode", True) if cfg else True
+        current_push_dir = (
+            getattr(cfg, "push_dir", "/sdcard/DCIM/PixelleVideo")
+            if cfg
+            else "/sdcard/DCIM/PixelleVideo"
+        )
+
+        st.markdown(
+            "控制小红书自动发布的行为模式。\n\n"
+            "- **严格模式（推荐）**：找不到控件时立即报错，避免误触。\n"
+            "- **兼容模式**：找不到控件时回退到坐标点击（可能误触，仅在严格模式下无法正常工作时使用）。"
+        )
+        if cfg is None:
+            st.info("未找到 xhs_publish 配置，当前使用默认值。点击“保存设置”可写回配置文件。")
+
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            new_strict = st.toggle(
+                "严格模式（找不到控件时报错）",
+                value=current_strict,
+                key="xhs_strict_mode_toggle",
+                help="关闭后切换为兼容模式：找不到控件时回退到坐标点击。不推荐长期使用兼容模式。",
+            )
+            new_push_dir = st.text_input(
+                "图片推送目录（设备侧）",
+                value=current_push_dir,
+                key="xhs_push_dir_input",
+                help="图片发布前临时存放在设备上的路径，发布完成后会自动删除。",
+            )
+        with col2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("💾 保存设置", key="save_xhs_settings"):
+                config_manager.update(
+                    {"xhs_publish": {"strict_mode": new_strict, "push_dir": new_push_dir.strip()}}
+                )
+                config_manager.save()
+                st.success("已保存")
+                st.rerun()
+
+
+# ---- Gallery Upload Tab ------------------------------------------------------
+
+def render_gallery_upload_tab():
+    """Upload image files directly to an Android device's gallery."""
+    st.subheader("📸 上传图片到手机相册")
+    st.caption("选择手机在线设备，上传图片后会通过 ADB 直接推送到手机相册，无需数据线反复插拔。")
+
+    dm = get_device_manager()
+    devices = [d for d in dm.get_all() if d.connected]
+
+    if not devices:
+        st.warning("没有已连接的设备。请先在“设备管理”中连接手机。")
+        return
+
+    device_options = {f"{d.name or d.serial} ({d.serial})": d.serial for d in devices}
+    selected_label = st.selectbox(
+        "选择目标设备",
+        options=list(device_options.keys()),
+        key="gallery_upload_device",
+    )
+    selected_serial = device_options[selected_label]
+
+    uploaded_files = st.file_uploader(
+        "选择图片文件",
+        type=["png", "jpg", "jpeg", "webp"],
+        accept_multiple_files=True,
+        key="gallery_upload_files",
+        help="支持 PNG / JPG / JPEG / WEBP，可多选。",
+    )
+
+    if uploaded_files:
+        st.info(f"已选择 {len(uploaded_files)} 个文件，点击下方按钮推送到手机相册。")
+
+    if st.button(
+        "📲 推送到手机相册",
+        disabled=not uploaded_files,
+        key="gallery_upload_btn",
+        type="primary",
+    ):
+        import tempfile
+        import os
+        from pixelle_video.services.device_manager import push_images_to_gallery
+        from pixelle_video.config import config_manager
+
+        push_cfg = getattr(config_manager.config, "xhs_publish", None)
+        push_dir = (
+            getattr(push_cfg, "push_dir", "/sdcard/DCIM/PixelleVideo")
+            if push_cfg
+            else "/sdcard/DCIM/PixelleVideo"
+        )
+
+        tmp_paths = []
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                for f in uploaded_files:
+                    tmp_path = os.path.join(tmpdir, f.name)
+                    with open(tmp_path, "wb") as fh:
+                        fh.write(f.getbuffer())
+                    tmp_paths.append(tmp_path)
+
+                with st.spinner(f"正在推送 {len(tmp_paths)} 张图片到 {selected_serial}..."):
+                    result = push_images_to_gallery(
+                        serial=selected_serial,
+                        local_paths=tmp_paths,
+                        push_dir=push_dir,
+                    )
+
+            if result["success"] > 0:
+                st.success(f"✅ 成功推送 {result['success']} 张图片到相册 ({push_dir})")
+            if result["failed"]:
+                st.error(
+                    f"❌ {len(result['failed'])} 张推送失败："
+                    + ", ".join(Path(p).name for p in result["failed"])
+                )
+        except Exception as exc:
+            st.error(f"推送出错：{exc}")
+
 
 # ---- Publish Queue Tab -------------------------------------------------------
 
@@ -185,17 +890,23 @@ def render_publish_tab():
 
     scheduler = get_publish_scheduler()
     dm = get_device_manager()
+    _init_publish_form_defaults()
+
+    _render_history_quick_panel(dm)
+    st.markdown("---")
 
     # New publish job form
-    with st.expander("➕ 新建发布任务", expanded=bool(st.session_state.get("last_post_result"))):
-        last = st.session_state.get("last_post_result", {})
+    with st.expander(
+        "➕ 新建发布任务",
+        expanded=bool(st.session_state.get("last_post_result") or st.session_state.get("publish_history_post_select")),
+    ):
         suggested_serials = st.session_state.get("publish_suggested_serials", [])
         all_connected_serials = [d.serial for d in dm.get_all() if d.connected]
 
         with st.form("new_publish_job"):
             devices = [d for d in dm.get_all() if d.connected]
             if not devices:
-                st.warning("没有已连接的设备。请先在「设备管理」中连接手机。")
+                st.warning("没有已连接的设备。请先在“设备管理”中连接手机。")
                 fallback_serial = st.text_input("设备 Serial（手动输入）", placeholder="192.168.1.100:5555")
                 selected_serials = [fallback_serial.strip()] if fallback_serial.strip() else []
             else:
@@ -211,17 +922,21 @@ def render_publish_tab():
                 )
                 selected_serials = [device_options[label] for label in selected_labels]
 
-            task_id = st.text_input("关联任务 ID", value=last.get("task_id", ""), placeholder="图文生成任务 ID")
-            topic = st.text_input("创作主题（用于自动推荐设备）", value=last.get("topic", ""))
-            title = st.text_input("帖子标题", value=last.get("title", ""))
-            body = st.text_area("帖子正文", value=last.get("body", ""), height=150)
+            task_id = st.text_input(
+                "关联任务 ID",
+                key=PUBLISH_FORM_KEYS["task_id"],
+                placeholder="图文生成任务 ID",
+            )
+            topic = st.text_input("创作主题（用于自动推荐设备）", key=PUBLISH_FORM_KEYS["topic"])
+            title = st.text_input("帖子标题", key=PUBLISH_FORM_KEYS["title"])
+            body = st.text_area("帖子正文", key=PUBLISH_FORM_KEYS["body"], height=150)
             hashtags_raw = st.text_input(
-                "话题标签（逗号分隔，不含#）",
-                value=", ".join(last.get("hashtags", [])),
+                "话题标签（逗号分隔，不带 #）",
+                key=PUBLISH_FORM_KEYS["hashtags_raw"],
             )
             images_raw = st.text_area(
-                "图片路径（每行一个）",
-                value="\n".join(last.get("images", [])),
+                "图片路径（每行一条）",
+                key=PUBLISH_FORM_KEYS["images_raw"],
                 height=100,
             )
 
@@ -246,7 +961,7 @@ def render_publish_tab():
             with action_col3:
                 clear_selection_clicked = st.form_submit_button("🧹 清空选择")
             with action_col4:
-                submit_clicked = st.form_submit_button("📤 一键创建发布任务", type="primary")
+                submit_clicked = st.form_submit_button("📤 提交并创建发布任务", type="primary")
 
             if select_all_clicked:
                 st.session_state["publish_suggested_serials"] = all_connected_serials
@@ -264,13 +979,13 @@ def render_publish_tab():
                     if not ranked:
                         themed_online = [d for d in devices if d.theme]
                         if not themed_online:
-                            st.info("当前在线设备都未设置默认主题，请先在设备管理中填写“内容主题”")
+                            st.info("当前在线设备都未设置默认主题，请先在设备管理中填写内容主题。")
                         else:
-                            st.info("没有找到匹配主题的在线设备，请手动选择设备")
+                            st.info("没有找到匹配主题的在线设备，请手动选择设备。")
                         st.session_state["publish_suggested_serials"] = []
                     else:
                         st.session_state["publish_suggested_serials"] = [dev.serial for dev, _, _ in ranked]
-                        reasons = "；".join([
+                        reasons = "、".join([
                             f"{dev.name or dev.serial}({reason})"
                             for dev, _, reason in ranked[:3]
                         ])
@@ -307,7 +1022,7 @@ def render_publish_tab():
 
                     if created_jobs:
                         st.success(
-                            f"已为 {len(created_jobs)} 台设备创建任务。"
+                            f"已为 {len(created_jobs)} 台设备创建任务。\n"
                             f"Job IDs: {', '.join(created_jobs[:3])}"
                             + (" ..." if len(created_jobs) > 3 else "")
                         )
@@ -334,7 +1049,7 @@ def render_publish_tab():
 def _render_publish_queue_list(filter_val: str | None):
     scheduler = get_publish_scheduler()
     jobs = scheduler.list_jobs(status_filter=filter_val)
-    st.caption("发布队列每 6 秒自动刷新一次")
+    st.caption("发布队列每 6 秒自动刷新一次。")
 
     if not jobs:
         st.info("队列为空")
@@ -342,7 +1057,7 @@ def _render_publish_queue_list(filter_val: str | None):
 
     for job in jobs:
         badge = STATUS_BADGE.get(job.status, job.status)
-        label = f"{badge}  |  {job.title[:30]}  →  {job.serial}  |  {job.created_at[:16]}"
+        label = f"{badge}  |  {job.title[:30]}  |  {job.serial}  |  {job.created_at[:16]}"
         with st.expander(label):
             col1, col2 = st.columns([3, 1])
             with col1:
@@ -370,7 +1085,7 @@ def _render_publish_queue_list(filter_val: str | None):
                 st.json(payload)
 
                 if elapsed is not None and elapsed > 600:
-                    st.warning(f"任务已运行 {elapsed // 60} 分钟，请观察设备是否仍在操作")
+                    st.warning(f"任务已运行 {elapsed // 60} 分钟，请观察设备侧是否仍在操作")
 
             with col2:
                 if job.status in ("pending", "scheduled"):
@@ -379,7 +1094,7 @@ def _render_publish_queue_list(filter_val: str | None):
                         asyncio.run(scheduler.execute_now(job.job_id))
                         st.rerun()
                 if job.status in ("pending", "scheduled", "running"):
-                    if st.button("⛔ 取消", key=f"cancel_{job.job_id}"):
+                    if st.button("❌ 取消", key=f"cancel_{job.job_id}"):
                         scheduler.cancel_job(job.job_id)
                         st.rerun()
 
@@ -393,7 +1108,7 @@ def main():
     st.title("📱 发布管理")
     st.caption("管理 Android 设备并将图文帖子发布到小红书")
 
-    tab_devices, tab_publish = st.tabs(["📱 设备管理", "📤 发布队列"])
+    tab_devices, tab_publish, tab_gallery = st.tabs(["📱 设备管理", "📤 发布队列", "📸 上传到相册"])
 
     with tab_devices:
         render_devices_tab()
@@ -401,6 +1116,13 @@ def main():
     with tab_publish:
         render_publish_tab()
 
+    with tab_gallery:
+        render_gallery_upload_tab()
+
 
 if __name__ == "__main__":
     main()
+
+
+
+

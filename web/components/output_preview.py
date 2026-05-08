@@ -1,4 +1,4 @@
-# Copyright (C) 2025 AIDC-AI
+﻿# Copyright (C) 2025 AIDC-AI
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -70,7 +70,7 @@ def render_single_output(pixelle_video, video_params):
             st.warning(tr("settings.not_configured"))
         
         # Generate Button
-        if st.button(tr("btn.generate"), type="primary", use_container_width=True):
+        if st.button(tr("btn.generate"), type="primary", width="stretch"):
             # Validate system configuration
             if not config_manager.validate():
                 st.error(tr("settings.not_configured"))
@@ -95,7 +95,7 @@ def render_single_output(pixelle_video, video_params):
                     """Update progress bar and status text from ProgressEvent"""
                     # Translate event to user-facing message
                     if event.event_type == "frame_step":
-                        # Frame step: "分镜 3/5 - 步骤 2/4: 生成插图"
+                        # Frame step: "分镜 3/5 - 步�? 2/4: 生成插图"
                         action_key = f"progress.step_{event.action}"
                         action_text = tr(action_key)
                         message = tr(
@@ -195,11 +195,11 @@ def render_single_output(pixelle_video, video_params):
                         video_bytes = video_file.read()
                         video_filename = os.path.basename(result.video_path)
                         st.download_button(
-                            label="⬇️ 下载视频" if get_language() == "zh_CN" else "⬇️ Download Video",
+                            label="⬇️ 下载视�?" if get_language() == "zh_CN" else "⬇️ Download Video",
                             data=video_bytes,
                             file_name=video_filename,
                             mime="video/mp4",
-                            use_container_width=True
+                            width="stretch"
                         )
                 else:
                     st.error(tr("status.video_not_found", path=result.video_path))
@@ -242,7 +242,7 @@ def render_batch_output(pixelle_video, video_params):
         if st.button(
             tr("batch.generate_button", count=batch_count),
             type="primary",
-            use_container_width=True,
+            width="stretch",
             help=tr("batch.generate_help")
         ):
             # Prepare shared config
@@ -350,7 +350,7 @@ def render_batch_output(pixelle_video, video_params):
             
             # Clear progress displays
             overall_progress_bar.progress(1.0)
-            overall_status.markdown(f"✅ **{tr('batch.completed')}**")
+            overall_status.markdown(f"�?**{tr('batch.completed')}**")
             current_task_title.empty()
             current_task_progress.empty()
             current_task_status.empty()
@@ -361,8 +361,8 @@ def render_batch_output(pixelle_video, video_params):
             
             col1, col2, col3 = st.columns(3)
             col1.metric(tr("batch.total"), batch_result["total_count"])
-            col2.metric(f"✅ {tr('batch.success')}", batch_result["success_count"])
-            col3.metric(f"❌ {tr('batch.failed')}", batch_result["failed_count"])
+            col2.metric(f"�?{tr('batch.success')}", batch_result["success_count"])
+            col3.metric(f"�?{tr('batch.failed')}", batch_result["failed_count"])
             
             # Display total time
             minutes = int(total_time / 60)
@@ -410,3 +410,5 @@ def render_batch_output(pixelle_video, video_params):
                         with st.expander(tr("batch.error_detail")):
                             st.code(item['traceback'], language="python")
     
+
+

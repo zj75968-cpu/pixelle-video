@@ -1,4 +1,4 @@
-import os
+﻿import os
 import time
 from pathlib import Path
 from typing import Any
@@ -21,7 +21,7 @@ class DigitalHumanPipelineUI(PipelineUI):
     Generates videos from user-provided assets (images&videos&audio).
     """
     name = "digital_human"
-    icon = "🤖"
+    icon = "�?"
     
     @property
     def display_name(self):
@@ -111,7 +111,7 @@ class DigitalHumanPipelineUI(PipelineUI):
                             # Check if image
                             ext = Path(path).suffix.lower()
                             if ext in [".jpg", ".jpeg", ".png", ".webp"]:
-                                st.image(file, caption=file.name, use_container_width=True)
+                                st.image(file, caption=file.name, width="stretch")
             else:
                 st.info(tr("digital_human.assets.character_empty_hint"))
 
@@ -239,7 +239,7 @@ class DigitalHumanPipelineUI(PipelineUI):
                                 # Check if image
                                 ext = Path(path).suffix.lower()
                                 if ext in [".jpg", ".jpeg", ".png", ".webp"]:
-                                    st.image(file, caption=file.name, use_container_width=True)
+                                    st.image(file, caption=file.name, width="stretch")
                 else:
                     st.info(tr("digital_human.assets.goods_empty_hint"))
                     # Text input
@@ -302,7 +302,7 @@ class DigitalHumanPipelineUI(PipelineUI):
             logger.info(f"🔧 The obtained TTS parameters:")
             logger.info(f"  - tts_voice: {tts_voice}")
             logger.info(f"  - tts_speed: {tts_speed}")
-            logger.info(f"  - video_params中的tts_voice: {video_params.get('tts_voice', 'NOT_FOUND')}")
+            logger.info(f"  - video_params�?��tts_voice: {video_params.get('tts_voice', 'NOT_FOUND')}")
             logger.info(f"  - video_params: {video_params}")
             
             # Validation
@@ -311,7 +311,7 @@ class DigitalHumanPipelineUI(PipelineUI):
                 st.button(
                     tr("btn.generate"),
                     type="primary",
-                    use_container_width=True,
+                    width="stretch",
                     disabled=True,
                     key="digital_human_generate_disabled"
                 )
@@ -322,7 +322,7 @@ class DigitalHumanPipelineUI(PipelineUI):
                 st.button(
                     tr("btn.generate"),
                     type="primary",
-                    use_container_width=True,
+                    width="stretch",
                     disabled=True,
                     key="digital_human_goods_vaiidation"
                 )
@@ -333,7 +333,7 @@ class DigitalHumanPipelineUI(PipelineUI):
                 st.button(
                     tr("btn.generate"),
                     type="primary",
-                    use_container_width=True,
+                    width="stretch",
                     disabled=True,
                     key="digital_human_digital_disable"
                 )
@@ -347,14 +347,14 @@ class DigitalHumanPipelineUI(PipelineUI):
                 st.button(
                     tr("btn.generate"),
                     type="primary",
-                    use_container_width=True,
+                    width="stretch",
                     disabled=True,
                     key="digital_human_customize_disable"
                 )
                 return
             
             # Generate button
-            if st.button(tr("btn.generate"), type="primary", use_container_width=True, key="digital_human_generate"):
+            if st.button(tr("btn.generate"), type="primary", width="stretch", key="digital_human_generate"):
                 # Validate
                 if not config_manager.validate():
                     st.error(tr("settings.not_configured"))
@@ -653,11 +653,11 @@ class DigitalHumanPipelineUI(PipelineUI):
                             video_bytes = video_file.read()
                             video_filename = os.path.basename(final_video_path)
                             st.download_button(
-                                label="⬇️ 下载视频" if get_language() == "zh_CN" else "⬇️ Download Video",
+                                label="⬇️ 下载视�?" if get_language() == "zh_CN" else "⬇️ Download Video",
                                 data=video_bytes,
                                 file_name=video_filename,
                                 mime="video/mp4",
-                                use_container_width=True
+                                width="stretch"
                             )
                     else:
                         st.error(tr("status.video_not_found", path=final_video_path))
@@ -672,4 +672,6 @@ class DigitalHumanPipelineUI(PipelineUI):
 
 # Register self
 register_pipeline_ui(DigitalHumanPipelineUI)
+
+
 

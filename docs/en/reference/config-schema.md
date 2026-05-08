@@ -24,7 +24,7 @@ comfyui:
     prompt_prefix: "Minimalist illustration style"
   
   video:
-    default_workflow: "runninghub/video_wan2.1_fusionx.json"
+    default_workflow: "selfhost/video_animatediff_sd15.json"
     prompt_prefix: "Minimalist illustration style"
   
   tts:
@@ -67,8 +67,7 @@ template:
 ### Video Configuration
 
 - `default_workflow`: Default video generation workflow
-  - `runninghub/video_wan2.1_fusionx.json`: Cloud workflow (recommended, no local setup required)
-  - `selfhost/video_wan2.1_fusionx.json`: Local workflow (requires local ComfyUI support)
+  - `selfhost/video_animatediff_sd15.json`: Local workflow (requires local ComfyUI, AnimateDiff, and VideoHelperSuite support)
 - `prompt_prefix`: Video prompt prefix (controls video generation style)
 
 ### TTS Configuration

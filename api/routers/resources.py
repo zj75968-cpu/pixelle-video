@@ -96,11 +96,11 @@ async def list_media_workflows(pixelle_video: PixelleVideoDep):
                 "workflow_id": "123456"
             },
             {
-                "name": "video_wan2.1.json",
-                "display_name": "video_wan2.1.json - Runninghub",
-                "source": "runninghub",
-                "path": "workflows/runninghub/video_wan2.1.json",
-                "key": "runninghub/video_wan2.1.json",
+                "name": "video_animatediff_sd15.json",
+                "display_name": "video_animatediff_sd15.json - Selfhost",
+                "source": "selfhost",
+                "path": "workflows/selfhost/video_animatediff_sd15.json",
+                "key": "selfhost/video_animatediff_sd15.json",
                 "workflow_id": "123457"
             }
         ]
