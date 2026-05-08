@@ -498,6 +498,164 @@ uv run streamlit run web/app.py
 - 🔗 [查看所有模板效果图](https://aidc-ai.github.io/Pixelle-Video/zh/user-guide/templates/#_3)
 
 
+### 🎬 视频生成工作流（中间栏 - 当选择"video"模板时出现）
+
+#### 什么是 AnimateDiff？
+
+**AnimateDiff** 是一个 Stable Diffusion 的运动模块，可以将静态图像转变为具有自然运动的视频片段。在 Pixelle-Video 中，AnimateDiff 被集成为默认的视频生成工作流，提供：
+
+- ✨ **流畅的动画运动** - 为 AI 生成的图像添加自然的动画效果
+- 🎥 **动态镜头感** - 支持缩放、平移等镜头运动
+- ⚡ **快速生成** - 本地 GPU 加速，速度快
+- 💰 **完全免费** - 支持本地 ComfyUI 部署
+
+#### 如何在界面中使用 AnimateDiff？
+
+**第一步：选择"video"模板类型**
+
+在「🎨 视觉设置」部分，模板类型选择器中选择 **【视频】** 标签：
+
+```
+[ 静态 ]  [ 图片 ]  [ 视频 ] ← 点击这个
+```
+
+**第二步：选择 AnimateDiff 工作流**
+
+选择"视频"模板后，会自动出现"ComfyUI 工作流"选择器，列出所有可用的视频生成工作流。选择：
+
+```
+video_animatediff_sd15.json - Selfhost
+```
+
+这个工作流使用 Stable Diffusion 1.5 + AnimateDiff 运动模块的组合。
+
+**第三步：配置其他参数**
+
+- **图像尺寸**：设置生成视频的分辨率（默认 512x768）
+- **提示词前缀**：控制视频的整体风格和质量
+- **其他设置**：帧率、时长等在系统配置中调整
+
+**第四步：生成视频**
+
+点击「🎬 生成视频」按钮，系统会：
+
+1. 根据主题生成文案
+2. 为每个分镜生成配图
+3. 使用 AnimateDiff 将静止图像转换为动画视频
+4. 合成语音和 BGM
+5. 输出最终视频
+
+#### API 调用示例
+
+如果你更倾向于直接调用 API，可以使用以下 PowerShell 脚本：
+
+```powershell
+$env:NO_PROXY = "127.0.0.1,localhost"
+$env:no_proxy = $env:NO_PROXY
+
+$body = @{
+    mode = "generate"
+    text = "一个人在办公室工作的场景"
+    frame_template = "1080x1920/video_default.html"
+    media_workflow = "selfhost/video_animatediff_sd15.json"
+    video_fps = 24
+    n_scenes = 3
+} | ConvertTo-Json -Depth 6
+
+Invoke-RestMethod -Method Post `
+    -Uri "http://127.0.0.1:8001/api/video/generate/sync" `
+    -Body $body `
+    -ContentType "application/json"
+```
+
+**关键参数说明：**
+
+| 参数 | 说明 | 示例 |
+|------|------|------|
+| `media_workflow` | 视频工作流标识 | `selfhost/video_animatediff_sd15.json` |
+| `frame_template` | 视频模板路径 | `1080x1920/video_default.html` |
+| `video_fps` | 视频帧率 | `24` (推荐 16-24) |
+| `n_scenes` | 分镜数 | `3-5` (数越多效果越好但耗时越长) |
+
+#### 前置条件与配置
+
+为了使用 AnimateDiff，请确保以下条件满足：
+
+1. **ComfyUI 已安装** 
+   - 本地 ComfyUI 运行在 `http://127.0.0.1:8188`
+   - 已安装 `ComfyUI-AnimateDiff-Evolved` 自定义节点
+
+2. **模型文件已下载**
+   - Stable Diffusion 1.5 检查点：`models/checkpoints/v1-5-pruned-emaonly.safetensors`
+   - AnimateDiff 运动模块：`models/animatediff_models/mm_sd_v15_v2.ckpt`
+   
+   如果模型缺失，运行以下命令下载：
+   
+   ```powershell
+   cd "d:\vscocde file\github-video-项目\Pixelle-Video"
+   uv run python scripts/download_animatediff_models.ps1
+   ```
+
+3. **系统配置已完成**
+   - LLM 已配置并测试通过
+   - ComfyUI 连接已测试通过（点击"测试连接"）
+
+#### 常见问题
+
+**Q: 为什么我选择了"video"模板但看不到工作流选择器？**
+
+A: 检查以下几点：
+- 确保 ComfyUI 已启动并在 `http://127.0.0.1:8188` 可访问
+- 浏览器刷新页面，重新选择"video"模板类型
+- 查看浏览器开发者工具中的报错信息
+
+**Q: 生成的视频为什么效果不好？**
+
+A: 尝试以下优化方案：
+- **增加分镜数**：从 3 分镜增加到 5-7 分镜，让 AI 有更多表达空间
+- **改进提示词**：在"图像尺寸"下方修改"提示词前缀"，使用更具体的描述
+- **调整帧率**：尝试 16fps 或 24fps，根据内容选择合适的速度
+- **使用不同的模板**：尝试 `video_default.html` 等其他视频模板
+
+**Q: AnimateDiff 和图片模板的区别是什么？**
+
+A: 
+
+| 特性 | 图片模板 | 视频模板（AnimateDiff） |
+|------|--------|----------------------|
+| 生成方式 | 每分镜生成一张静态图片 | 每分镜生成一段动画视频 |
+| 视觉效果 | 分镜式、静态感 | 流畅、动画感、更生动 |
+| 处理速度 | 快 | 中等（取决于分镜数和时长） |
+| 文件大小 | 小 | 较大 |
+| 适用场景 | 知识科普、信息呈现 | 故事叙述、产品演示、动画讲述 |
+
+**Q: 我想用其他的 SD 模型（如 SD 2.1）或其他视频生成模型，怎么办？**
+
+A: 
+
+1. 在 ComfyUI 中安装对应的模型加载节点
+2. 复制 `workflows/selfhost/video_animatediff_sd15.json` 为新文件
+3. 修改 JSON 中的模型检查点和节点参数
+4. 重启 Streamlit，新工作流会自动出现在工作流列表中
+
+#### 故障排查
+
+如果遇到"工作流不可用"或"节点缺失"的错误，可以运行验证脚本：
+
+```powershell
+cd "d:\vscocde file\github-video-项目\Pixelle-Video"
+uv run python scripts/validate_animatediff_smoke.py
+```
+
+脚本会检查：
+- ✅ ComfyUI 连接状态
+- ✅ AnimateDiff 节点是否安装
+- ✅ 所需模型文件是否存在
+- ✅ 工作流 JSON 有效性
+
+如有问题，脚本会给出具体的修复建议。
+
+
 ### 🎬 生成视频（右侧栏）
 
 #### 生成按钮
