@@ -105,35 +105,34 @@ class MediaService(ComfyBaseService):
                     logger.error(f"Failed to parse workflow {source_name}/{filename}: {e}")
         
         # Sort by key (source/name)
-        # Add virtual RunningHub Model API workflows (low-cost direct REST API)
-        # Hidden by default — set comfyui.show_unavailable_workflows=true to enable.
+        # Add virtual RunningHub Model API workflows from registry
+        # （由 registry 驱动；如不希望展示，可设置 comfyui.show_unavailable_workflows=false 并改下面 if）
         try:
             from pixelle_video.config import config_manager
             show_unavailable = bool(getattr(config_manager.config.comfyui, "show_unavailable_workflows", False))
         except Exception:
             show_unavailable = False
 
-        if show_unavailable:
-            workflows.extend([
-                {
-                    "key": "runninghub-api/text-to-video",
+        # 默认：始终把 registry 的 RunningHub 低价模型加入（用户已要求接入）。
+        # 仍允许通过 show_unavailable_workflows=false 强制隐藏（向后兼容）。
+        try:
+            from pixelle_video.services import runninghub_registry as _rh_reg
+            for _m in _rh_reg.list_models():
+                workflows.append({
+                    "key": _m["workflow_key"],
                     "source": "runninghub-api",
-                    "name": "text-to-video",
-                    "display_name": "全能视频V3.1-fast 文生视频 [RunningHub低价]",
-                    "description": "RunningHub Model API Text-to-Video (¥0.03/s)",
+                    "name": _m["rhEndpoint"].lstrip("/"),
+                    "display_name": f"[{_m['category']}] {_m['name']}",
+                    "description": (_m.get("modelHighlights") or "")[:120],
                     "path": None,
-                },
-                {
-                    "key": "runninghub-api/image-to-video",
-                    "source": "runninghub-api",
-                    "name": "image-to-video",
-                    "display_name": "全能视频X 图生视频 [RunningHub低价]",
-                    "description": "RunningHub Model API Image-to-Video (¥0.03/s)",
-                    "path": None,
-                },
-            ])
-        else:
-            # Also hide selfhost/* entries when local ComfyUI is presumed unavailable
+                    # 额外元数据，供 UI 动态渲染参数表单使用
+                    "runninghub_model": _m,
+                })
+        except Exception as e:
+            logger.warning(f"加载 RunningHub registry 失败: {e}")
+
+        if not show_unavailable:
+            # 不展示自部署 selfhost/*（默认无本地 ComfyUI）
             workflows = [wf for wf in workflows if wf.get("source") != "selfhost"]
         return sorted(workflows, key=lambda w: w["key"])
     
@@ -225,44 +224,70 @@ class MediaService(ComfyBaseService):
             )
         """
         # 1. Resolve workflow (returns structured info)
-        # --- RunningHub Model API direct routing (low-cost REST API) ---
+        # --- RunningHub Model API direct routing (low-cost REST API, registry-driven) ---
         if workflow and workflow.startswith("runninghub-api/"):
-            import math
             from pixelle_video.services.runninghub_api_service import RunningHubAPIService
+            from pixelle_video.services import runninghub_registry as rh_reg
+
+            model = rh_reg.get_model_by_workflow_key(workflow)
+            if not model:
+                raise ValueError(f"未找到 RunningHub 低价模型: {workflow}")
+
+            # 准备用户参数：把通用 prompt / image_urls 等映射到模型的字段
+            user_params = dict(params)  # 复制
+            user_params.setdefault("prompt", prompt)
+
+            # 通用宽高 -> aspectRatio（仅当模型有 aspectRatio 字段且用户没提供时）
+            field_keys = {i["fieldKey"] for i in model.get("inputs", [])}
+            if "aspectRatio" in field_keys and "aspectRatio" not in user_params:
+                if width and height:
+                    import math
+                    g = math.gcd(int(width), int(height))
+                    user_params["aspectRatio"] = f"{int(width)//g}:{int(height)//g}"
+            # 时长
+            if "duration" in field_keys and "duration" not in user_params and duration is not None:
+                # 部分模型 duration 是字符串枚举（如 "8"），让 build_payload 通过 _coerce 处理
+                user_params["duration"] = int(max(1, duration))
+
+            # image_urls (多图模型) / imageUrl (单图模型) 兼容
+            if "imageUrls" in field_keys and "imageUrls" not in user_params:
+                imgs = params.get("image_urls") or params.get("imageUrl")
+                if imgs:
+                    user_params["imageUrls"] = imgs if isinstance(imgs, list) else [imgs]
+            if "imageUrl" in field_keys and "imageUrl" not in user_params:
+                img = params.get("imageUrl") or params.get("image_url")
+                if not img:
+                    imgs = params.get("image_urls")
+                    if isinstance(imgs, list) and imgs:
+                        img = imgs[0]
+                if img:
+                    user_params["imageUrl"] = img
+
             api_svc = RunningHubAPIService()
-            # Compute aspect ratio from width/height
-            if width and height:
-                gcd_val = math.gcd(int(width), int(height))
-                aspect_ratio = f"{int(width) // gcd_val}:{int(height) // gcd_val}"
-            else:
-                aspect_ratio = "9:16"
-            # Clamp duration to [4, 15]
-            target_duration = int(max(4, min(15, duration))) if duration else 8
 
-            if workflow == "runninghub-api/text-to-video":
-                logger.info(f"[RunningHub低价] 文生视频 aspect={aspect_ratio} duration={target_duration}s")
-                video_url = await api_svc.text_to_video_and_wait(
-                    prompt=prompt,
-                    aspect_ratio=aspect_ratio,
-                    duration=target_duration,
-                    resolution="720p",
-                )
-            elif workflow == "runninghub-api/image-to-video":
-                image_urls = params.get("image_urls", [])
-                if not image_urls:
-                    raise ValueError("runninghub-api/image-to-video 需要 image_urls 参数")
-                logger.info(f"[RunningHub低价] 图生视频 images={len(image_urls)} aspect={aspect_ratio} duration={target_duration}s")
-                video_url = await api_svc.image_to_video_and_wait(
-                    prompt=prompt,
-                    image_urls=image_urls,
-                    aspect_ratio=aspect_ratio,
-                    duration=target_duration,
-                    resolution="480p",
-                )
-            else:
-                raise ValueError(f"未知的 RunningHub API 工作流: {workflow}")
+            # 自动把本地图片路径上传到 RunningHub 云存储，转换成可访问 URL
+            import os as _os
+            async def _maybe_upload(val):
+                if isinstance(val, str) and not val.startswith(("http://", "https://")) and _os.path.exists(val):
+                    return await api_svc.upload_image(val)
+                return val
 
-            return MediaResult(media_type="video", url=video_url)
+            for spec in model.get("inputs", []):
+                if spec.get("type") != "IMAGE":
+                    continue
+                key = spec["fieldKey"]
+                if key not in user_params:
+                    continue
+                v = user_params[key]
+                if isinstance(v, list):
+                    user_params[key] = [await _maybe_upload(x) for x in v]
+                else:
+                    user_params[key] = await _maybe_upload(v)
+
+            logger.info(f"[RunningHub低价] 调用 {model['name']} ({model['rhEndpoint']})")
+            file_url = await api_svc.call_model(model["rhEndpoint"], user_params)
+            media_kind = "video" if "video" in (model.get("category") or "") else "image"
+            return MediaResult(media_type=media_kind, url=file_url)
         # --- 正常 ComfyKit 工作流 ---
         workflow_info = self._resolve_workflow(workflow=workflow)
 

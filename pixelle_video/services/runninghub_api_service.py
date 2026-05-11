@@ -58,6 +58,42 @@ class RunningHubAPIService:
     # Public API
     # ------------------------------------------------------------------
 
+    async def call_model(
+        self,
+        endpoint: str,
+        params: dict,
+        timeout: int = 600,
+    ) -> str:
+        """
+        通用调用：根据 registry 中的 endpoint 直接发请求并轮询直到完成。
+
+        Args:
+            endpoint: 形如 ``/rhart-video-g/text-to-video`` 的相对路径（带或不带前导 ``/`` 都可）。
+            params:   用户参数（无需包含 ``apiKey``，会自动注入；类型由 registry 校正）。
+            timeout:  最大等待秒数。
+
+        Returns:
+            视频/图片文件 URL。
+        """
+        from pixelle_video.services import runninghub_registry as reg
+
+        ep_norm = "/" + endpoint.lstrip("/")
+        model = reg.get_model_by_endpoint(ep_norm)
+        if not model:
+            raise RunningHubAPIError(
+                code=-1,
+                msg=f"未在 registry 中找到 endpoint={ep_norm}，请检查 runninghub_lowprice_registry.json",
+            )
+
+        payload = reg.build_payload(model, params, self._api_key)
+        url = f"{_BASE_URL}{ep_norm}"
+        logger.info(
+            f"[RunningHub] call_model | key={self._masked_key} | "
+            f"endpoint={ep_norm} | inputs={list(payload.keys())}"
+        )
+        resp = await self._post(url, payload)
+        return await self._wait_for_completion(resp, timeout)
+
     async def image_to_video(
         self,
         prompt: str,
@@ -294,11 +330,20 @@ class RunningHubAPIService:
 
         # RunningHub wraps errors in HTTP 200 with a non-zero code
         if code is not None and code != 200 and code != 0:
+            # 友好处理：412 TOKEN_INVALID = 当前 API Key 未开通该「标准模型」（Standard Model API）
+            if code == 412:
+                friendly = (
+                    f"RunningHub 返回 412 TOKEN_INVALID。\n"
+                    f"原因：你的 API Key 没有开通这个「低价渠道/标准模型」产品。\n"
+                    f"解决：访问 https://www.runninghub.cn/call-api/search-api/standard-model "
+                    f"找到对应模型，点击「立即接入」开通后再试。\n"
+                    f"（注意：RunningHub 的 ComfyUI 工作流 API 和 标准模型 API 是两个独立产品，需要分别激活。）\n"
+                    f"调用 URL: {url}"
+                )
+                logger.error(f"[RunningHub] {friendly}")
+                raise RunningHubAPIError(code=code, msg=friendly)
             logger.error(
-                f"[RunningHub] API error: code={code} msg={msg} | "
-                "If code=412 (TOKEN_INVALID), check that your API Key is valid "
-                "and has permission to call video generation endpoints. "
-                "Some endpoints require an enterprise-level account."
+                f"[RunningHub] API error: code={code} msg={msg} url={url}"
             )
             raise RunningHubAPIError(code=code, msg=msg)
 

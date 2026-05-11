@@ -167,10 +167,14 @@ class ImageToVideoPipelineUI(PipelineUI):
             # ============================================================
             param_overrides: list[tuple[str, str, Any]] = []
             task_options: dict[str, Any] = {}
+            rh_api_params: dict[str, Any] = {}
             is_rh = bool(workflow_key and workflow_key.startswith("runninghub/"))
+            is_rh_api = bool(workflow_key and workflow_key.startswith("runninghub-api/"))
             if is_rh and workflow_key:
                 param_overrides = self._render_workflow_params(pixelle_video, workflow_key)
                 task_options = self._render_task_options()
+            elif is_rh_api and workflow_key:
+                rh_api_params = self._render_rh_api_params(workflow_key)
 
             return {
                 "audio_assets": audio_asset_paths,
@@ -179,7 +183,69 @@ class ImageToVideoPipelineUI(PipelineUI):
                 "image_urls": image_urls,
                 "param_overrides": param_overrides,
                 "task_options": task_options,
+                "rh_api_params": rh_api_params,
+                "is_rh_api": is_rh_api,
                 }
+
+    def _render_rh_api_params(self, workflow_key: str) -> dict[str, Any]:
+        """渲染 RunningHub 低价渠道 / 标准模型 API 的动态参数面板（registry 驱动）。"""
+        from pixelle_video.services import runninghub_registry as rh_reg
+
+        model = rh_reg.get_model_by_workflow_key(workflow_key)
+        if not model:
+            st.warning(f"未在 registry 中找到模型: {workflow_key}")
+            return {}
+
+        with st.expander(f"⚙️ 参数 — {model['name']}", expanded=True):
+            highlight = model.get("modelHighlights")
+            if highlight:
+                st.caption(highlight)
+            values: dict[str, Any] = {}
+            inputs = model.get("inputs", []) or []
+            cols = st.columns(2)
+            for idx, spec in enumerate(inputs):
+                k = spec["fieldKey"]
+                # 由 pipeline 自动注入的字段，不在 UI 暴露
+                if k in ("prompt", "imageUrls", "imageUrl", "firstFrameUrl", "lastFrameUrl"):
+                    continue
+                t = spec.get("type")
+                label = spec.get("description") or k
+                if spec.get("required"):
+                    label = f"{label} *"
+                default = spec.get("defaultValue")
+                wkey = self._k(f"rh_api_{workflow_key}_{k}")
+                with cols[idx % 2]:
+                    if t == "LIST":
+                        options = [o.get("value") for o in (spec.get("options") or [])]
+                        if not options:
+                            continue
+                        try:
+                            idx_default = options.index(default) if default in options else 0
+                        except ValueError:
+                            idx_default = 0
+                        values[k] = st.selectbox(label, options, index=idx_default, key=wkey)
+                    elif t == "BOOLEAN":
+                        values[k] = st.checkbox(label, value=bool(default) if default is not None else False, key=wkey)
+                    elif t == "INT":
+                        try:
+                            min_v = int(spec.get("minValue") or 0)
+                            max_v = int(spec.get("maxValue") or 2**31 - 1)
+                            cur = int(default) if default not in (None, "") else min_v
+                        except Exception:
+                            min_v, max_v, cur = 0, 2**31 - 1, 0
+                        values[k] = int(st.number_input(label, min_value=min_v, max_value=max_v, value=cur, key=wkey))
+                    elif t == "STRING":
+                        max_len = int(spec.get("maxLength") or 1000)
+                        if max_len > 200:
+                            values[k] = st.text_area(label, value=str(default or ""), max_chars=max_len, key=wkey, height=100)
+                        else:
+                            values[k] = st.text_input(label, value=str(default or ""), max_chars=max_len, key=wkey)
+                    elif t in ("IMAGE", "VIDEO"):
+                        st.caption(f"{label}（首帧/参考素材请在左侧上传，URL 会自动注入）")
+                    else:
+                        values[k] = st.text_input(label, value=str(default or ""), key=wkey)
+            # 清理空值
+            return {kk: vv for kk, vv in values.items() if vv not in (None, "")}
 
     def _render_task_options(self) -> dict[str, Any]:
         """渲染 RunningHub 任务高级选项（addMetadata / instanceType / usePersonalQueue / retainSeconds）。"""
@@ -323,7 +389,9 @@ class ImageToVideoPipelineUI(PipelineUI):
             image_urls = video_params.get("image_urls", [])
             param_overrides = video_params.get("param_overrides", []) or []
             task_options = video_params.get("task_options", {}) or {}
+            rh_api_params = video_params.get("rh_api_params", {}) or {}
             is_runninghub_workflow = bool(workflow_key and workflow_key.startswith("runninghub/"))
+            is_rh_api_workflow = bool(workflow_key and workflow_key.startswith("runninghub-api/"))
 
             logger.info(f"  - video_params: {video_params}")
 
@@ -387,7 +455,42 @@ class ImageToVideoPipelineUI(PipelineUI):
 
                         workflow_path = Path("workflows") / workflow_key
 
-                        if is_runninghub_workflow:
+                        if is_rh_api_workflow:
+                            config_manager.reload()
+                            from pixelle_video.services import runninghub_registry as _rh_reg
+
+                            model = _rh_reg.get_model_by_workflow_key(workflow_key)
+                            if not model:
+                                raise Exception(f"未在 registry 中找到模型: {workflow_key}")
+
+                            # 把上传的图片作为 imageUrl / imageUrls 注入（media.py 会自动上传到 RH CDN）
+                            field_keys = {i["fieldKey"] for i in model.get("inputs", [])}
+                            params: dict[str, Any] = dict(rh_api_params)
+                            if image_path:
+                                if "imageUrls" in field_keys:
+                                    params.setdefault("imageUrls", [image_path])
+                                elif "imageUrl" in field_keys:
+                                    params.setdefault("imageUrl", image_path)
+                                elif "firstFrameUrl" in field_keys:
+                                    params.setdefault("firstFrameUrl", image_path)
+
+                            media_svc = pixelle_video.media
+                            status_text.text("正在调用 RunningHub 低价渠道模型...")
+                            progress_bar.progress(30)
+                            # 把会与 MediaService.__call__ 命名参数冲突的 key 提出来单独传
+                            _named = {}
+                            for _k in ("duration", "width", "height", "seed", "steps", "cfg", "sampler", "negative_prompt"):
+                                if _k in params:
+                                    _named[_k] = params.pop(_k)
+                            result = await media_svc(
+                                prompt=prompt,
+                                workflow=workflow_key,
+                                media_type="video",
+                                **_named,
+                                **params,
+                            )
+                            generated_video_url = result.url
+                        elif is_runninghub_workflow:
                             config_manager.reload()
                             if not image_path:
                                 raise Exception("RunningHub 工作流需要上传首帧图片。")
