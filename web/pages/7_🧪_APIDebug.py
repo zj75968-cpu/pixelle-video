@@ -82,6 +82,22 @@ with left:
         with st.expander("description", expanded=False):
             st.write(model["description"])
 
+    # ----- 高级开关：抗 1011 / plus 实例 -----
+    st.markdown("### ⚙️ 调度选项")
+    opt_cols = st.columns(2)
+    use_plus = opt_cols[0].checkbox(
+        "⚡ 使用 plus 独立实例",
+        value=False,
+        help="走独立 GPU 队列，降低 1011「模型繁忙」概率，单价略高。",
+        key="rh_api_dbg_plus",
+    )
+    auto_retry = opt_cols[1].checkbox(
+        "🔁 1011 自动重试（30s/60s/120s）",
+        value=True,
+        help="任务因 1011 模型繁忙失败时自动按指数退避重试，最多 3 次。",
+        key="rh_api_dbg_retry",
+    )
+
     # ----- 参数表单：原样还原 -----
     st.markdown("### 📥 请求参数")
     st.caption("`*` 标记 = 必填；类型与 default 来自 registry")
@@ -160,7 +176,7 @@ with left:
 # ------------------------------------------------------------
 with right:
     st.markdown("### 📄 请求体预览")
-    preview = {"apiKey": "<注入>", **{k: v for k, v in params.items() if v not in (None, "")}}
+    preview = {**{k: v for k, v in params.items() if v not in (None, "")}}
     for k, (u, multi) in image_uploads.items():
         if u is None:
             continue
@@ -168,13 +184,17 @@ with right:
             preview[k] = [f.name for f in (u or [])]
         else:
             preview[k] = u.name
+    if use_plus:
+        preview["instanceType"] = "plus"
     st.code(
-        f"POST https://www.runninghub.cn/api/v1{model['rhEndpoint']}\n"
+        f"POST https://www.runninghub.cn/openapi/v2{model['rhEndpoint']}\n"
         + f"Authorization: Bearer <API_KEY>\n"
         + f"Content-Type: application/json\n\n"
         + json.dumps(preview, ensure_ascii=False, indent=2),
         language="json",
     )
+    if auto_retry:
+        st.caption("🔁 启用 1011 自动重试：30s → 60s → 120s（最多 3 次）")
 
     st.markdown("### 🎬 结果")
     result_box = st.empty()
@@ -206,13 +226,18 @@ async def _upload_files() -> dict:
 
 
 async def _send():
+    from pixelle_video.services.runninghub_api_service import RunningHubAPIService
+
     image_params = await _upload_files()
     full_params = {**params, **image_params}
     # 清掉空字符串
     full_params = {k: v for k, v in full_params.items() if v not in (None, "")}
-    return await pixelle_video.media(
-        workflow=model["workflow_key"],
+    svc = RunningHubAPIService()
+    return await svc.call_model(
+        endpoint=model["rhEndpoint"],
         params=full_params,
+        instance_type="plus" if use_plus else None,
+        auto_retry_1011=auto_retry,
     )
 
 
@@ -247,11 +272,13 @@ if submit:
             else:
                 with result_box.container():
                     st.success("✅ 调用成功")
-                    url = getattr(media_result, "url", str(media_result))
-                    mtype = getattr(media_result, "media_type", "")
+                    url = str(media_result)
+                    suffix = url.split("?")[0].rsplit(".", 1)[-1].lower()
+                    is_video = suffix in {"mp4", "mov", "webm", "mkv"}
+                    mtype = "video" if is_video else "image"
                     st.write(f"**media_type:** `{mtype}`")
                     st.write(f"**url:** {url}")
-                    if mtype == "video":
+                    if is_video:
                         st.video(url)
                     else:
                         st.image(url)

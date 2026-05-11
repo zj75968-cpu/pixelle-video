@@ -53,13 +53,25 @@ class RunningHubAPIService:
     # 公开 API
     # ==================================================================
 
-    async def call_model(self, endpoint: str, params: dict, timeout: int = 600) -> str:
+    async def call_model(
+        self,
+        endpoint: str,
+        params: dict,
+        timeout: int = 600,
+        instance_type: Optional[str] = None,
+        auto_retry_1011: bool = True,
+        max_retries_1011: int = 3,
+    ) -> str:
         """通用调用：提交任务并轮询直到完成，返回首个产物 URL。
 
         Args:
             endpoint: ``/rhart-video-g/text-to-video`` 等 registry endpoint。
             params:   不需要也不要包含 ``apiKey``，鉴权走 Bearer 头。
             timeout:  最长等待秒数。
+            instance_type: ``"plus"`` 走独立队列（降低 1011 概率，单价略高）；
+                ``None`` 或 ``"default"`` 走共享队列。
+            auto_retry_1011: 任务因 1011（模型繁忙）失败时，按 30s/60s/120s 退避自动重试。
+            max_retries_1011: 1011 最大重试次数，超过仍繁忙则抛错。
 
         Returns:
             ``results[0].url`` 文件直链（链接 24h 内有效）。
@@ -77,15 +89,41 @@ class RunningHubAPIService:
         # registry.build_payload 会注入 apiKey，这里剥掉（v2 用 header 鉴权）
         payload = reg.build_payload(model, params, self._api_key)
         payload.pop("apiKey", None)
+        if instance_type and instance_type != "default":
+            payload["instanceType"] = instance_type
 
-        submit = await self._submit(ep_norm, payload)
-        task_id = submit.get("taskId")
-        if not task_id:
-            raise RunningHubAPIError(
-                code=-1, msg=f"提交响应缺少 taskId: {submit}"
-            )
-        logger.info(f"[RunningHub] task submitted: {task_id} | endpoint={ep_norm}")
-        return await self._wait_for_completion(task_id, timeout)
+        backoffs = [30, 60, 120]
+        attempt = 0
+        while True:
+            try:
+                submit = await self._submit(ep_norm, payload)
+                task_id = submit.get("taskId")
+                if not task_id:
+                    raise RunningHubAPIError(
+                        code=-1, msg=f"提交响应缺少 taskId: {submit}"
+                    )
+                logger.info(
+                    f"[RunningHub] task submitted: {task_id} | endpoint={ep_norm} "
+                    f"| instanceType={payload.get('instanceType', 'default')}"
+                )
+                return await self._wait_for_completion(task_id, timeout)
+            except RunningHubAPIError as e:
+                msg_l = (e.msg or "").lower()
+                is_1011 = (
+                    str(e.code) == "1011"
+                    or "1011" in (e.msg or "")
+                    or "busy" in msg_l
+                    or "负载较高" in (e.msg or "")
+                )
+                if not (is_1011 and auto_retry_1011 and attempt < max_retries_1011):
+                    raise
+                wait_s = backoffs[min(attempt, len(backoffs) - 1)]
+                logger.warning(
+                    f"[RunningHub] 1011 模型繁忙，{wait_s}s 后重试 "
+                    f"({attempt + 1}/{max_retries_1011})..."
+                )
+                await asyncio.sleep(wait_s)
+                attempt += 1
 
     async def probe_activation(self, endpoint: str) -> dict:
         """探测 endpoint 是否可用（轻量调用，**不消耗**任务额度）。
