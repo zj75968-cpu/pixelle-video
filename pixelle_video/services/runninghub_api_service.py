@@ -116,11 +116,15 @@ class RunningHubAPIService:
                     "activated": False, "code": status_code,
                     "msg": f"HTTP {status_code} {err_msg}", "endpoint": ep_norm,
                 }
-            auth_codes = {"401", "403", "412", 401, 403, 412}
+            # 1014 = 非企业级共享 API Key；401/403/412 = 鉴权/未开通
+            auth_codes = {"401", "403", "412", "1014", 401, 403, 412, 1014}
             if err_code and err_code in auth_codes:
+                friendly = err_msg or "未开通"
+                if str(err_code) == "1014":
+                    friendly = "需要「企业级-共享 API Key」才能调用标准模型 API。"
                 return {
                     "activated": False, "code": err_code,
-                    "msg": err_msg or "未开通", "endpoint": ep_norm,
+                    "msg": friendly, "endpoint": ep_norm,
                 }
             return {
                 "activated": True, "code": err_code or 0,
@@ -228,6 +232,11 @@ class RunningHubAPIService:
         err_code = data.get("errorCode")
         err_msg = data.get("errorMessage") or ""
         if err_code not in (None, "", 0, "0"):
+            if str(err_code) == "1014":
+                err_msg = (
+                    "标准模型 API 仅限「企业级-共享 API Key」调用。请到 "
+                    "https://www.runninghub.cn/  控制台申请升级为企业级共享 Key 后重试。"
+                )
             raise RunningHubAPIError(code=err_code, msg=err_msg or "submit failed")
         return data
 
