@@ -19,11 +19,21 @@ init_session_state()
 init_i18n()
 
 st.title("🟢 RunningHub 低价渠道模型状态")
+
+st.warning(
+    "⚠️ **限制说明**：这 18 个低价渠道模型属于 **Standard Model API**（`/openapi/v2/<model>`），"
+    "服务端强制要求 **企业级-共享 API Key**。个人 Key 调用任意模型都会返回 "
+    "`errorCode 1014 ACCESS_DENIED`，与是否「开通」无关。\n\n"
+    "**没有企业级 Key 怎么办？** 请改用左侧导航的常规生成入口（文生图 / 文生视频 / 图生视频），"
+    "底层走 **ComfyUI Workflow API**，已实测 `image_flux` / `video_wan2.2` / `i2v_LTX2` 等"
+    "工作流可用个人 Key 直接出片。"
+)
+
 st.caption(
     "对当前 API Key 下的 18 个低价模型逐一探测。"
     "策略：发送只含 apiKey 的极简请求，服务端先校验 token —— "
-    "若返回 412 TOKEN_INVALID 即视为未开通，其它响应（包括"
-    "缺参数错误）即视为已开通。"
+    "若返回 412 TOKEN_INVALID 即视为未开通，1014 视为受限（需企业 Key），"
+    "其它响应（包括缺参数错误）即视为已开通。"
 )
 
 # 一键开通入口
