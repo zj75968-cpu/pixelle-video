@@ -50,3 +50,27 @@ __version__ = "0.1.0"
 
 __all__ = ["PixelleVideoCore", "pixelle_video", "config_manager"]
 
+
+# ------------------------------------------------------------------
+# 进程退出钩子：自动关闭 ComfyKit + aiohttp ClientSession，
+# 避免「Unclosed client session / Unclosed connector」警告。
+# ------------------------------------------------------------------
+def _atexit_cleanup() -> None:
+    import asyncio as _asyncio
+    if not pixelle_video._initialized or pixelle_video._comfykit is None:
+        return
+    try:
+        try:
+            loop = _asyncio.get_event_loop()
+            if loop.is_running():
+                return  # 在事件循环里（如 Streamlit）不强行关闭，交给业务自行 cleanup
+        except RuntimeError:
+            loop = None
+        _asyncio.run(pixelle_video.cleanup())
+    except Exception:
+        pass
+
+
+import atexit as _atexit
+_atexit.register(_atexit_cleanup)
+
