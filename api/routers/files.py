@@ -16,8 +16,10 @@ File service endpoints
 Provides access to generated files (videos, images, audio) and resource files.
 """
 
+import shutil
+import uuid
 from pathlib import Path
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from fastapi.responses import FileResponse
 from loguru import logger
 
@@ -125,4 +127,52 @@ async def get_file(file_path: str):
     except Exception as e:
         logger.error(f"File access error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+_ALLOWED_UPLOAD_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+
+
+@router.post("/upload")
+async def upload_image(request: Request, file: UploadFile = File(...)):
+    """
+    Upload an image and return a public URL for use with external APIs (e.g. RunningHub).
+
+    The file is saved under output/uploads/ and served via GET /api/files/output/uploads/{filename}.
+    The public base URL is taken from comfyui.public_base_url in config.yaml.
+    """
+    if file.content_type not in _ALLOWED_UPLOAD_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type: {file.content_type}. Allowed: {', '.join(_ALLOWED_UPLOAD_TYPES)}",
+        )
+
+    upload_dir = Path.cwd() / "output" / "uploads"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+
+    ext = Path(file.filename).suffix.lower() if file.filename else ".jpg"
+    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+        ext = ".jpg"
+    filename = f"{uuid.uuid4().hex[:16]}{ext}"
+    dest = upload_dir / filename
+
+    try:
+        with open(dest, "wb") as out:
+            shutil.copyfileobj(file.file, out)
+    except Exception as e:
+        logger.error(f"Failed to save uploaded file: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save file")
+
+    # Determine public base URL from config, fallback to request base_url
+    try:
+        from pixelle_video.config import config_manager
+        public_base = (getattr(config_manager.config.comfyui, "public_base_url", "") or "").rstrip("/")
+    except Exception:
+        public_base = ""
+
+    if not public_base:
+        public_base = str(request.base_url).rstrip("/")
+
+    file_url = f"{public_base}/api/files/output/uploads/{filename}"
+    logger.info(f"Uploaded image → {file_url}")
+    return {"url": file_url, "filename": filename}
 

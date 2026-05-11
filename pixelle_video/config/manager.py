@@ -151,8 +151,10 @@ class ConfigManager:
             "comfyui_url": self.config.comfyui.comfyui_url,
             "comfyui_api_key": self.config.comfyui.comfyui_api_key,
             "runninghub_api_key": self.config.comfyui.runninghub_api_key,
+            "runninghub_base_url": self.config.comfyui.runninghub_base_url,
             "runninghub_concurrent_limit": self.config.comfyui.runninghub_concurrent_limit,
             "runninghub_instance_type": self.config.comfyui.runninghub_instance_type,
+            "show_unavailable_workflows": self.config.comfyui.show_unavailable_workflows,
             "tts": {
                 "default_workflow": self.config.comfyui.tts.default_workflow,
             },

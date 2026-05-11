@@ -73,8 +73,20 @@ class ComfyUIConfig(BaseModel):
     comfyui_url: str = Field(default="http://127.0.0.1:8188", description="ComfyUI Server URL")
     comfyui_api_key: Optional[str] = Field(default=None, description="ComfyUI API Key (optional)")
     runninghub_api_key: Optional[str] = Field(default=None, description="RunningHub API Key (optional)")
+    runninghub_base_url: Optional[str] = Field(
+        default=None,
+        description="RunningHub API base URL. Use https://www.runninghub.cn for China, https://www.runninghub.ai for international (default).",
+    )
     runninghub_concurrent_limit: int = Field(default=1, ge=1, le=10, description="RunningHub concurrent execution limit (1-10)")
     runninghub_instance_type: Optional[str] = Field(default=None, description="RunningHub instance type (optional, set to 'plus' for 48GB VRAM)")
+    show_unavailable_workflows: bool = Field(
+        default=False,
+        description="Whether to show selfhost/* and runninghub-api/* workflows in UI dropdowns. Set true only if local ComfyUI is running or the standard RunningHub model APIs are enabled on your account.",
+    )
+    public_base_url: str = Field(
+        default="",
+        description="Public base URL for file access (e.g. https://yourdomain.com). Used when serving files to external APIs like RunningHub.",
+    )
     tts: TTSSubConfig = Field(default_factory=TTSSubConfig, description="TTS-specific configuration")
     image: ImageSubConfig = Field(default_factory=ImageSubConfig, description="Image-specific configuration")
     video: VideoSubConfig = Field(default_factory=VideoSubConfig, description="Video-specific configuration")

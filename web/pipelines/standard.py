@@ -45,6 +45,29 @@ class StandardPipelineUI(PipelineUI):
         return tr("pipeline.quick_create.description")
     
     def render(self, pixelle_video: Any):
+        # ====================================================================
+        # 模式开关：文生视频脚本流 / 图生视频
+        # ====================================================================
+        mode = st.radio(
+            "生成模式",
+            options=["script", "i2v"],
+            format_func=lambda x: "📝 文生视频脚本流" if x == "script" else "🎥 图生视频",
+            horizontal=True,
+            key="quick_create_mode",
+        )
+
+        if mode == "i2v":
+            # 复用 ImageToVideoPipelineUI（加 key_prefix 避免与图生视频 Tab 冲突）
+            from web.pipelines.i2v import ImageToVideoPipelineUI
+            i2v_ui = ImageToVideoPipelineUI(key_prefix="quick_")
+            left_col, right_col = st.columns([1, 1])
+            with left_col:
+                asset_params = i2v_ui.render_audio_visual_input(pixelle_video)
+                render_version_info()
+            with right_col:
+                i2v_ui._render_output_preview(pixelle_video, {**asset_params})
+            return
+
         # Three-column layout
         left_col, middle_col, right_col = st.columns([1, 1, 1])
         

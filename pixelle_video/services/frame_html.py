@@ -306,8 +306,46 @@ class HTMLFrameGenerator:
 
     @classmethod
     async def _ensure_browser(cls):
-        """Lazily initialize a shared Playwright browser instance"""
-        if cls._browser is None or not cls._browser.is_connected():
+        """Lazily initialize a shared Playwright browser instance.
+
+        Streamlit can swap event loops between reruns. A Browser launched on a
+        previously closed loop will report ``is_connected()==True`` but its
+        underlying transport is gone, leading to
+        ``'NoneType' object has no attribute 'send'``. We detect this by
+        comparing the current running loop with the one used at launch time,
+        and rebuild when they differ.
+        """
+        import asyncio
+
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+
+        loop_changed = (
+            getattr(cls, "_browser_loop", None) is not None
+            and current_loop is not None
+            and getattr(cls, "_browser_loop", None) is not current_loop
+        )
+
+        # Quick liveness probe — `is_connected()` is not enough; touching the
+        # transport via a no-op coro reveals stale browsers.
+        needs_rebuild = cls._browser is None or loop_changed or not cls._browser.is_connected()
+        if not needs_rebuild:
+            try:
+                # cheap call that exercises the transport
+                _ = cls._browser.contexts  # property access only
+            except Exception as probe_err:
+                logger.warning(f"Playwright browser probe failed, will rebuild: {probe_err}")
+                needs_rebuild = True
+
+        if needs_rebuild:
+            # Best-effort cleanup of stale objects (do NOT await — its loop is dead)
+            if cls._browser is not None or cls._playwright is not None:
+                logger.info("Rebuilding Playwright browser due to stale/closed loop or disconnect")
+                cls._browser = None
+                cls._playwright = None
+
             from playwright.async_api import async_playwright
             cls._playwright = await async_playwright().start()
             cls._browser = await cls._playwright.chromium.launch(
@@ -318,6 +356,7 @@ class HTMLFrameGenerator:
                     '--disable-extensions',
                 ]
             )
+            cls._browser_loop = current_loop
             logger.debug("Initialized Playwright Chromium browser")
         return cls._browser
 
@@ -388,10 +427,25 @@ class HTMLFrameGenerator:
         tmp_html_path = None
         try:
             browser = await self._ensure_browser()
-            page = await browser.new_page(
-                viewport={'width': self.width, 'height': self.height},
-                device_scale_factor=1,
-            )
+            try:
+                page = await browser.new_page(
+                    viewport={'width': self.width, 'height': self.height},
+                    device_scale_factor=1,
+                )
+            except Exception as new_page_err:
+                # Stale browser (loop closed): force-rebuild once and retry
+                msg = str(new_page_err)
+                if "send" in msg or "closed" in msg.lower() or "NoneType" in msg:
+                    logger.warning(f"new_page failed ({new_page_err}); rebuilding Playwright and retrying once")
+                    type(self)._browser = None
+                    type(self)._playwright = None
+                    browser = await self._ensure_browser()
+                    page = await browser.new_page(
+                        viewport={'width': self.width, 'height': self.height},
+                        device_scale_factor=1,
+                    )
+                else:
+                    raise
             try:
                 # Write HTML to a temp file and navigate via file:// URL so that
                 # local file:// image references are loaded under the same origin.

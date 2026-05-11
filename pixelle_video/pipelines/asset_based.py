@@ -611,9 +611,10 @@ class AssetBasedPipeline(LinearVideoPipeline):
                 
                 # Create a file list for FFmpeg concat
                 filelist_path = Path(context.task_dir) / "frames" / f"{i:02d}_audiolist.txt"
-                with open(filelist_path, 'w') as f:
+                with open(filelist_path, 'w', encoding='utf-8', newline='\n') as f:
                     for audio_file in narration_audios:
-                        escaped_path = str(Path(audio_file).absolute()).replace("'", "'\\''")
+                        # Use absolute POSIX-style path to avoid Windows backslash escape issues.
+                        escaped_path = Path(audio_file).resolve().as_posix().replace("'", "'\\''")
                         f.write(f"file '{escaped_path}'\n")
                 
                 # Concatenate audio files
@@ -627,7 +628,20 @@ class AssetBasedPipeline(LinearVideoPipeline):
                     str(combined_audio_path)
                 ]
                 
-                subprocess.run(concat_cmd, check=True, capture_output=True)
+                try:
+                    subprocess.run(
+                        concat_cmd,
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                        encoding='utf-8',
+                        errors='replace'
+                    )
+                except subprocess.CalledProcessError as e:
+                    logger.error(f"FFmpeg concat failed for scene {i}. Command: {' '.join(concat_cmd)}")
+                    if e.stderr:
+                        logger.error(f"FFmpeg stderr: {e.stderr.strip()}")
+                    raise
                 frame.audio_path = str(combined_audio_path)
                 
                 logger.info(f"✅ Combined {len(narration_audios)} narrations into one audio")

@@ -105,6 +105,36 @@ class MediaService(ComfyBaseService):
                     logger.error(f"Failed to parse workflow {source_name}/{filename}: {e}")
         
         # Sort by key (source/name)
+        # Add virtual RunningHub Model API workflows (low-cost direct REST API)
+        # Hidden by default — set comfyui.show_unavailable_workflows=true to enable.
+        try:
+            from pixelle_video.config import config_manager
+            show_unavailable = bool(getattr(config_manager.config.comfyui, "show_unavailable_workflows", False))
+        except Exception:
+            show_unavailable = False
+
+        if show_unavailable:
+            workflows.extend([
+                {
+                    "key": "runninghub-api/text-to-video",
+                    "source": "runninghub-api",
+                    "name": "text-to-video",
+                    "display_name": "全能视频V3.1-fast 文生视频 [RunningHub低价]",
+                    "description": "RunningHub Model API Text-to-Video (¥0.03/s)",
+                    "path": None,
+                },
+                {
+                    "key": "runninghub-api/image-to-video",
+                    "source": "runninghub-api",
+                    "name": "image-to-video",
+                    "display_name": "全能视频X 图生视频 [RunningHub低价]",
+                    "description": "RunningHub Model API Image-to-Video (¥0.03/s)",
+                    "path": None,
+                },
+            ])
+        else:
+            # Also hide selfhost/* entries when local ComfyUI is presumed unavailable
+            workflows = [wf for wf in workflows if wf.get("source") != "selfhost"]
         return sorted(workflows, key=lambda w: w["key"])
     
     async def __call__(
@@ -195,6 +225,45 @@ class MediaService(ComfyBaseService):
             )
         """
         # 1. Resolve workflow (returns structured info)
+        # --- RunningHub Model API direct routing (low-cost REST API) ---
+        if workflow and workflow.startswith("runninghub-api/"):
+            import math
+            from pixelle_video.services.runninghub_api_service import RunningHubAPIService
+            api_svc = RunningHubAPIService()
+            # Compute aspect ratio from width/height
+            if width and height:
+                gcd_val = math.gcd(int(width), int(height))
+                aspect_ratio = f"{int(width) // gcd_val}:{int(height) // gcd_val}"
+            else:
+                aspect_ratio = "9:16"
+            # Clamp duration to [4, 15]
+            target_duration = int(max(4, min(15, duration))) if duration else 8
+
+            if workflow == "runninghub-api/text-to-video":
+                logger.info(f"[RunningHub低价] 文生视频 aspect={aspect_ratio} duration={target_duration}s")
+                video_url = await api_svc.text_to_video_and_wait(
+                    prompt=prompt,
+                    aspect_ratio=aspect_ratio,
+                    duration=target_duration,
+                    resolution="720p",
+                )
+            elif workflow == "runninghub-api/image-to-video":
+                image_urls = params.get("image_urls", [])
+                if not image_urls:
+                    raise ValueError("runninghub-api/image-to-video 需要 image_urls 参数")
+                logger.info(f"[RunningHub低价] 图生视频 images={len(image_urls)} aspect={aspect_ratio} duration={target_duration}s")
+                video_url = await api_svc.image_to_video_and_wait(
+                    prompt=prompt,
+                    image_urls=image_urls,
+                    aspect_ratio=aspect_ratio,
+                    duration=target_duration,
+                    resolution="480p",
+                )
+            else:
+                raise ValueError(f"未知的 RunningHub API 工作流: {workflow}")
+
+            return MediaResult(media_type="video", url=video_url)
+        # --- 正常 ComfyKit 工作流 ---
         workflow_info = self._resolve_workflow(workflow=workflow)
 
         # 2. Build workflow parameters (ComfyKit config is now managed by core)

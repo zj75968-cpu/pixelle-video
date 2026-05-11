@@ -57,6 +57,7 @@ from api.routers import (
     post_router,
     devices_router,
     publish_router,
+    runninghub_router,
 )
 
 
@@ -145,6 +146,7 @@ app.include_router(frame_router, prefix=api_config.api_prefix)
 app.include_router(post_router, prefix=api_config.api_prefix)
 app.include_router(devices_router, prefix=api_config.api_prefix)
 app.include_router(publish_router, prefix=api_config.api_prefix)
+app.include_router(runninghub_router, prefix=api_config.api_prefix)
 
 
 @app.get("/")

@@ -79,3 +79,7 @@ repositories/
 # Local ffmpeg artifacts
 ffmpeg-temp/
 ffmpeg-release-essentials.zip
+
+# Runtime API logs
+api_log.txt
+api_err.txt
