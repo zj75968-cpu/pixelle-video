@@ -34,6 +34,15 @@ st.caption(
     "与 runninghub.cn 官方 API 文档保持一致。"
 )
 
+st.warning(
+    "⚠️ **限制说明**：这 18 个「低价渠道版」属于 RunningHub **Standard Model API**，"
+    "官方限制必须使用「**企业级-共享 API Key**」才能调用（个人 Key 会得到 `errorCode=1014 Access Denied`）。\n\n"
+    "**没有企业级 Key 怎么办？** 请改用左侧导航的常规生成入口（🎨 i2v / 🖼️ style_config 等），"
+    "它们走的是 **ComfyUI Workflow API**（`workflows/runninghub/*.json`），\n"
+    "**个人 API Key 完全可调用**，已通过端到端实测 ✅。\n\n"
+    "如需开通：到 [RunningHub 控制台](https://www.runninghub.cn/) → API 中心 → 申请「企业级-共享 API Key」。"
+)
+
 pixelle_video = get_pixelle_video()
 
 models = reg.list_models()
