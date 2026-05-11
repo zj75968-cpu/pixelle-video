@@ -94,6 +94,32 @@ class RunningHubAPIService:
         resp = await self._post(url, payload)
         return await self._wait_for_completion(resp, timeout)
 
+    async def probe_activation(self, endpoint: str) -> dict:
+        """
+        探测当前 API Key 是否已开通该 endpoint 对应的标准模型。
+
+        策略：只发送 ``{apiKey}`` 的极简载荷。
+            - 服务端先校验 token：未开通 → 返回 code=412 TOKEN_INVALID。
+            - 已开通：会因缺少必填参数返回其它 4xx（通常 code != 412）。
+            - 因此 412 → False，其它一切（含网络错误）→ True/Unknown。
+
+        Returns:
+            ``{"activated": bool, "code": int, "msg": str, "endpoint": str}``
+        """
+        ep_norm = "/" + endpoint.lstrip("/")
+        url = f"{_BASE_URL}{ep_norm}"
+        payload = {"apiKey": self._api_key}
+        try:
+            await self._post(url, payload)
+            # code == 0 / 200 表示已开通且任务已创建（极少发生，因为 prompt 等必填缺失）
+            return {"activated": True, "code": 0, "msg": "OK", "endpoint": ep_norm}
+        except RunningHubAPIError as e:
+            if e.code == 412:
+                return {"activated": False, "code": 412, "msg": "TOKEN_INVALID（未开通）", "endpoint": ep_norm}
+            return {"activated": True, "code": e.code, "msg": f"已开通（缺参数: {e.msg[:60]}）", "endpoint": ep_norm}
+        except Exception as e:
+            return {"activated": None, "code": -1, "msg": f"网络错误: {e}", "endpoint": ep_norm}
+
     async def image_to_video(
         self,
         prompt: str,
