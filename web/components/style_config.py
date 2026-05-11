@@ -707,12 +707,21 @@ def render_style_config(pixelle_video):
             all_workflows = pixelle_video.media.list_workflows()
             
             # Filter workflows based on template media type
-            if template_media_type == "video":
-                # Only show video_ workflows
-                workflows = [wf for wf in all_workflows if "video_" in wf["key"].lower()]
-            else:
-                # Only show image_ workflows (exclude video_)
-                workflows = [wf for wf in all_workflows if "video_" not in wf["key"].lower()]
+            def _wf_matches_media(wf, want_video: bool) -> bool:
+                # 优先按 registry 元信息判断 (runninghub-api/*)
+                rh_model = wf.get("runninghub_model")
+                if rh_model:
+                    cat = (rh_model.get("category") or "").lower()
+                    # 按"X-to-Y"中的 Y（输出类型）判断
+                    is_video_out = cat.endswith("-to-video") or cat == "video-tools"
+                    is_image_out = cat.endswith("-to-image")
+                    return is_video_out if want_video else is_image_out
+                # 旧逻辑（按 key 名）
+                key_low = wf["key"].lower()
+                has_video = "video_" in key_low or "/video" in key_low
+                return has_video if want_video else not has_video
+
+            workflows = [wf for wf in all_workflows if _wf_matches_media(wf, template_media_type == "video")]
         
             # Build options for selectbox
             # Display: "image_flux.json - Runninghub"
@@ -748,6 +757,61 @@ def render_style_config(pixelle_video):
             
             # Check and warn for selfhost media workflow (auto popup if not confirmed)
             check_and_warn_selfhost_workflow(workflow_key)
+
+            # ============================================================
+            # RunningHub 低价渠道（标准模型 API）动态参数表单
+            # ============================================================
+            rh_api_params: dict = {}
+            if workflow_key and workflow_key.startswith("runninghub-api/"):
+                try:
+                    from pixelle_video.services import runninghub_registry as _rh_reg
+                    _model = _rh_reg.get_model_by_workflow_key(workflow_key)
+                except Exception:
+                    _model = None
+                if _model:
+                    with st.expander(f"⚙️ 参数 — {_model['name']}", expanded=True):
+                        if _model.get("modelHighlights"):
+                            st.caption(_model["modelHighlights"])
+                        cols2 = st.columns(2)
+                        for _idx, _spec in enumerate(_model.get("inputs", []) or []):
+                            _k = _spec["fieldKey"]
+                            if _k in ("prompt", "imageUrls", "imageUrl", "firstFrameUrl", "lastFrameUrl"):
+                                continue  # 由 pipeline 自动注入
+                            _t = _spec.get("type")
+                            _label = _spec.get("description") or _k
+                            if _spec.get("required"):
+                                _label = f"{_label} *"
+                            _default = _spec.get("defaultValue")
+                            _wkey = f"style_rh_api_{workflow_key}_{_k}"
+                            with cols2[_idx % 2]:
+                                if _t == "LIST":
+                                    _opts = [o.get("value") for o in (_spec.get("options") or [])]
+                                    if not _opts:
+                                        continue
+                                    try:
+                                        _idef = _opts.index(_default) if _default in _opts else 0
+                                    except ValueError:
+                                        _idef = 0
+                                    rh_api_params[_k] = st.selectbox(_label, _opts, index=_idef, key=_wkey)
+                                elif _t == "BOOLEAN":
+                                    rh_api_params[_k] = st.checkbox(_label, value=bool(_default) if _default is not None else False, key=_wkey)
+                                elif _t == "INT":
+                                    try:
+                                        _mn = int(_spec.get("minValue") or 0)
+                                        _mx = int(_spec.get("maxValue") or 2**31 - 1)
+                                        _cur = int(_default) if _default not in (None, "") else _mn
+                                    except Exception:
+                                        _mn, _mx, _cur = 0, 2**31 - 1, 0
+                                    rh_api_params[_k] = int(st.number_input(_label, min_value=_mn, max_value=_mx, value=_cur, key=_wkey))
+                                elif _t == "STRING":
+                                    _mlen = int(_spec.get("maxLength") or 1000)
+                                    if _mlen > 200:
+                                        rh_api_params[_k] = st.text_area(_label, value=str(_default or ""), max_chars=_mlen, key=_wkey, height=80)
+                                    else:
+                                        rh_api_params[_k] = st.text_input(_label, value=str(_default or ""), max_chars=_mlen, key=_wkey)
+                                else:
+                                    pass  # IMAGE/VIDEO 由模板尺寸/上传管线自动注入
+                    rh_api_params = {kk: vv for kk, vv in rh_api_params.items() if vv not in (None, "")}
         
             # Get media size from template
             media_width = st.session_state.get('template_media_width')
@@ -804,12 +868,20 @@ def render_style_config(pixelle_video):
                             final_prompt = build_image_prompt(test_prompt, prompt_prefix)
                         
                             # Generate preview media (use user-specified size and media type)
+                            # 把 runninghub-api 的注册表参数也透传过去；duration 等命名冲突字段单独提
+                            _extra = dict(rh_api_params)
+                            _named = {}
+                            for _ck in ("duration", "seed", "steps", "cfg", "sampler", "negative_prompt"):
+                                if _ck in _extra:
+                                    _named[_ck] = _extra.pop(_ck)
                             media_result = run_async(pixelle_video.media(
                                 prompt=final_prompt,
                                 workflow=workflow_key,
                                 media_type=template_media_type,
                                 width=int(media_width),
-                                height=int(media_height)
+                                height=int(media_height),
+                                **_named,
+                                **_extra,
                             ))
                             preview_media_path = media_result.url
                         

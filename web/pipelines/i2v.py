@@ -90,6 +90,18 @@ class ImageToVideoPipelineUI(PipelineUI):
                                 "key": f"{source}/{fname}",
                                 "display_name": display
                             })
+                # 追加 RunningHub 低价渠道 registry 中的图生视频 / 首尾帧模型
+                try:
+                    from pixelle_video.services import runninghub_registry as _rh_reg
+                    for _m in _rh_reg.list_models():
+                        cat = _m.get("category") or ""
+                        if cat in ("image-to-video", "start-end-to-video"):
+                            result.append({
+                                "key": _m["workflow_key"],
+                                "display_name": f"[{cat}] {_m['name']} - RH低价",
+                            })
+                except Exception:
+                    pass
                 return result
 
             # File uploader for multiple files
