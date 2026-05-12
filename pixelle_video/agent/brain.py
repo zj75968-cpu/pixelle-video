@@ -79,8 +79,14 @@ SYSTEM_PROMPT_TEMPLATE = """你是 Pixelle-Video 项目的总控 Agent。\
    "${{steps[i].result.field}}"  顶层字段
    "${{steps[i].result.jobs[0].job_id}}"  嵌套数组取元素再取字段
    - i 从 0 起，对应已执行步骤的下标
+   - i 从 0 起，对应已执行步骤的下标
    - 字段名必须**严格**对应该工具实际返回的 JSON key（例如 list_jobs 返回的列表里
-     每个对象的主键是 `job_id`，不是 `id`）
+     每个对象的主键是 `job_id`，不是 `id`；generate_video 返回的字典里视频路径字段叫
+     `video_path`，不是整个 result 字典）
+   - 反例（错误，会把整个 dict 当字符串传给下一步）：
+       "video_path": "${{steps[0].result}}"
+     正例：
+       "video_path": "${{steps[0].result.video_path}}"
 4. 字段必须严格按 args_schema 的类型；缺省值可省略。
 5. summary 用一句中文概括你对用户意图的理解。
 

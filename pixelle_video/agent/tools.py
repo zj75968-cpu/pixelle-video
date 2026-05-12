@@ -153,6 +153,25 @@ async def _enqueue_publish(
     from pixelle_video.services.device_manager import device_manager
     from pixelle_video.services.publish_scheduler import publish_scheduler
 
+    # Defensive unwrap: LLM sometimes passes generate_video's whole result dict
+    # instead of just the path string.
+    if isinstance(video_path, dict):
+        unwrapped = (
+            video_path.get("video_path")
+            or video_path.get("final_video_path")
+            or video_path.get("path")
+        )
+        if not unwrapped:
+            raise ValueError(
+                f"enqueue_publish.video_path is a dict but no path field found: {list(video_path.keys())}"
+            )
+        logger.warning(
+            f"[agent] enqueue_publish received dict for video_path; "
+            f"unwrapped -> {unwrapped}"
+        )
+        video_path = unwrapped
+    video_path = str(video_path)
+
     # Resolve device serial: explicit -> first connected -> error
     serial = device_serial
     if not serial:
