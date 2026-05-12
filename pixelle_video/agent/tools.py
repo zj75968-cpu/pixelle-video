@@ -39,12 +39,62 @@ async def _list_devices() -> Dict[str, Any]:
     devices = [
         {
             "serial": d.serial,
-            "label": getattr(d, "label", None) or getattr(d, "alias", None) or "",
+            "name": getattr(d, "name", "") or "",
+            "theme": getattr(d, "theme", "") or "",
+            "notes": getattr(d, "notes", "") or "",
             "status": getattr(d, "status", "unknown"),
         }
         for d in device_manager.get_all()
     ]
     return {"count": len(devices), "devices": devices}
+
+
+async def _set_device_info(
+    serial: str,
+    name: str = "",
+    theme: str = "",
+    notes: str = "",
+) -> Dict[str, Any]:
+    """Register or update a device's name / theme / notes."""
+    from pixelle_video.services.device_manager import device_manager
+
+    dev = device_manager.add_device(serial=serial, name=name, theme=theme, notes=notes)
+    return {
+        "serial": dev.serial,
+        "name": dev.name,
+        "theme": dev.theme,
+        "notes": dev.notes,
+    }
+
+
+async def _list_jobs(status_filter: Optional[str] = None) -> Dict[str, Any]:
+    """List publish jobs. Optional status_filter: pending/scheduled/running/success/failed/cancelled."""
+    from pixelle_video.services.publish_scheduler import publish_scheduler
+
+    jobs = publish_scheduler.list_jobs(status_filter=status_filter)
+    items = [
+        {
+            "job_id": j.job_id,
+            "serial": j.serial,
+            "title": j.title,
+            "status": j.status,
+            "scheduled_at": j.scheduled_at,
+            "created_at": j.created_at,
+            "started_at": j.started_at,
+            "finished_at": j.finished_at,
+            "error": j.error,
+        }
+        for j in jobs
+    ]
+    return {"count": len(items), "jobs": items}
+
+
+async def _cancel_job(job_id: str) -> Dict[str, Any]:
+    """Cancel a pending/scheduled/running publish job by its job_id."""
+    from pixelle_video.services.publish_scheduler import publish_scheduler
+
+    ok = publish_scheduler.cancel_job(job_id)
+    return {"job_id": job_id, "cancelled": ok}
 
 
 async def _list_workflows() -> Dict[str, Any]:
@@ -139,9 +189,24 @@ async def _enqueue_publish(
 TOOLS: List[ToolSpec] = [
     ToolSpec(
         name="list_devices",
-        description="列出当前通过 ADB 连接的安卓设备（含 serial / label / status）。需要选择发布目标设备前先调用。",
+        description="列出所有已登记/连接的安卓设备（含 serial / name / theme / status）。需要选择发布目标设备前先调用。",
         args_schema={"type": "object", "properties": {}, "required": []},
         handler=_list_devices,
+    ),
+    ToolSpec(
+        name="set_device_info",
+        description="为某台设备登记或更新名称/主题/备注。常用于给新连接的设备取一个易记的名字。",
+        args_schema={
+            "type": "object",
+            "properties": {
+                "serial": {"type": "string", "description": "ADB serial"},
+                "name": {"type": "string", "description": "设备友好名称"},
+                "theme": {"type": "string", "description": "主题/账号定位（如 美食 / 旅行）"},
+                "notes": {"type": "string", "description": "其他备注"},
+            },
+            "required": ["serial"],
+        },
+        handler=_set_device_info,
     ),
     ToolSpec(
         name="list_workflows",
@@ -198,6 +263,36 @@ TOOLS: List[ToolSpec] = [
             "required": ["video_path", "title"],
         },
         handler=_enqueue_publish,
+    ),
+    ToolSpec(
+        name="list_jobs",
+        description=(
+            "查看发布队列里的任务。可选 status_filter：pending/scheduled/running/success/failed/cancelled。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "status_filter": {
+                    "type": "string",
+                    "description": "可选状态过滤",
+                    "enum": ["pending", "scheduled", "running", "success", "failed", "cancelled"],
+                },
+            },
+            "required": [],
+        },
+        handler=_list_jobs,
+    ),
+    ToolSpec(
+        name="cancel_job",
+        description="按 job_id 取消一个尚未完成的发布任务。",
+        args_schema={
+            "type": "object",
+            "properties": {
+                "job_id": {"type": "string", "description": "发布任务 ID"},
+            },
+            "required": ["job_id"],
+        },
+        handler=_cancel_job,
     ),
 ]
 
