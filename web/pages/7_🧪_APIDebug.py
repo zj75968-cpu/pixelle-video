@@ -43,6 +43,19 @@ st.warning(
     "如需开通：到 [RunningHub 控制台](https://www.runninghub.cn/) → API 中心 → 申请「企业级-共享 API Key」。"
 )
 
+with st.expander("💡 提示词避雷指南（避免 errorCode=1501 内容安全审查）", expanded=False):
+    st.markdown(
+        "RunningHub 在提交模型前会对 prompt 做内容安全审查，触发 `1501` 即整个任务失败。"
+        "常见误伤场景：\n"
+        "- **食材/药材主题**：少用「**食用 / 服用 / 使用 / 功效 / 治疗 / 养生 / 美容养颜**」这类动词或宣称语，"
+        "改为「**制作 / 展示 / 烹饪 / 摆盘 / 拍摄**」等场景词。\n"
+        "- **中文比英文严**：`peach gum dessert, warm lighting, food photography` 这种英文 prompt 通常更易过审。\n"
+        "- **避雷词汇**：`oral / consume / inject / cure / 吸食 / 服食 / 用法 / 偏方 / 包治`。\n"
+        "- **人体特写**：手/脸/口部大特写也偶发 1501，可改用中景或场景镜头。\n"
+        "- **真正被审的是最终 prompt**：若上游有 LLM 改写，请看终端日志中 `POST .../openapi/v2/...` 后的请求体，"
+        "确认到底是哪个词触发。"
+    )
+
 models = reg.list_models()
 if not models:
     st.error("registry 为空，请检查 runninghub_lowprice_registry.json")
