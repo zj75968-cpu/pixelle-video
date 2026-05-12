@@ -249,6 +249,110 @@ async def _delete_task(task_id: str) -> Dict[str, Any]:
     return {"task_id": task_id, "deleted": True}
 
 
+async def _cleanup_outputs(
+    days: int = 7,
+    keep_latest: int = 5,
+    dry_run: bool = True,
+) -> Dict[str, Any]:
+    """Clean up old task output directories.
+
+    Strategy:
+    - Sort all task dirs by mtime (newest first).
+    - Always keep the `keep_latest` newest dirs.
+    - Among the rest, mark as candidates any dir whose mtime is older than `days` days ago.
+    - If dry_run is True (default), only report; otherwise delete via persistence.delete_task.
+    """
+    import time
+    from pixelle_video.service import pixelle_video as core
+
+    if not getattr(core, "_initialized", False):
+        await core.initialize()
+
+    persistence = core.persistence
+    if persistence is None:
+        raise RuntimeError("PersistenceService not initialized")
+
+    output_dir = persistence.output_dir
+    days = max(0, int(days))
+    keep_latest = max(0, int(keep_latest))
+    cutoff_ts = time.time() - days * 86400
+
+    entries: List[Dict[str, Any]] = []
+    for task_dir in output_dir.iterdir():
+        if not task_dir.is_dir():
+            continue
+        # Only consider entries that look like task directories
+        # (must have a metadata.json or final.mp4 to be safe).
+        if not ((task_dir / "metadata.json").exists() or (task_dir / "final.mp4").exists()):
+            continue
+        try:
+            mtime = task_dir.stat().st_mtime
+        except OSError:
+            continue
+        # Compute size
+        size = 0
+        for p in task_dir.rglob("*"):
+            try:
+                if p.is_file():
+                    size += p.stat().st_size
+            except OSError:
+                continue
+        entries.append({
+            "task_id": task_dir.name,
+            "mtime": mtime,
+            "size_bytes": size,
+        })
+
+    # Sort newest first
+    entries.sort(key=lambda e: e["mtime"], reverse=True)
+    kept_latest_ids = {e["task_id"] for e in entries[:keep_latest]}
+
+    items: List[Dict[str, Any]] = []
+    deleted_count = 0
+    bytes_freed = 0
+    for e in entries:
+        is_protected = e["task_id"] in kept_latest_ids
+        is_old = e["mtime"] < cutoff_ts
+        is_candidate = (not is_protected) and is_old
+        will_delete = is_candidate and (not dry_run)
+
+        if will_delete:
+            try:
+                await persistence.delete_task(e["task_id"])
+                deleted_count += 1
+                bytes_freed += e["size_bytes"]
+                status = "deleted"
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"cleanup_outputs: failed to delete {e['task_id']}: {exc}")
+                status = f"error:{exc}"
+        elif is_candidate:
+            status = "candidate"
+        elif is_protected:
+            status = "kept_latest"
+        else:
+            status = "kept_recent"
+
+        items.append({
+            "task_id": e["task_id"],
+            "size_mb": round(e["size_bytes"] / (1024 * 1024), 2),
+            "age_days": round((time.time() - e["mtime"]) / 86400, 2),
+            "status": status,
+        })
+
+    candidate_count = sum(1 for it in items if it["status"] == "candidate")
+    return {
+        "dry_run": dry_run,
+        "days": days,
+        "keep_latest": keep_latest,
+        "scanned": len(entries),
+        "candidates": candidate_count if dry_run else 0,
+        "deleted": deleted_count,
+        "bytes_freed": bytes_freed,
+        "mb_freed": round(bytes_freed / (1024 * 1024), 2),
+        "items": items[:50],  # truncate long listings for LLM
+    }
+
+
 # --------------------------------------------------------------------------
 # Registry
 # --------------------------------------------------------------------------
@@ -393,6 +497,25 @@ TOOLS: List[ToolSpec] = [
             "required": ["task_id"],
         },
         handler=_delete_task,
+    ),
+    ToolSpec(
+        name="cleanup_outputs",
+        description=(
+            "清理 output/ 下的历史任务目录，释放磁盘空间。"
+            "默认 dry_run=True 只列出候选不删除；确认后再用 dry_run=False 实际删除。"
+            "days：保留最近 N 天内的任务（默认 7）；keep_latest：无论年龄都保留的最新 N 条（默认 5）。"
+            "返回 scanned / candidates / deleted / mb_freed / items[]。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "days": {"type": "integer", "description": "保留最近 N 天内的任务", "default": 7},
+                "keep_latest": {"type": "integer", "description": "始终保留的最新条数", "default": 5},
+                "dry_run": {"type": "boolean", "description": "True=仅模拟", "default": True},
+            },
+            "required": [],
+        },
+        handler=_cleanup_outputs,
     ),
 ]
 
