@@ -83,3 +83,7 @@ ffmpeg-release-essentials.zip
 # Runtime API logs
 api_log.txt
 api_err.txt
+
+# Local Android platform-tools (downloaded binaries)
+packaging/windows/platform-tools/
+packaging/windows/platform-tools-latest-windows.zip

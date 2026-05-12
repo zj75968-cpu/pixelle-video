@@ -33,6 +33,13 @@ from loguru import logger
 
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 DEVICES_FILE = DATA_DIR / "devices.json"
+PROJECT_LOCAL_ADB = (
+    Path(__file__).resolve().parent.parent.parent
+    / "packaging"
+    / "windows"
+    / "platform-tools"
+    / "adb.exe"
+)
 DEFAULT_AUTO_SYNC_INTERVAL = 8
 DEFAULT_WIFI_RECONNECT_COOLDOWN = 30
 
@@ -158,6 +165,7 @@ class DeviceManager:
 
         home = Path.home()
         candidates.extend([
+            PROJECT_LOCAL_ADB,
             home / "AppData" / "Local" / "Android" / "Sdk" / "platform-tools" / "adb.exe",
             home / "Android" / "Sdk" / "platform-tools" / "adb.exe",
             Path("C:/Android/platform-tools/adb.exe"),
