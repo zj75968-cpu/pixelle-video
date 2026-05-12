@@ -74,8 +74,13 @@ SYSTEM_PROMPT_TEMPLATE = """你是 Pixelle-Video 项目的总控 Agent。\
 规则：
 1. 只能使用清单内的工具，工具名拼写必须完全一致。
 2. 步骤要尽量少；若不需要调用任何工具（例如用户只是问问题），返回空 steps。
-3. 当下一步参数依赖上一步结果时，使用占位符字符串：
-   "${{steps[i].result.field_name}}"，i 从 0 起。例如把生成的 video_path 传给 enqueue_publish。
+3. 当下一步参数依赖上一步结果时，使用占位符字符串。占位符必须**整串**匹配以下格式：
+   "${{steps[i].result}}"  整个结果
+   "${{steps[i].result.field}}"  顶层字段
+   "${{steps[i].result.jobs[0].job_id}}"  嵌套数组取元素再取字段
+   - i 从 0 起，对应已执行步骤的下标
+   - 字段名必须**严格**对应该工具实际返回的 JSON key（例如 list_jobs 返回的列表里
+     每个对象的主键是 `job_id`，不是 `id`）
 4. 字段必须严格按 args_schema 的类型；缺省值可省略。
 5. summary 用一句中文概括你对用户意图的理解。
 
@@ -84,10 +89,39 @@ SYSTEM_PROMPT_TEMPLATE = """你是 Pixelle-Video 项目的总控 Agent。\
 
 
 def _resolve_placeholders(args: Dict[str, Any], prior_results: List[Any]) -> Dict[str, Any]:
-    """Replace ${steps[i].result.x.y} placeholders in args with actual values."""
+    """Replace ${steps[i].result.x.y[0].z} placeholders in args with actual values.
+
+    Supported path syntax after `.result`:
+      - dot field: `.foo`
+      - array index: `[0]` or `.0`
+      - chained: `.jobs[0].job_id` or `.jobs.0.job_id`
+    """
     import re
 
-    pattern = re.compile(r"^\$\{steps\[(\d+)\]\.result(?:\.([\w.]+))?\}$")
+    # Full-string match. The trailing part after .result is captured verbatim and
+    # parsed manually so we can support [N] segments.
+    pattern = re.compile(r"^\$\{steps\[(\d+)\]\.result((?:\.[\w]+|\[\d+\]|\.\d+)*)\}$")
+    seg_re = re.compile(r"\.([A-Za-z_][\w]*)|\[(\d+)\]|\.(\d+)")
+
+    def _walk(cur: Any, raw_path: str) -> Any:
+        if not raw_path:
+            return cur
+        for m in seg_re.finditer(raw_path):
+            field, idx_bracket, idx_dot = m.groups()
+            if field is not None:
+                if isinstance(cur, dict):
+                    cur = cur.get(field)
+                else:
+                    cur = getattr(cur, field, None)
+            else:
+                i = int(idx_bracket if idx_bracket is not None else idx_dot)
+                if isinstance(cur, (list, tuple)) and 0 <= i < len(cur):
+                    cur = cur[i]
+                else:
+                    cur = None
+            if cur is None:
+                return None
+        return cur
 
     def _resolve_one(value: Any) -> Any:
         if isinstance(value, str):
@@ -95,17 +129,10 @@ def _resolve_placeholders(args: Dict[str, Any], prior_results: List[Any]) -> Dic
             if not m:
                 return value
             idx = int(m.group(1))
-            path = m.group(2)
+            raw_path = m.group(2) or ""
             if idx >= len(prior_results):
                 raise ValueError(f"Placeholder references step {idx} which has not run")
-            cur = prior_results[idx]
-            if path:
-                for part in path.split("."):
-                    if isinstance(cur, dict):
-                        cur = cur.get(part)
-                    else:
-                        cur = getattr(cur, part, None)
-            return cur
+            return _walk(prior_results[idx], raw_path)
         if isinstance(value, list):
             return [_resolve_one(v) for v in value]
         if isinstance(value, dict):
