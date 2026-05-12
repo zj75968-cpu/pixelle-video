@@ -21,7 +21,7 @@ if str(_project_root) not in sys.path:
 import streamlit as st
 
 from pixelle_video.services import runninghub_registry as reg
-from web.state.session import init_session_state, init_i18n, get_pixelle_video
+from web.state.session import init_session_state, init_i18n
 
 
 st.set_page_config(page_title="API 调试", page_icon="🧪", layout="wide")
@@ -42,8 +42,6 @@ st.warning(
     "**个人 API Key 完全可调用**，已通过端到端实测 ✅。\n\n"
     "如需开通：到 [RunningHub 控制台](https://www.runninghub.cn/) → API 中心 → 申请「企业级-共享 API Key」。"
 )
-
-pixelle_video = get_pixelle_video()
 
 models = reg.list_models()
 if not models:
@@ -82,20 +80,19 @@ with left:
         with st.expander("description", expanded=False):
             st.write(model["description"])
 
-    # ----- 高级开关：抗 1011 / plus 实例 -----
-    st.markdown("### ⚙️ 调度选项")
-    opt_cols = st.columns(2)
-    use_plus = opt_cols[0].checkbox(
+    # ----- 高级选项 -----
+    adv_cols = st.columns(2)
+    use_plus = adv_cols[0].checkbox(
         "⚡ 使用 plus 独立实例",
         value=False,
-        help="走独立 GPU 队列，降低 1011「模型繁忙」概率，单价略高。",
-        key="rh_api_dbg_plus",
+        help="走独立 GPU 队列，大幅降低 1011（模型繁忙）概率，单价略高。",
+        key="rh_api_dbg_use_plus",
     )
-    auto_retry = opt_cols[1].checkbox(
-        "🔁 1011 自动重试（30s/60s/120s）",
+    auto_retry = adv_cols[1].checkbox(
+        "🔁 1011 模型繁忙时自动重试",
         value=True,
-        help="任务因 1011 模型繁忙失败时自动按指数退避重试，最多 3 次。",
-        key="rh_api_dbg_retry",
+        help="任务因 1011 失败时按 30s/60s/120s 退避重试，最多 3 次。",
+        key="rh_api_dbg_auto_retry",
     )
 
     # ----- 参数表单：原样还原 -----
@@ -176,7 +173,7 @@ with left:
 # ------------------------------------------------------------
 with right:
     st.markdown("### 📄 请求体预览")
-    preview = {**{k: v for k, v in params.items() if v not in (None, "")}}
+    preview = {k: v for k, v in params.items() if v not in (None, "")}
     for k, (u, multi) in image_uploads.items():
         if u is None:
             continue
@@ -194,21 +191,17 @@ with right:
         language="json",
     )
     if auto_retry:
-        st.caption("🔁 启用 1011 自动重试：30s → 60s → 120s（最多 3 次）")
+        st.caption("🔁 已启用：1011 自动按 30s/60s/120s 退避重试 3 次。")
 
     st.markdown("### 🎬 结果")
     result_box = st.empty()
 
 
-async def _upload_files() -> dict:
-    """把 file_uploader 拿到的本地文件上传到 RunningHub，得到 URL。"""
-    api_svc = pixelle_video.media._runninghub_api_service if hasattr(pixelle_video.media, "_runninghub_api_service") else None
-    if api_svc is None:
-        # 直接构造一个新实例
-        from pixelle_video.services.runninghub_api_service import RunningHubAPIService
-        api_svc = RunningHubAPIService(api_key=pixelle_video.config.get("runninghub", {}).get("api_key", ""))
+async def _send():
+    from pixelle_video.services.runninghub_api_service import RunningHubAPIService
 
-    out = {}
+    api_svc = RunningHubAPIService()
+    image_params = {}
     for k, (u, multi) in image_uploads.items():
         if u is None:
             continue
@@ -219,26 +212,20 @@ async def _upload_files() -> dict:
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp.write(f.getbuffer())
                 tmp_path = tmp.name
-            url = await api_svc.upload_image(tmp_path)
-            urls.append(url)
-        out[k] = urls if multi else urls[0]
-    return out
+            urls.append(await api_svc.upload_image(tmp_path))
+        image_params[k] = urls if multi else urls[0]
 
-
-async def _send():
-    from pixelle_video.services.runninghub_api_service import RunningHubAPIService
-
-    image_params = await _upload_files()
     full_params = {**params, **image_params}
-    # 清掉空字符串
     full_params = {k: v for k, v in full_params.items() if v not in (None, "")}
-    svc = RunningHubAPIService()
-    return await svc.call_model(
+    url = await api_svc.call_model(
         endpoint=model["rhEndpoint"],
         params=full_params,
         instance_type="plus" if use_plus else None,
         auto_retry_1011=auto_retry,
     )
+    suffix = Path(url.split("?")[0]).suffix.lower()
+    mtype = "video" if suffix in (".mp4", ".mov", ".webm") else "image"
+    return url, mtype
 
 
 if submit:
@@ -260,11 +247,11 @@ if submit:
         with st.spinner("发送请求并轮询结果中（最长 600s）..."):
             try:
                 try:
-                    media_result = asyncio.run(_send())
+                    url, mtype = asyncio.run(_send())
                 except RuntimeError:
                     loop = asyncio.new_event_loop()
                     try:
-                        media_result = loop.run_until_complete(_send())
+                        url, mtype = loop.run_until_complete(_send())
                     finally:
                         loop.close()
             except Exception as e:
@@ -272,13 +259,9 @@ if submit:
             else:
                 with result_box.container():
                     st.success("✅ 调用成功")
-                    url = str(media_result)
-                    suffix = url.split("?")[0].rsplit(".", 1)[-1].lower()
-                    is_video = suffix in {"mp4", "mov", "webm", "mkv"}
-                    mtype = "video" if is_video else "image"
                     st.write(f"**media_type:** `{mtype}`")
                     st.write(f"**url:** {url}")
-                    if is_video:
+                    if mtype == "video":
                         st.video(url)
                     else:
                         st.image(url)

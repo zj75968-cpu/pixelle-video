@@ -68,10 +68,10 @@ class RunningHubAPIService:
             endpoint: ``/rhart-video-g/text-to-video`` 等 registry endpoint。
             params:   不需要也不要包含 ``apiKey``，鉴权走 Bearer 头。
             timeout:  最长等待秒数。
-            instance_type: ``"plus"`` 走独立队列（降低 1011 概率，单价略高）；
+            instance_type: ``"plus"`` 走独立 GPU 队列（降低 1011 概率，单价略高）；
                 ``None`` 或 ``"default"`` 走共享队列。
-            auto_retry_1011: 任务因 1011（模型繁忙）失败时，按 30s/60s/120s 退避自动重试。
-            max_retries_1011: 1011 最大重试次数，超过仍繁忙则抛错。
+            auto_retry_1011: errorCode 1011（模型繁忙）时按 30/60/120s 退避自动重试。
+            max_retries_1011: 1011 最大重试次数。
 
         Returns:
             ``results[0].url`` 文件直链（链接 24h 内有效）。
@@ -108,11 +108,11 @@ class RunningHubAPIService:
                 )
                 return await self._wait_for_completion(task_id, timeout)
             except RunningHubAPIError as e:
-                msg_l = (e.msg or "").lower()
+                msg_lower = (e.msg or "").lower()
                 is_1011 = (
                     str(e.code) == "1011"
                     or "1011" in (e.msg or "")
-                    or "busy" in msg_l
+                    or "busy" in msg_lower
                     or "负载较高" in (e.msg or "")
                 )
                 if not (is_1011 and auto_retry_1011 and attempt < max_retries_1011):
