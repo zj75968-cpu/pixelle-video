@@ -65,8 +65,14 @@ def main():
         icon="📱"
     )
 
+    agent_page = st.Page(
+        "pages/8_🤖_Agent.py",
+        title="Agent 大脑",
+        icon="🤖"
+    )
+
     # Set up navigation and run
-    pg = st.navigation([home_page, history_page, post_page, publish_page])
+    pg = st.navigation([home_page, history_page, post_page, publish_page, agent_page])
     pg.run()
 
 
