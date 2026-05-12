@@ -16,7 +16,7 @@ import streamlit as st
 from web.state.session import init_session_state, init_i18n, get_pixelle_video
 from web.utils.async_helpers import run_async
 
-from pixelle_video.agent import AgentBrain, TOOLS
+from pixelle_video.agent import AgentBrain, TOOLS, enhance_instruction
 
 st.set_page_config(page_title="Agent 大脑", page_icon="🤖", layout="wide")
 init_session_state()
@@ -57,6 +57,12 @@ if col_clear.button("🧹 清空历史", use_container_width=True):
     st.session_state.agent_history = []
     st.rerun()
 
+enhance_toggle = st.toggle(
+    "✨ AI 提示词增强（先由 LLM 把你的短句扩写成完整任务描述，再交给 Agent）",
+    value=True,
+    help="开启后会多花一次 LLM 调用，但能显著提升对模糊/口语化指令的理解。",
+)
+
 
 def _result_to_dict(result) -> dict:
     """Pydantic AgentRunResult -> JSON-safe dict (handles non-serializable result blobs)."""
@@ -72,13 +78,46 @@ if run_clicked:
         st.warning("请先输入指令")
     else:
         brain = AgentBrain(llm=pixelle_video.llm)
+        raw_instruction = instruction.strip()
+        final_instruction = raw_instruction
+        enhanced_payload = None
+
+        if enhance_toggle:
+            with st.spinner("✨ 提示词增强中..."):
+                try:
+                    enhanced = run_async(
+                        enhance_instruction(raw_instruction, llm=pixelle_video.llm)
+                    )
+                except Exception as e:  # noqa: BLE001
+                    st.warning(f"提示词增强失败，已回退到原始指令：{type(e).__name__}: {e}")
+                    enhanced = None
+            if enhanced and enhanced.enhanced_instruction.strip():
+                final_instruction = enhanced.enhanced_instruction.strip()
+                enhanced_payload = {
+                    "inferred_intent": enhanced.inferred_intent,
+                    "enhanced_instruction": enhanced.enhanced_instruction,
+                    "clarifications": list(enhanced.clarifications),
+                }
+                with st.expander("✨ 增强后的指令", expanded=True):
+                    st.markdown(f"**意图**：{enhanced.inferred_intent}")
+                    st.markdown("**改写后**：")
+                    st.info(enhanced.enhanced_instruction)
+                    if enhanced.clarifications:
+                        st.markdown("**LLM 做出的假设**：")
+                        for c in enhanced.clarifications:
+                            st.markdown(f"- {c}")
+
         with st.spinner("🧠 规划与执行中..."):
             try:
-                result = run_async(brain.run(instruction.strip()))
+                result = run_async(brain.run(final_instruction))
             except Exception as e:  # noqa: BLE001
                 st.error(f"运行失败: {type(e).__name__}: {e}")
                 st.stop()
-        st.session_state.agent_history.insert(0, _result_to_dict(result))
+        run_dict = _result_to_dict(result)
+        run_dict["raw_instruction"] = raw_instruction
+        if enhanced_payload is not None:
+            run_dict["enhanced"] = enhanced_payload
+        st.session_state.agent_history.insert(0, run_dict)
 
 # ---- 历史 -----------------------------------------------------------------
 st.divider()
@@ -92,6 +131,15 @@ else:
         icon = "✅" if ok else "❌"
         instr = run.get("instruction", "")
         with st.expander(f"{icon} {instr}", expanded=(idx == 0)):
+            raw_instruction = run.get("raw_instruction")
+            enhanced_meta = run.get("enhanced")
+            if enhanced_meta and raw_instruction and raw_instruction != instr:
+                st.caption(f"📥 原始指令：{raw_instruction}")
+                st.caption(f"🎯 意图：{enhanced_meta.get('inferred_intent', '')}")
+                if enhanced_meta.get("clarifications"):
+                    with st.popover("LLM 做出的假设"):
+                        for c in enhanced_meta["clarifications"]:
+                            st.markdown(f"- {c}")
             plan = run.get("plan", {})
             st.markdown(f"**理解**：{plan.get('summary', '')}")
             if plan.get("notes"):

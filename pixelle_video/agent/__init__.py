@@ -5,6 +5,7 @@
 
 from pixelle_video.agent.brain import AgentBrain, AgentPlan, AgentStep, AgentRunResult
 from pixelle_video.agent.tools import TOOLS, ToolSpec
+from pixelle_video.agent.enhancer import EnhancedInstruction, enhance_instruction
 
 __all__ = [
     "AgentBrain",
@@ -13,4 +14,6 @@ __all__ = [
     "AgentRunResult",
     "TOOLS",
     "ToolSpec",
+    "EnhancedInstruction",
+    "enhance_instruction",
 ]
