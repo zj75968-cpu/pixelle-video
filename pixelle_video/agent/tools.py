@@ -201,6 +201,54 @@ async def _enqueue_publish(
     }
 
 
+async def _list_tasks(
+    status: Optional[str] = None,
+    limit: int = 20,
+) -> Dict[str, Any]:
+    """List historical video-generation tasks (from output/<task_id>/metadata.json)."""
+    from pixelle_video.service import pixelle_video as core
+
+    if not getattr(core, "_initialized", False):
+        await core.initialize()
+
+    persistence = core.persistence
+    if persistence is None:
+        raise RuntimeError("PersistenceService not initialized")
+
+    raw = await persistence.list_tasks(status=status, limit=max(1, int(limit)))
+    tasks = []
+    for m in raw:
+        tasks.append({
+            "task_id": m.get("task_id"),
+            "status": m.get("status"),
+            "title": (m.get("input") or {}).get("text") or m.get("title"),
+            "created_at": m.get("created_at"),
+            "completed_at": m.get("completed_at"),
+            "duration": (m.get("result") or {}).get("duration"),
+            "video_path": (m.get("result") or {}).get("video_path")
+                or (m.get("result") or {}).get("final_video_path"),
+        })
+    return {"count": len(tasks), "tasks": tasks}
+
+
+async def _delete_task(task_id: str) -> Dict[str, Any]:
+    """Delete a historical generation task directory by task_id."""
+    from pixelle_video.service import pixelle_video as core
+
+    if not getattr(core, "_initialized", False):
+        await core.initialize()
+
+    persistence = core.persistence
+    if persistence is None:
+        raise RuntimeError("PersistenceService not initialized")
+
+    existed = await persistence.task_exists(task_id)
+    if not existed:
+        return {"task_id": task_id, "deleted": False, "reason": "not_found"}
+    await persistence.delete_task(task_id)
+    return {"task_id": task_id, "deleted": True}
+
+
 # --------------------------------------------------------------------------
 # Registry
 # --------------------------------------------------------------------------
@@ -312,6 +360,39 @@ TOOLS: List[ToolSpec] = [
             "required": ["job_id"],
         },
         handler=_cancel_job,
+    ),
+    ToolSpec(
+        name="list_tasks",
+        description=(
+            "列出历史视频生成任务（output/<task_id> 下的 metadata.json）。"
+            "可选 status 过滤（pending/running/completed/failed/cancelled），limit 默认 20，按创建时间倒序。"
+            "返回每条 task 的 task_id / status / title / created_at / completed_at / duration / video_path。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string",
+                    "description": "可选状态过滤",
+                    "enum": ["pending", "running", "completed", "failed", "cancelled"],
+                },
+                "limit": {"type": "integer", "description": "最多返回条数", "default": 20},
+            },
+            "required": [],
+        },
+        handler=_list_tasks,
+    ),
+    ToolSpec(
+        name="delete_task",
+        description="按 task_id 删除一个历史生成任务（连同 output/<task_id> 目录一起移除）。不可恢复，请谨慎使用。",
+        args_schema={
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "string", "description": "历史任务 ID，如 20260512_162614_cdf3"},
+            },
+            "required": ["task_id"],
+        },
+        handler=_delete_task,
     ),
 ]
 
