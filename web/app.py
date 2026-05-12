@@ -40,39 +40,51 @@ st.set_page_config(
 def main():
     """Main entry point with navigation"""
     # Define pages using st.Page
-    home_page = st.Page(
-        "pages/1_🎬_Home.py",
-        title="Home",
-        icon="🎬",
-        default=True
+    create_page = st.Page(
+        "pages/1_🎨_创作.py",
+        title="创作",
+        icon="🎨",
+        default=True,
     )
-    
+
     history_page = st.Page(
         "pages/2_📚_History.py",
         title="History",
-        icon="📚"
-    )
-
-    post_page = st.Page(
-        "pages/3_📝_Post.py",
-        title="图文创作",
-        icon="📝"
+        icon="📚",
     )
 
     publish_page = st.Page(
         "pages/4_📱_Publish.py",
         title="发布管理",
-        icon="📱"
+        icon="📱",
+    )
+
+    devtools_page = st.Page(
+        "pages/5_🛠️_开发者工具.py",
+        title="开发者工具",
+        icon="🛠️",
+    )
+
+    recommend_page = st.Page(
+        "pages/6_🧠_Recommend.py",
+        title="选题推荐",
+        icon="🧠",
     )
 
     agent_page = st.Page(
         "pages/8_🤖_Agent.py",
         title="Agent 大脑",
-        icon="🤖"
+        icon="🤖",
     )
 
-    # Set up navigation and run
-    pg = st.navigation([home_page, history_page, post_page, publish_page, agent_page])
+    pg = st.navigation([
+        create_page,
+        history_page,
+        publish_page,
+        recommend_page,
+        devtools_page,
+        agent_page,
+    ])
     pg.run()
 
 
