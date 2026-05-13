@@ -157,6 +157,29 @@ class XHSPublisher:
             except Exception:
                 pass
 
+    def _push_video(self, video_path: str) -> str:
+        """Push a single video file to the device and trigger media scan."""
+        self._adb("shell", "mkdir", "-p", self.push_dir)
+        filename = Path(video_path).name
+        device_path = f"{self.push_dir}/{filename}"
+        logger.debug(f"Pushing video {video_path} -> {device_path}")
+        self._adb("push", video_path, device_path)
+        # Trigger media scan so video appears in the gallery picker
+        try:
+            self._adb(
+                "shell",
+                "am",
+                "broadcast",
+                "-a",
+                "android.intent.action.MEDIA_SCANNER_SCAN_FILE",
+                "-d",
+                f"file://{device_path}",
+            )
+        except Exception:
+            pass
+        time.sleep(3)  # Videos may take a moment longer to be indexed
+        return device_path
+
     # -------------------------------------------------------------------------
     # UI Automation
     # -------------------------------------------------------------------------
@@ -801,3 +824,225 @@ class XHSPublisher:
             # Clean up pushed images regardless of success/failure
             if device_paths:
                 self._cleanup_device_images(device_paths)
+
+    # -------------------------------------------------------------------------
+    # Video Publish API
+    # -------------------------------------------------------------------------
+
+    async def publish_video(
+        self,
+        video_path: str,
+        title: str,
+        body: str,
+        hashtags: Optional[List[str]] = None,
+        dry_run: bool = False,
+    ) -> bool:
+        """
+        Publish a single-video note to Xiaohongshu.
+
+        Args:
+            video_path: Local path to the .mp4 file.
+            title:      Post title.
+            body:       Post body / description.
+            hashtags:   Topic tags (without #).
+            dry_run:    If True, run all steps up to (but not including) the
+                        final "发布" tap. Useful for end-to-end smoke checks
+                        that do not actually post.
+
+        Returns:
+            True on confirmed success; False otherwise (or True in dry_run
+            once the editor is reached).
+        """
+        hashtags = hashtags or []
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(
+            None,
+            self._publish_video_sync,
+            video_path,
+            title,
+            body,
+            hashtags,
+            dry_run,
+        )
+
+    def _publish_video_sync(
+        self,
+        video_path: str,
+        title: str,
+        body: str,
+        hashtags: List[str],
+        dry_run: bool,
+    ) -> bool:
+        if not Path(video_path).exists():
+            raise XHSPublishError(f"Video file not found: {video_path}")
+
+        device_path: Optional[str] = None
+        try:
+            d = self._get_device()
+
+            # 1. Push video to device
+            logger.info(f"[{self.serial}] Pushing video {video_path}")
+            device_path = self._push_video(video_path)
+
+            # 2. Open XHS publish flow
+            logger.info(f"[{self.serial}] Opening XHS publish screen")
+            self._open_xhs_publish(d)
+            self._screenshot(d, "v01_publish_screen")
+
+            # 3. Select video mode / video entry
+            self._select_video_mode(d)
+            self._screenshot(d, "v02_video_mode")
+
+            # 4. Pick the freshly pushed video from album
+            logger.info(f"[{self.serial}] Selecting video from album: {Path(video_path).name}")
+            self._select_video_from_album(d, Path(video_path).name)
+            self._screenshot(d, "v03_video_selected")
+
+            # 5. Fill title / body (XHS may show a media editor with "下一步" first)
+            logger.info(f"[{self.serial}] Filling title and body")
+            self._fill_title_and_body(d, title, body)
+            self._screenshot(d, "v04_content_filled")
+
+            # 6. Hashtags
+            if hashtags:
+                logger.info(f"[{self.serial}] Adding {len(hashtags)} hashtags")
+                self._add_hashtags(d, hashtags)
+                self._screenshot(d, "v05_hashtags_added")
+
+            if dry_run:
+                logger.info(f"[{self.serial}] DRY RUN - skipping final publish tap")
+                self._screenshot(d, "v06_dry_run_stop")
+                return True
+
+            # 7. Publish
+            logger.info(f"[{self.serial}] Submitting video post")
+            self._adb_wakeup()
+            self._publish(d)
+
+            # 8. Verify
+            self._adb_wakeup()
+            success = self._check_success(d, expected_title=title)
+            if success:
+                logger.info(f"[{self.serial}] ✅ Video post published")
+            else:
+                logger.warning(f"[{self.serial}] ⚠️ Could not confirm video publish success")
+            return success
+
+        except XHSPublishError:
+            raise
+        except Exception as exc:
+            raise XHSPublishError(f"Video publish failed on {self.serial}: {exc}") from exc
+        finally:
+            if device_path:
+                try:
+                    self._adb("shell", "rm", "-f", device_path)
+                except Exception:
+                    pass
+
+    # -------------------------------------------------------------------------
+    # Video-specific UI helpers
+    # -------------------------------------------------------------------------
+
+    def _select_video_mode(self, d):
+        """
+        From the publish chooser, enter the video flow.
+
+        Newer XHS shows a bottom-sheet with options such as
+            "从相册选择 / 拍摄 / 写文字"
+        and once the album opens you can switch between 照片 / 视频 tabs.
+        Older builds show explicit "视频" mode tabs at the bottom of the camera.
+        """
+        clicked = (
+            self._click_text(d, "从相册选择", timeout=4)
+            or self._click_text_contains(d, "相册选择", timeout=4)
+            or self._click_text(d, "视频", timeout=6)
+            or self._click_text_contains(d, "视频", timeout=6)
+            or self._click_resource(d, f"{XHS_PACKAGE}:id/video_tab", timeout=4)
+        )
+        if not clicked:
+            self._screenshot(d, "video_mode_fail")
+            if self.strict_mode:
+                raise XHSPublishError(
+                    "Could not find 视频 entry; strict mode aborted"
+                )
+            logger.warning("Could not find 视频 entry; compatible mode: tap mid-bottom")
+            w, h = self._screen_size(d)
+            d.click(int(w * 0.5), int(h * 0.92))
+        time.sleep(1)
+
+    def _select_video_from_album(self, d, filename: str):
+        """
+        Open the album (if not already) and select the freshly pushed video
+        identified by `filename`.
+
+        Strategy:
+          1. Make sure we are on an album/grid screen; if photos are shown,
+             try to switch to the "视频" tab.
+          2. Prefer matching the cell whose contentDescription contains the
+             filename. Fall back to the first video-like clickable cell.
+        """
+        self._grant_permissions(d)
+
+        # Try switching album content type to videos if a tab exists
+        switched = (
+            self._click_text(d, "视频", timeout=3)
+            or self._click_text_contains(d, "视频", timeout=2)
+        )
+        if switched:
+            time.sleep(1)
+            self._grant_permissions(d)
+
+        # 1) Prefer description match (newer XHS sets desc to filename or duration)
+        target_desc = filename
+        el = d(descriptionContains=target_desc)
+        if el.exists(timeout=3):
+            el.click()
+            time.sleep(1)
+            self._confirm_album_selection(d)
+            return
+
+        # 2) Stem match (drop extension)
+        stem = Path(filename).stem
+        if stem and stem != target_desc:
+            el2 = d(descriptionContains=stem)
+            if el2.exists(timeout=1.5):
+                el2.click()
+                time.sleep(1)
+                self._confirm_album_selection(d)
+                return
+
+        # 3) Classic resource-id (treat as a single-select grid)
+        items = d(resourceId=f"{XHS_PACKAGE}:id/photo_item")
+        if items.exists(timeout=2) and items.count > 0:
+            items[0].click()
+            time.sleep(1)
+            self._confirm_album_selection(d)
+            return
+
+        # 4) Obfuscated grid fallback: first big clickable image cell.
+        if self._is_album_grid_screen(d):
+            picked = self._select_images_from_obfuscated_grid(d, 1)
+            if picked > 0:
+                time.sleep(1)
+                self._confirm_album_selection(d)
+                return
+
+        self._screenshot(d, "video_pick_fail")
+        if self.strict_mode:
+            raise XHSPublishError(
+                f"Could not locate pushed video '{filename}' in album; strict mode aborted"
+            )
+
+    def _confirm_album_selection(self, d):
+        """Tap 下一步/完成 after picking media."""
+        confirmed = (
+            self._click_text(d, "下一步", "完成", "确定", timeout=6)
+            or self._click_text_contains(d, "下一步", "完成", "确定", timeout=4)
+            or self._click_resource(d, f"{XHS_PACKAGE}:id/next_btn", timeout=4)
+        )
+        if not confirmed and self.strict_mode:
+            self._screenshot(d, "video_next_fail")
+            raise XHSPublishError(
+                "Could not tap 下一步 after picking video; strict mode aborted"
+            )
+        time.sleep(2)

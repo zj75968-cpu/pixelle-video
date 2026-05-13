@@ -25,7 +25,7 @@ def _run_subpage(path: Path) -> None:
     _orig = st.set_page_config
     st.set_page_config = lambda *a, **k: None  # type: ignore[assignment]
     try:
-        runpy.run_path(str(path), run_name="__pixelle_subpage__")
+        runpy.run_path(str(path), run_name="__main__")
     finally:
         st.set_page_config = _orig  # type: ignore[assignment]
 

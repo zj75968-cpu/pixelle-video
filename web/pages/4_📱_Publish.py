@@ -1057,7 +1057,9 @@ def _render_publish_queue_list(filter_val: str | None):
 
     for job in jobs:
         badge = STATUS_BADGE.get(job.status, job.status)
-        label = f"{badge}  |  {job.title[:30]}  |  {job.serial}  |  {job.created_at[:16]}"
+        kind = getattr(job, "kind", "image_text") or "image_text"
+        kind_tag = "🎬 视频" if kind == "video" else "🖼️ 图文"
+        label = f"{badge}  |  {kind_tag}  |  {job.title[:30]}  |  {job.serial}  |  {job.created_at[:16]}"
         with st.expander(label):
             col1, col2 = st.columns([3, 1])
             with col1:
@@ -1071,6 +1073,7 @@ def _render_publish_queue_list(filter_val: str | None):
 
                 payload = {
                     "job_id": job.job_id,
+                    "kind": kind,
                     "device": job.serial,
                     "task_id": job.task_id,
                     "status": job.status,
@@ -1078,11 +1081,25 @@ def _render_publish_queue_list(filter_val: str | None):
                     "started_at": job.started_at,
                     "finished_at": job.finished_at,
                     "error": job.error,
-                    "images": job.images,
                 }
+                if kind == "video":
+                    payload["video_path"] = getattr(job, "video_path", None)
+                else:
+                    payload["images"] = job.images
                 if elapsed is not None:
                     payload["running_seconds"] = elapsed
                 st.json(payload)
+
+                # Inline preview for video jobs
+                if kind == "video":
+                    vp = getattr(job, "video_path", None)
+                    if vp and Path(vp).exists():
+                        try:
+                            st.video(vp)
+                        except Exception:
+                            st.caption(f"无法预览视频：{vp}")
+                    elif vp:
+                        st.caption(f"⚠️ 视频文件不存在：{vp}")
 
                 if elapsed is not None and elapsed > 600:
                     st.warning(f"任务已运行 {elapsed // 60} 分钟，请观察设备侧是否仍在操作")

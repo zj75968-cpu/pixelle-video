@@ -61,6 +61,8 @@ class PublishJob:
         hashtags: List[str],
         images: List[str],
         scheduled_at: Optional[str] = None,
+        kind: str = "image_text",
+        video_path: Optional[str] = None,
     ):
         self.job_id = job_id
         self.serial = serial
@@ -70,6 +72,8 @@ class PublishJob:
         self.hashtags = hashtags
         self.images = images
         self.scheduled_at: Optional[str] = scheduled_at  # ISO-8601 or None (immediate)
+        self.kind: str = kind  # "image_text" | "video"
+        self.video_path: Optional[str] = video_path
         self.status: str = JobStatus.PENDING
         self.created_at: str = datetime.now().isoformat()
         self.started_at: Optional[str] = None
@@ -85,6 +89,8 @@ class PublishJob:
             "body": self.body,
             "hashtags": self.hashtags,
             "images": self.images,
+            "kind": self.kind,
+            "video_path": self.video_path,
             "scheduled_at": self.scheduled_at,
             "status": self.status,
             "created_at": self.created_at,
@@ -104,6 +110,8 @@ class PublishJob:
             hashtags=data.get("hashtags", []),
             images=data.get("images", []),
             scheduled_at=data.get("scheduled_at"),
+            kind=data.get("kind", "image_text"),
+            video_path=data.get("video_path"),
         )
         job.status = data.get("status", JobStatus.PENDING)
         job.created_at = data.get("created_at", datetime.now().isoformat())
@@ -208,6 +216,8 @@ class PublishScheduler:
         hashtags: List[str],
         images: List[str],
         scheduled_at: Optional[str] = None,
+        kind: str = "image_text",
+        video_path: Optional[str] = None,
     ) -> PublishJob:
         """Add a new publish job to the queue."""
         job = PublishJob(
@@ -219,6 +229,8 @@ class PublishScheduler:
             hashtags=hashtags,
             images=images,
             scheduled_at=scheduled_at,
+            kind=kind,
+            video_path=video_path,
         )
         self._jobs[job.job_id] = job
         self._save()
@@ -340,15 +352,30 @@ class PublishScheduler:
 
             try:
                 publisher = XHSPublisher(serial=job.serial)
-                success = await asyncio.wait_for(
-                    publisher.publish(
-                        images=job.images,
-                        title=job.title,
-                        body=job.body,
-                        hashtags=job.hashtags,
-                    ),
-                    timeout=PUBLISH_TIMEOUT_SECONDS,
-                )
+                if job.kind == "video":
+                    if not job.video_path:
+                        raise XHSPublishError(
+                            "Video job missing video_path"
+                        )
+                    success = await asyncio.wait_for(
+                        publisher.publish_video(
+                            video_path=job.video_path,
+                            title=job.title,
+                            body=job.body,
+                            hashtags=job.hashtags,
+                        ),
+                        timeout=PUBLISH_TIMEOUT_SECONDS,
+                    )
+                else:
+                    success = await asyncio.wait_for(
+                        publisher.publish(
+                            images=job.images,
+                            title=job.title,
+                            body=job.body,
+                            hashtags=job.hashtags,
+                        ),
+                        timeout=PUBLISH_TIMEOUT_SECONDS,
+                    )
                 job.status = JobStatus.SUCCESS if success else JobStatus.FAILED
                 if not success:
                     job.error = "Publish did not confirm success"

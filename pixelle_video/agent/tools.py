@@ -192,6 +192,8 @@ async def _enqueue_publish(
         hashtags=list(hashtags or []),
         images=[video_path],
         scheduled_at=scheduled_at,
+        kind="video",
+        video_path=video_path,
     )
     return {
         "job_id": job.job_id,
@@ -398,6 +400,127 @@ async def _recommend_models(
         ],
     }
 
+
+async def _recommend_device(
+    topic: str,
+    top_n: int = 3,
+    only_connected: bool = True,
+) -> Dict[str, Any]:
+    """Recommend Android devices for a publishing topic based on their `theme`.
+
+    Strategy:
+      1. Fetch all registered devices via device_manager.
+      2. If LLM is available, ask it to pick the best matches given each
+         device's `name / theme / notes / status` and the user's topic.
+      3. Otherwise, fall back to a deterministic keyword-overlap scorer
+         over (theme + name + notes).
+    """
+    from pixelle_video.service import pixelle_video as core
+    from pixelle_video.services.device_manager import device_manager
+
+    try:
+        device_manager.sync_connected()
+    except Exception:  # noqa: BLE001
+        pass
+
+    devices = device_manager.get_all()
+    candidates = []
+    for d in devices:
+        status = getattr(d, "status", "unknown") or "unknown"
+        if only_connected and status != "connected":
+            continue
+        candidates.append({
+            "serial": d.serial,
+            "name": getattr(d, "name", "") or "",
+            "theme": getattr(d, "theme", "") or "",
+            "notes": getattr(d, "notes", "") or "",
+            "status": status,
+        })
+
+    if not candidates:
+        return {
+            "topic": topic,
+            "method": "none",
+            "picks": [],
+            "notes": "没有满足条件的设备（only_connected="
+                     f"{only_connected}）。",
+        }
+
+    top_n = max(1, min(int(top_n), len(candidates)))
+
+    if not getattr(core, "_initialized", False):
+        try:
+            await core.initialize()
+        except Exception:  # noqa: BLE001
+            pass
+
+    # ---- Path A: LLM-based ranking ---------------------------------------
+    llm = getattr(core, "llm", None)
+    if llm is not None:
+        try:
+            from pydantic import BaseModel, Field
+
+            class _Pick(BaseModel):
+                serial: str = Field(description="device serial")
+                score: int = Field(description="0-100 match score")
+                reason: str = Field(description="简短中文理由")
+
+            class _Result(BaseModel):
+                picks: List[_Pick] = Field(description="按 score 降序的设备推荐")
+
+            prompt = (
+                "你是发布调度助手。下面给出可用安卓设备清单（每台带主题 / 名称 / "
+                "备注），请根据用户的发布主题，挑出最匹配的设备并打分。"
+                "评分要点：theme 与主题语义匹配优先；name/notes 含相关词次之；"
+                "若没有相关设备，所有 score 给 50 以下。\n\n"
+                f"用户主题: {topic}\n\n"
+                f"候选设备: {candidates}\n\n"
+                f"请输出 Top-{top_n}，按 score 降序。"
+            )
+            res: _Result = await llm(
+                prompt=prompt,
+                response_type=_Result,
+                temperature=0.2,
+                max_tokens=600,
+            )
+            picks = [
+                {"serial": p.serial, "score": int(p.score), "reason": p.reason}
+                for p in res.picks[:top_n]
+            ]
+            return {
+                "topic": topic,
+                "method": "llm",
+                "picks": picks,
+                "candidates": candidates,
+            }
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(f"[recommend_device] LLM path failed, fallback: {exc}")
+
+    # ---- Path B: keyword fallback ----------------------------------------
+    topic_norm = (topic or "").strip().lower()
+    tokens = [t for t in topic_norm.replace("，", ",").replace("、", ",").replace(" ", ",").split(",") if t]
+    if not tokens:
+        tokens = [topic_norm] if topic_norm else []
+
+    scored = []
+    for c in candidates:
+        hay = " ".join([c["theme"], c["name"], c["notes"]]).lower()
+        hits = sum(1 for tok in tokens if tok and tok in hay)
+        score = 50 + min(50, hits * 25) if hits else (40 if c["theme"] else 30)
+        reason = (
+            f"theme/name/notes 命中 {hits} 个关键词"
+            if hits else
+            ("有 theme 但未直接命中关键词" if c["theme"] else "无 theme，仅作兜底")
+        )
+        scored.append({"serial": c["serial"], "score": score, "reason": reason})
+    scored.sort(key=lambda x: x["score"], reverse=True)
+    return {
+        "topic": topic,
+        "method": "fallback_keyword",
+        "picks": scored[:top_n],
+        "candidates": candidates,
+    }
+
 # --------------------------------------------------------------------------
 # Registry
 # --------------------------------------------------------------------------
@@ -590,6 +713,32 @@ TOOLS: List[ToolSpec] = [
             "required": ["user_prompt"],
         },
         handler=_recommend_models,
+    ),
+    ToolSpec(
+        name="recommend_device",
+        description=(
+            "根据待发布的主题/选题，从已登记的安卓设备里挑出最匹配的 Top-N 台。"
+            "优先使用每台设备的 `theme`（在『发布管理』里登记的账号定位/主题）做语义匹配，"
+            "找不到完全匹配时回退到 name/notes 的关键词命中。"
+            "返回的 picks[0].serial 可以直接作为 enqueue_publish.device_serial。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "topic": {
+                    "type": "string",
+                    "description": "本次要发布的主题/选题（如『职场效率』『萌宠日常』）",
+                },
+                "top_n": {"type": "integer", "description": "返回条数 1-5", "default": 3},
+                "only_connected": {
+                    "type": "boolean",
+                    "description": "True=只在已连接设备中推荐；False=也考虑离线设备",
+                    "default": True,
+                },
+            },
+            "required": ["topic"],
+        },
+        handler=_recommend_device,
     ),
 ]
 

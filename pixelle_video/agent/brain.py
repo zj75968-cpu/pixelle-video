@@ -89,6 +89,13 @@ SYSTEM_PROMPT_TEMPLATE = """你是 Pixelle-Video 项目的总控 Agent。\
        "video_path": "${{steps[0].result.video_path}}"
 4. 字段必须严格按 args_schema 的类型；缺省值可省略。
 5. summary 用一句中文概括你对用户意图的理解。
+6. **设备智能推荐**：当任务涉及把内容发布到小红书（enqueue_publish）时：
+   - 如果用户没有明确指定 device_serial：必须在 enqueue_publish 之前**先调用 `recommend_device`**，
+     topic 用本次发布的选题/主题（短句即可，如"职场效率""萌宠日常"）。
+   - 然后用占位符把推荐结果传给 enqueue_publish：
+       `"device_serial": "${{steps[i].result.picks[0].serial}}"`
+     （i 是 recommend_device 的步骤下标）。
+   - 如果 recommend_device 返回 picks 为空，再退回到不传 device_serial（由系统自动取第一台连接设备）。
 
 用户指令："{instruction}"
 """
