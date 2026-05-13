@@ -1,4 +1,4 @@
-﻿import os
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -14,6 +14,77 @@ from web.utils.async_helpers import run_async
 from web.utils.streamlit_helpers import check_and_warn_selfhost_workflow
 from pixelle_video.config import config_manager
 from pixelle_video.utils.os_util import create_task_output_dir
+
+
+async def _try_runninghub_v2(
+    *,
+    workflow_id: str,
+    node_info_list: list[dict],
+    expected: str = "image",
+):
+    """Helper: run a RunningHub workflow via openapi/v2 using the consumer-tier API key.
+
+    Returns one of:
+        - {"url": "<image_url>", "text": "<optional_text>"}  if expected == "image"
+        - {"url": "<video_url>"}                              if expected == "video"
+    Returns None when:
+        - consumer key not configured, or
+        - v2 call/upload/poll/extract fails (caller should fall back to v1).
+    """
+    cfg = config_manager.get_comfyui_config()
+    key = (cfg.get("runninghub_consumer_api_key") or "").strip()
+    if not key:
+        return None
+    base_url = (cfg.get("runninghub_base_url") or "").strip() or None
+    try:
+        from pixelle_video.services.runninghub_v2 import RunningHubV2Client
+        client = RunningHubV2Client(api_key=key, base_url=base_url)
+        create = await client.run_workflow(workflow_id=workflow_id, node_info_list=node_info_list)
+        task_id = create.get("taskId") or (create.get("data") or {}).get("taskId")
+        if not task_id:
+            raise RuntimeError(f"v2 run_workflow returned no taskId: {create}")
+        final = await client.wait_for_task(task_id)
+        if (final.get("status") or "").upper() != "SUCCESS":
+            raise RuntimeError(f"v2 task non-success: {final}")
+        results = final.get("results") or []
+        image_url = None
+        video_url = None
+        text_val = None
+        for r in results:
+            otype = (r.get("outputType") or "").lower()
+            if otype in ("png", "jpg", "jpeg", "webp") and image_url is None:
+                image_url = r.get("url")
+            if otype in ("mp4", "webm", "mov") and video_url is None:
+                video_url = r.get("url")
+            if (otype == "txt" or r.get("text")) and text_val is None:
+                text_val = r.get("text")
+        if expected == "image":
+            if not image_url:
+                raise RuntimeError(f"v2 task SUCCESS but no image in results: {results}")
+            return {"url": image_url, "text": text_val}
+        elif expected == "video":
+            if not video_url:
+                raise RuntimeError(f"v2 task SUCCESS but no video in results: {results}")
+            return {"url": video_url}
+        else:
+            raise ValueError(f"unknown expected type: {expected}")
+    except Exception as exc:
+        logger.warning(f"[digital_human] v2 path failed (workflow_id={workflow_id}, expected={expected}): {exc}")
+        return None
+
+
+async def _rh_v2_upload(local_path) -> str | None:
+    """Upload a local file via openapi/v2 with consumer key. Returns a fileName/url string,
+    or None if consumer key not configured. Raises on actual upload errors."""
+    cfg = config_manager.get_comfyui_config()
+    key = (cfg.get("runninghub_consumer_api_key") or "").strip()
+    if not key:
+        return None
+    base_url = (cfg.get("runninghub_base_url") or "").strip() or None
+    from pixelle_video.services.runninghub_v2 import RunningHubV2Client
+    client = RunningHubV2Client(api_key=key, base_url=base_url)
+    up = await client.upload_file(local_path)
+    return up.get("fileName") or up.get("download_url")
 
 class DigitalHumanPipelineUI(PipelineUI):
     """
@@ -444,18 +515,47 @@ class DigitalHumanPipelineUI(PipelineUI):
                                 workflow_input = second_workflow_config["workflow_id"]
                             else:
                                 workflow_input = str(second_workflow_config)
-                            second_result = await kit.execute(workflow_input, second_workflow_params)
-                            # Video Link Extraction
+
+                            # ===== v2 + 消费级 key 路径（优先） =====
                             generated_video_url = None
-                            if hasattr(second_result, 'videos') and second_result.videos:
-                                generated_video_url = second_result.videos[0]
-                            elif hasattr(second_result, 'outputs') and second_result.outputs:
-                                for node_id, node_output in second_result.outputs.items():
-                                    if isinstance(node_output, dict) and 'videos' in node_output:
-                                        videos = node_output['videos']
-                                        if videos and len(videos) > 0:
-                                            generated_video_url = videos[0]
-                                            break
+                            if (
+                                second_workflow_config.get("source") == "runninghub"
+                                and "workflow_id" in second_workflow_config
+                            ):
+                                try:
+                                    img_ref = await _rh_v2_upload(generated_image_path)
+                                    audio_ref = await _rh_v2_upload(audio_path) if img_ref else None
+                                except Exception as exc:
+                                    logger.warning(f"[digital_human] v2 second-step upload failed: {exc}")
+                                    img_ref = audio_ref = None
+                                if img_ref and audio_ref:
+                                    node_info_list = [
+                                        {"nodeId": "133", "fieldName": "image", "fieldValue": img_ref},
+                                        {"nodeId": "206", "fieldName": "audio", "fieldValue": audio_ref},
+                                    ]
+                                    v2_res = await _try_runninghub_v2(
+                                        workflow_id=workflow_input,
+                                        node_info_list=node_info_list,
+                                        expected="video",
+                                    )
+                                    if v2_res:
+                                        generated_video_url = v2_res["url"]
+                                        logger.info(
+                                            f"[digital_human] v2 second-step OK: video_url={generated_video_url}"
+                                        )
+
+                            if generated_video_url is None:
+                                second_result = await kit.execute(workflow_input, second_workflow_params)
+                                # Video Link Extraction
+                                if hasattr(second_result, 'videos') and second_result.videos:
+                                    generated_video_url = second_result.videos[0]
+                                elif hasattr(second_result, 'outputs') and second_result.outputs:
+                                    for node_id, node_output in second_result.outputs.items():
+                                        if isinstance(node_output, dict) and 'videos' in node_output:
+                                            videos = node_output['videos']
+                                            if videos and len(videos) > 0:
+                                                generated_video_url = videos[0]
+                                                break
                             if not generated_video_url:
                                 raise Exception("The second step of the workflow did not return a video. Please check the workflow configuration.")
                                         
@@ -494,10 +594,40 @@ class DigitalHumanPipelineUI(PipelineUI):
                                     workflow_input = workflow_config["workflow_id"]
                                 else:
                                     workflow_input = str(workflow_config)
-                                combine_image = await kit.execute(workflow_input, workflow_params)
-                                if combine_image.status != "completed":
-                                    raise Exception(f"workflow execution failed: {combine_image.msg}")
-                                generated_image_url = getattr(combine_image, "images", [None])[0]
+
+                                # ===== v2 + 消费级 key 路径（优先） =====
+                                generated_image_url = None
+                                if (
+                                    workflow_config.get("source") == "runninghub"
+                                    and "workflow_id" in workflow_config
+                                ):
+                                    try:
+                                        first_ref = await _rh_v2_upload(character_assets[0])
+                                        second_ref = await _rh_v2_upload(goods_assets[0]) if first_ref else None
+                                    except Exception as exc:
+                                        logger.warning(f"[digital_human] v2 customize upload failed: {exc}")
+                                        first_ref = second_ref = None
+                                    if first_ref and second_ref:
+                                        node_info_list = [
+                                            {"nodeId": "18", "fieldName": "image", "fieldValue": first_ref},
+                                            {"nodeId": "17", "fieldName": "image", "fieldValue": second_ref},
+                                        ]
+                                        v2_res = await _try_runninghub_v2(
+                                            workflow_id=workflow_input,
+                                            node_info_list=node_info_list,
+                                            expected="image",
+                                        )
+                                        if v2_res:
+                                            generated_image_url = v2_res["url"]
+                                            logger.info(
+                                                f"[digital_human] v2 customize step OK: image_url={generated_image_url}"
+                                            )
+
+                                if generated_image_url is None:
+                                    combine_image = await kit.execute(workflow_input, workflow_params)
+                                    if combine_image.status != "completed":
+                                        raise Exception(f"workflow execution failed: {combine_image.msg}")
+                                    generated_image_url = getattr(combine_image, "images", [None])[0]
                                 status_text.text(tr("progress.step_audio"))
                                 audio_path = os.path.join(task_dir, "narration.mp3")
                                 tts_inference_mode = video_params.get("tts_inference_mode", "local")
@@ -536,18 +666,45 @@ class DigitalHumanPipelineUI(PipelineUI):
                                     workflow_input = second_workflow_config["workflow_id"]
                                 else:
                                     workflow_input = str(second_workflow_config)
-                                second_result = await kit.execute(workflow_input, second_workflow_params)
-                                # Video Link Extraction
+
+                                # ===== v2 + ??? key ?????? =====
                                 generated_video_url = None
-                                if hasattr(second_result, 'videos') and second_result.videos:
-                                    generated_video_url = second_result.videos[0]
-                                elif hasattr(second_result, 'outputs') and second_result.outputs:
-                                    for node_id, node_output in second_result.outputs.items():
-                                        if isinstance(node_output, dict) and 'videos' in node_output:
-                                            videos = node_output['videos']
-                                            if videos and len(videos) > 0:
-                                                generated_video_url = videos[0]
-                                                break
+                                if (
+                                    second_workflow_config.get("source") == "runninghub"
+                                    and "workflow_id" in second_workflow_config
+                                ):
+                                    try:
+                                        audio_ref = await _rh_v2_upload(audio_path)
+                                    except Exception as exc:
+                                        logger.warning(f"[digital_human] v2 combination upload failed: {exc}")
+                                        audio_ref = None
+                                    if audio_ref and generated_image_url:
+                                        node_info_list = [
+                                            {"nodeId": "133", "fieldName": "image", "fieldValue": generated_image_url},
+                                            {"nodeId": "206", "fieldName": "audio", "fieldValue": audio_ref},
+                                        ]
+                                        v2_res = await _try_runninghub_v2(
+                                            workflow_id=workflow_input,
+                                            node_info_list=node_info_list,
+                                            expected="video",
+                                        )
+                                        if v2_res:
+                                            generated_video_url = v2_res["url"]
+                                            logger.info(
+                                                f"[digital_human] v2 combination OK: video_url={generated_video_url}"
+                                            )
+
+                                if generated_video_url is None:
+                                    second_result = await kit.execute(workflow_input, second_workflow_params)
+                                    if hasattr(second_result, 'videos') and second_result.videos:
+                                        generated_video_url = second_result.videos[0]
+                                    elif hasattr(second_result, 'outputs') and second_result.outputs:
+                                        for node_id, node_output in second_result.outputs.items():
+                                            if isinstance(node_output, dict) and 'videos' in node_output:
+                                                videos = node_output['videos']
+                                                if videos and len(videos) > 0:
+                                                    generated_video_url = videos[0]
+                                                    break
                                 if not generated_video_url:
                                     raise Exception("The second step of the workflow did not return a video. Please check the workflow configuration.")
                                             
@@ -579,37 +736,17 @@ class DigitalHumanPipelineUI(PipelineUI):
                                 generated_text = None
 
                                 # ===== v2 + 消费级 key 路径（优先）=====
-                                # 仅当：1) 用户配置了 runninghub_consumer_api_key
-                                #      2) workflow 是 RunningHub 远程
-                                # 时尝试通过 openapi/v2 + Bearer auth 调用，节省企业级 key 配额。
-                                # 任何失败都回落到原 v1（kit.execute 或 v1 nodeInfoList 覆盖）路径。
-                                comfyui_cfg = config_manager.get_comfyui_config()
-                                consumer_key = (comfyui_cfg.get("runninghub_consumer_api_key") or "").strip()
-                                v2_attempted = False
                                 if (
-                                    consumer_key
-                                    and workflow_config.get("source") == "runninghub"
+                                    workflow_config.get("source") == "runninghub"
                                     and "workflow_id" in workflow_config
                                 ):
-                                    v2_attempted = True
                                     try:
-                                        from pixelle_video.services.runninghub_v2 import RunningHubV2Client
-                                        rh_base_url = (comfyui_cfg.get("runninghub_base_url") or "").strip() or None
-                                        v2_client = RunningHubV2Client(api_key=consumer_key, base_url=rh_base_url)
-                                        logger.info(
-                                            f"[digital_human] trying RunningHub openapi/v2 with consumer key "
-                                            f"(workflow_id={workflow_input}, product_prompt={'set' if product_prompt else 'default'})"
-                                        )
-                                        # 上传两张本地图（v2 上传返回 fileName，可直接作为 LoadImage.image 值）
-                                        up1 = await v2_client.upload_file(character_assets[0])
-                                        up2 = await v2_client.upload_file(goods_assets[0])
-                                        # v2 上传响应里通常带 fileName（如 "openapi/xxx.png"）和 download_url。
-                                        # nodeInfoList 给 LoadImage 节点的 fieldValue 在 v2 也接受 fileName 或公开 URL。
-                                        first_ref = up1.get("fileName") or up1.get("download_url")
-                                        second_ref = up2.get("fileName") or up2.get("download_url")
-                                        if not first_ref or not second_ref:
-                                            raise RuntimeError(f"v2 upload returned no fileName/download_url: {up1}, {up2}")
-
+                                        first_ref = await _rh_v2_upload(character_assets[0])
+                                        second_ref = await _rh_v2_upload(goods_assets[0]) if first_ref else None
+                                    except Exception as exc:
+                                        logger.warning(f"[digital_human] v2 upload failed: {exc}")
+                                        first_ref = second_ref = None
+                                    if first_ref and second_ref:
                                         node_info_list = [
                                             {"nodeId": "18", "fieldName": "image", "fieldValue": first_ref},
                                             {"nodeId": "17", "fieldName": "image", "fieldValue": second_ref},
@@ -619,39 +756,17 @@ class DigitalHumanPipelineUI(PipelineUI):
                                             node_info_list.append(
                                                 {"nodeId": "14", "fieldName": "text", "fieldValue": product_prompt}
                                             )
-                                        v2_create = await v2_client.run_workflow(
+                                        v2_res = await _try_runninghub_v2(
                                             workflow_id=workflow_input,
                                             node_info_list=node_info_list,
+                                            expected="image",
                                         )
-                                        v2_task_id = v2_create.get("taskId") or (v2_create.get("data") or {}).get("taskId")
-                                        if not v2_task_id:
-                                            raise RuntimeError(f"v2 run_workflow returned no taskId: {v2_create}")
-                                        v2_final = await v2_client.wait_for_task(v2_task_id)
-                                        v2_status = (v2_final.get("status") or "").upper()
-                                        if v2_status != "SUCCESS":
-                                            raise RuntimeError(
-                                                f"v2 task failed status={v2_status} err={v2_final.get('errorMessage')}"
+                                        if v2_res:
+                                            generated_image_url = v2_res["url"]
+                                            generated_text = v2_res.get("text")
+                                            logger.info(
+                                                f"[digital_human] v2 first-step OK: image_url={generated_image_url}"
                                             )
-                                        results = v2_final.get("results") or []
-                                        # 找到合成图（首个 png/jpg）+ 口播文本（首个 txt 类型或 text 字段非空）
-                                        for r in results:
-                                            otype = (r.get("outputType") or "").lower()
-                                            if generated_image_url is None and otype in ("png", "jpg", "jpeg", "webp"):
-                                                generated_image_url = r.get("url")
-                                            if generated_text is None and (otype == "txt" or r.get("text")):
-                                                generated_text = r.get("text") or None
-                                        if not generated_image_url:
-                                            raise RuntimeError(f"v2 task SUCCESS but no image url in results: {results}")
-                                        logger.info(
-                                            f"[digital_human] v2 path OK: image_url={generated_image_url}, "
-                                            f"text={'<got>' if generated_text else '<none>'}"
-                                        )
-                                    except Exception as exc:
-                                        logger.warning(
-                                            f"[digital_human] v2/consumer path failed, falling back to v1: {exc}"
-                                        )
-                                        generated_image_url = None
-                                        generated_text = None
 
                                 # ===== v1 fallback / 默认路径 =====
                                 if generated_image_url is None:
@@ -673,7 +788,7 @@ class DigitalHumanPipelineUI(PipelineUI):
                                             ]
                                             logger.info(
                                                 f"[digital_human] v1 nodeInfoList override path, "
-                                                f"len(product_prompt)={len(product_prompt)}, v2_attempted={v2_attempted}"
+                                                f"len(product_prompt)={len(product_prompt)}"
                                             )
                                             task_data = await rh_client.create_task(workflow_input, node_info_list)
                                             task_id = task_data.get("taskId")
@@ -730,18 +845,45 @@ class DigitalHumanPipelineUI(PipelineUI):
                                     workflow_input = second_workflow_config["workflow_id"]
                                 else:
                                     workflow_input = str(second_workflow_config)
-                                second_result = await kit.execute(workflow_input, second_workflow_params)
-                                # Video Link Extraction
+
+                                # ===== v2 + ??? key ?????? =====
                                 generated_video_url = None
-                                if hasattr(second_result, 'videos') and second_result.videos:
-                                    generated_video_url = second_result.videos[0]
-                                elif hasattr(second_result, 'outputs') and second_result.outputs:
-                                    for node_id, node_output in second_result.outputs.items():
-                                        if isinstance(node_output, dict) and 'videos' in node_output:
-                                            videos = node_output['videos']
-                                            if videos and len(videos) > 0:
-                                                generated_video_url = videos[0]
-                                                break
+                                if (
+                                    second_workflow_config.get("source") == "runninghub"
+                                    and "workflow_id" in second_workflow_config
+                                ):
+                                    try:
+                                        audio_ref = await _rh_v2_upload(audio_path)
+                                    except Exception as exc:
+                                        logger.warning(f"[digital_human] v2 combination upload failed: {exc}")
+                                        audio_ref = None
+                                    if audio_ref and generated_image_url:
+                                        node_info_list = [
+                                            {"nodeId": "133", "fieldName": "image", "fieldValue": generated_image_url},
+                                            {"nodeId": "206", "fieldName": "audio", "fieldValue": audio_ref},
+                                        ]
+                                        v2_res = await _try_runninghub_v2(
+                                            workflow_id=workflow_input,
+                                            node_info_list=node_info_list,
+                                            expected="video",
+                                        )
+                                        if v2_res:
+                                            generated_video_url = v2_res["url"]
+                                            logger.info(
+                                                f"[digital_human] v2 combination OK: video_url={generated_video_url}"
+                                            )
+
+                                if generated_video_url is None:
+                                    second_result = await kit.execute(workflow_input, second_workflow_params)
+                                    if hasattr(second_result, 'videos') and second_result.videos:
+                                        generated_video_url = second_result.videos[0]
+                                    elif hasattr(second_result, 'outputs') and second_result.outputs:
+                                        for node_id, node_output in second_result.outputs.items():
+                                            if isinstance(node_output, dict) and 'videos' in node_output:
+                                                videos = node_output['videos']
+                                                if videos and len(videos) > 0:
+                                                    generated_video_url = videos[0]
+                                                    break
                                 if not generated_video_url:
                                     raise Exception("The second step of the workflow did not return a video. Please check the workflow configuration.")
                                             
