@@ -159,13 +159,29 @@ class AgentBrain:
     """Orchestrates planning + execution for one instruction."""
 
     def __init__(self, llm=None):
-        """`llm` is a LLMService instance; defaults to pixelle_video.llm."""
-        if llm is None:
-            from pixelle_video.service import pixelle_video as core
-            llm = core.llm
+        """`llm` is a LLMService instance; defaults to pixelle_video.llm.
+
+        We do NOT fail here if `llm` is None — the core service may not have
+        been initialized yet. `_ensure_llm` will lazy-initialize it before
+        the first LLM call.
+        """
         self._llm = llm
 
+    async def _ensure_llm(self):
+        if self._llm is not None:
+            return
+        from pixelle_video.service import pixelle_video as core
+        if not getattr(core, "_initialized", False):
+            await core.initialize()
+        self._llm = core.llm
+        if self._llm is None:
+            raise RuntimeError(
+                "LLM service is not configured; cannot run AgentBrain. "
+                "Configure LLM in 创作页 / Developer Tools first."
+            )
+
     async def plan(self, instruction: str) -> AgentPlan:
+        await self._ensure_llm()
         prompt = SYSTEM_PROMPT_TEMPLATE.format(
             tools_json=json.dumps(tools_manifest(), ensure_ascii=False, indent=2),
             instruction=instruction.replace('"', '\\"'),
