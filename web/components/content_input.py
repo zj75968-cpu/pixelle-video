@@ -18,6 +18,7 @@ import streamlit as st
 
 from web.i18n import tr
 from web.utils.async_helpers import get_project_version
+from web.components.polish import render_polish_button
 
 
 def render_content_input():
@@ -56,7 +57,14 @@ def render_content_input():
                 tr("input.text"),
                 placeholder=text_placeholder,
                 height=text_height,
-                help=text_help
+                help=text_help,
+                key="quick_content_text",
+            )
+            render_polish_button(
+                source_key="quick_content_text",
+                kind=("topic" if mode == "generate" else "body"),
+                label="✨ 润色文案",
+                help_text="用 LLM 一键润色上面的输入内容",
             )
             
             # Split mode selector (only show in fixed mode)
@@ -80,7 +88,14 @@ def render_content_input():
             title = st.text_input(
                 tr("input.title"),
                 placeholder=tr("input.title_placeholder"),
-                help=tr("input.title_help")
+                help=tr("input.title_help"),
+                key="quick_content_title",
+            )
+            render_polish_button(
+                source_key="quick_content_title",
+                kind="title",
+                label="✨ 润色标题",
+                help_text="用 LLM 让标题更具吸引力",
             )
             
             # Number of scenes (only show in generate mode)

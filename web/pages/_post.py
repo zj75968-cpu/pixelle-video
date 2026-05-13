@@ -147,6 +147,18 @@ def _is_complete_override(cfg: dict | None) -> bool:
 
 def render_generate_form() -> dict | None:
     """Render the post generation input form. Returns params dict on submit."""
+    # Polish button must live OUTSIDE st.form (form bodies only allow form_submit_button).
+    from web.components.polish import render_polish_button
+    polish_col, _ = st.columns([1, 5])
+    with polish_col:
+        render_polish_button(
+            source_key="post_form_topic",
+            kind="topic",
+            label="✨ 润色主题",
+            help_text="让创作主题更具体、更可执行",
+            button_key="polish_post_topic",
+        )
+
     with st.form("post_gen_form"):
         st.subheader("📝 图文帖子生成")
 
