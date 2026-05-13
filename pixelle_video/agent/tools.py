@@ -352,6 +352,51 @@ async def _cleanup_outputs(
         "items": items[:50],  # truncate long listings for LLM
     }
 
+async def _recommend_models(
+    user_prompt: str,
+    task_kind: str = "text-to-video",
+    top_n: int = 3,
+) -> Dict[str, Any]:
+    """Recommend RunningHub low-price models for a generation goal.
+
+    Wraps `runninghub_recommender.recommend`. task_kind must be one of:
+    text-to-image / image-to-image / text-to-video / image-to-video /
+    start-end-to-video / video-tools.
+    """
+    from pixelle_video.service import pixelle_video as core
+    from pixelle_video.services.runninghub_recommender import recommend
+
+    if not getattr(core, "_initialized", False):
+        await core.initialize()
+    if core.llm is None:
+        raise RuntimeError("LLM service not configured")
+
+    allowed = {
+        "text-to-image", "image-to-image", "text-to-video",
+        "image-to-video", "start-end-to-video", "video-tools",
+    }
+    if task_kind not in allowed:
+        raise ValueError(f"task_kind must be one of {sorted(allowed)}, got {task_kind!r}")
+
+    rec = await recommend(
+        llm=core.llm,
+        user_prompt=user_prompt,
+        task_kind=task_kind,  # type: ignore[arg-type]
+        top_n=max(1, int(top_n)),
+    )
+    return {
+        "task_kind": task_kind,
+        "notes": rec.notes,
+        "picks": [
+            {
+                "workflow_key": p.workflow_key,
+                "score": p.score,
+                "reason": p.reason,
+                "suggested_params": p.suggested_params,
+            }
+            for p in rec.picks
+        ],
+    }
 
 # --------------------------------------------------------------------------
 # Registry
@@ -516,6 +561,35 @@ TOOLS: List[ToolSpec] = [
             "required": [],
         },
         handler=_cleanup_outputs,
+    ),
+    ToolSpec(
+        name="recommend_models",
+        description=(
+            "根据用户生成需求，从 RunningHub 低价渠道模型清单里挑出最适合的 Top-N 个 workflow，"
+            "并给出评分、理由、建议参数。task_kind 必填，取值："
+            "text-to-image / image-to-image / text-to-video / image-to-video / start-end-to-video / video-tools。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "user_prompt": {
+                    "type": "string",
+                    "description": "用户的生成需求/提示词（自然语言）",
+                },
+                "task_kind": {
+                    "type": "string",
+                    "description": "任务类型",
+                    "enum": [
+                        "text-to-image", "image-to-image", "text-to-video",
+                        "image-to-video", "start-end-to-video", "video-tools",
+                    ],
+                    "default": "text-to-video",
+                },
+                "top_n": {"type": "integer", "description": "返回条数 1-5", "default": 3},
+            },
+            "required": ["user_prompt"],
+        },
+        handler=_recommend_models,
     ),
 ]
 

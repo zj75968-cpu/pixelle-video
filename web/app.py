@@ -65,12 +65,6 @@ def main():
         icon="🛠️",
     )
 
-    recommend_page = st.Page(
-        "pages/6_🧠_Recommend.py",
-        title="选题推荐",
-        icon="🧠",
-    )
-
     agent_page = st.Page(
         "pages/8_🤖_Agent.py",
         title="Agent 大脑",
@@ -81,7 +75,6 @@ def main():
         create_page,
         history_page,
         publish_page,
-        recommend_page,
         devtools_page,
         agent_page,
     ])
