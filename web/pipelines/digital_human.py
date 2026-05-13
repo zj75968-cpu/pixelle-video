@@ -36,14 +36,27 @@ async def _try_runninghub_v2(
     if not key:
         return None
     base_url = (cfg.get("runninghub_base_url") or "").strip() or None
+    public_base = (cfg.get("public_base_url") or "").strip()
+    webhook_url = f"{public_base.rstrip('/')}/webhooks/runninghub" if public_base else None
     try:
         from pixelle_video.services.runninghub_v2 import RunningHubV2Client
         client = RunningHubV2Client(api_key=key, base_url=base_url)
-        create = await client.run_workflow(workflow_id=workflow_id, node_info_list=node_info_list)
+        create = await client.run_workflow(
+            workflow_id=workflow_id,
+            node_info_list=node_info_list,
+            webhook_url=webhook_url,
+        )
         task_id = create.get("taskId") or (create.get("data") or {}).get("taskId")
         if not task_id:
             raise RuntimeError(f"v2 run_workflow returned no taskId: {create}")
-        final = await client.wait_for_task(task_id)
+        if webhook_url:
+            logger.info(
+                f"[digital_human] v2 task {task_id} created with webhook={webhook_url}, awaiting callback"
+            )
+            final = await client.wait_via_webhook(task_id)
+        else:
+            logger.info(f"[digital_human] v2 task {task_id} created, polling (no public_base_url)")
+            final = await client.wait_for_task(task_id)
         if (final.get("status") or "").upper() != "SUCCESS":
             raise RuntimeError(f"v2 task non-success: {final}")
         results = final.get("results") or []

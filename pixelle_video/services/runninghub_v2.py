@@ -152,3 +152,43 @@ class RunningHubV2Client:
                     f"(last status={status or 'UNKNOWN'})"
                 )
             await asyncio.sleep(poll_interval)
+
+    async def wait_via_webhook(
+        self,
+        task_id: str,
+        *,
+        max_wait_seconds: int = 1800,
+        fallback_poll: bool = True,
+        poll_interval: float = 3.0,
+    ) -> dict[str, Any]:
+        """Wait for a task to finish by listening to the webhook callback.
+
+        Requires the FastAPI app to be running and reachable from RunningHub at
+        `<public_base_url>/webhooks/runninghub`, AND that `run_workflow(...)`
+        was called with `webhook_url=` pointing at that endpoint.
+
+        Behaviour:
+          - Registers an asyncio.Future via webhook_registry.
+          - Awaits the future with a timeout of `max_wait_seconds`.
+          - On timeout: if fallback_poll, falls back to `wait_for_task`; else raises TimeoutError.
+        """
+        from pixelle_video.services import webhook_registry
+
+        fut = await webhook_registry.register(task_id)
+        try:
+            payload = await asyncio.wait_for(fut, timeout=max_wait_seconds)
+            # Webhook payloads may not include `results`; if not, fetch once via query.
+            if "results" not in payload:
+                queried = await self.query_task(task_id)
+                merged = {**payload, **queried}
+                return merged
+            return payload
+        except asyncio.TimeoutError:
+            await webhook_registry.unregister(task_id)
+            if fallback_poll:
+                return await self.wait_for_task(
+                    task_id, poll_interval=poll_interval, max_wait_seconds=30
+                )
+            raise TimeoutError(
+                f"RunningHub v2 task {task_id} webhook did not arrive in {max_wait_seconds}s"
+            )
