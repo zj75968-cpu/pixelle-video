@@ -258,11 +258,33 @@ class DigitalHumanPipelineUI(PipelineUI):
                     key="goods_title"
                 )
 
+                # 商品图合成提示词（注入 RunningHub workflow 节点 14 的 CR Text.text 字段）
+                product_prompt_default = (
+                    "让这个人物自然地手持产品，保留产品的真实材质、立体感和品牌细节，"
+                    "产品广告级布光，高级摄影质感，避免把产品压扁成平面贴图"
+                )
+                product_prompt = st.text_area(
+                    "🎨 商品融合提示词（控制立体感/真实感）",
+                    value=st.session_state.get("digital_product_prompt", product_prompt_default),
+                    height=80,
+                    help="决定 AI 在合成「人物+商品」时如何处理商品。默认强调保留立体感与材质，避免被处理成平面图。",
+                    key="digital_product_prompt",
+                )
+                from web.components.polish import render_polish_button
+                render_polish_button(
+                    source_key="digital_product_prompt",
+                    kind="topic",
+                    label="✨ 润色提示词",
+                    help_text="让商品融合提示词更具体、更专业",
+                    button_key="polish_digital_product_prompt",
+                )
+
                 return {
                     "character_assets": character_asset_paths,
                     "goods_title": goods_title,
                     "goods_assets": goods_asset_paths,
                     "goods_text": goods_text,
+                    "product_prompt": product_prompt,
                     "mode": mode
                     }
 
@@ -543,7 +565,7 @@ class DigitalHumanPipelineUI(PipelineUI):
                             else:
                                 workflow_path = first_workflow_path
                                 workflow_params = {"firstimage": character_assets[0], "secondimage": goods_assets[0], "goodstype": goods_title}
-                                
+
                                 status_text.text(tr("progress.step_image"))
                                 kit = await pixelle_video._get_or_create_comfykit()
                                 workflow_config = json.load(open(workflow_path, 'r', encoding='utf8'))
@@ -551,7 +573,48 @@ class DigitalHumanPipelineUI(PipelineUI):
                                     workflow_input = workflow_config["workflow_id"]
                                 else:
                                     workflow_input = str(workflow_config)
-                                synthesis_result = await kit.execute(workflow_input, workflow_params)
+
+                                # ----- 自定义商品融合提示词覆盖 -----
+                                # 默认 RunningHub workflow 节点 14 (CR Text) 的固定 prompt 是
+                                # "让这个人物拿着这个产品"，没有强调立体感/真实材质，
+                                # 因此产品常被压扁成平面贴图。允许用户从 UI 传入 product_prompt
+                                # 直接覆盖节点 14 的 text 字段（RunningHub /task/openapi/create
+                                # 的 nodeInfoList 支持任意 nodeId+fieldName 覆盖，无需修改云端 workflow）。
+                                product_prompt = (video_params.get("product_prompt") or "").strip()
+                                if (
+                                    product_prompt
+                                    and workflow_config.get("source") == "runninghub"
+                                    and "workflow_id" in workflow_config
+                                ):
+                                    try:
+                                        rh_executor = kit._get_runninghub_executor()
+                                        rh_client = rh_executor.client
+                                        # 上传两张本地图到 RunningHub
+                                        first_filename = await rh_client.upload_file(str(character_assets[0]))
+                                        second_filename = await rh_client.upload_file(str(goods_assets[0]))
+                                        node_info_list = [
+                                            {"nodeId": "18", "fieldName": "image", "fieldValue": first_filename},
+                                            {"nodeId": "17", "fieldName": "image", "fieldValue": second_filename},
+                                            {"nodeId": "19", "fieldName": "text", "fieldValue": goods_title or ""},
+                                            {"nodeId": "14", "fieldName": "text", "fieldValue": product_prompt},
+                                        ]
+                                        logger.info(
+                                            f"[digital_human] using custom product_prompt via nodeInfoList override, "
+                                            f"len(product_prompt)={len(product_prompt)}"
+                                        )
+                                        task_data = await rh_client.create_task(workflow_input, node_info_list)
+                                        task_id = task_data.get("taskId")
+                                        if not task_id:
+                                            raise Exception(f"RunningHub create_task did not return taskId: {task_data}")
+                                        synthesis_result = await rh_executor._wait_for_task_completion(task_id, {})
+                                    except Exception as exc:
+                                        logger.warning(
+                                            f"[digital_human] custom product_prompt path failed, "
+                                            f"falling back to default kit.execute: {exc}"
+                                        )
+                                        synthesis_result = await kit.execute(workflow_input, workflow_params)
+                                else:
+                                    synthesis_result = await kit.execute(workflow_input, workflow_params)
                                 if synthesis_result.status != "completed":
                                     raise Exception(f"workflow execution failed: {synthesis_result.msg}")
                                 generated_image_url = getattr(synthesis_result, "images", [None])[0]
