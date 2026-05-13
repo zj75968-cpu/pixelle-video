@@ -151,6 +151,7 @@ class ConfigManager:
             "comfyui_url": self.config.comfyui.comfyui_url,
             "comfyui_api_key": self.config.comfyui.comfyui_api_key,
             "runninghub_api_key": self.config.comfyui.runninghub_api_key,
+            "runninghub_consumer_api_key": self.config.comfyui.runninghub_consumer_api_key,
             "runninghub_base_url": self.config.comfyui.runninghub_base_url,
             "runninghub_concurrent_limit": self.config.comfyui.runninghub_concurrent_limit,
             "runninghub_instance_type": self.config.comfyui.runninghub_instance_type,
@@ -173,6 +174,7 @@ class ConfigManager:
         comfyui_url: Optional[str] = None,
         comfyui_api_key: Optional[str] = None,
         runninghub_api_key: Optional[str] = None,
+        runninghub_consumer_api_key: Optional[str] = None,
         runninghub_concurrent_limit: Optional[int] = None,
         runninghub_instance_type: Optional[str] = None
     ):
@@ -184,6 +186,8 @@ class ConfigManager:
             updates["comfyui_api_key"] = comfyui_api_key
         if runninghub_api_key is not None:
             updates["runninghub_api_key"] = runninghub_api_key
+        if runninghub_consumer_api_key is not None:
+            updates["runninghub_consumer_api_key"] = runninghub_consumer_api_key
         if runninghub_concurrent_limit is not None:
             updates["runninghub_concurrent_limit"] = runninghub_concurrent_limit
         if runninghub_instance_type is not None:

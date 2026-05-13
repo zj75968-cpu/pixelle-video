@@ -259,6 +259,15 @@ def render_advanced_settings():
                     f"[{tr('settings.comfyui.runninghub_get_api_key')}]"
                     f"(https://www.runninghub{'.cn' if get_language() == 'zh_CN' else '.ai'}/?inviteCode=bozpdlbj)"
                 )
+
+                # Consumer-tier RunningHub key (optional) — used by digital_image v2 path
+                runninghub_consumer_api_key = st.text_input(
+                    "RunningHub 消费级会员 API Key（可选）",
+                    value=comfyui_config.get("runninghub_consumer_api_key", "") or "",
+                    type="password",
+                    help="如果你有消费级会员 key（更便宜），数字人 digital_image 会优先用此 key 走 openapi/v2 接口；失败/未填时自动回退到上面的企业级 key + v1 接口。",
+                    key="runninghub_consumer_api_key_input"
+                )
                 
                 # RunningHub concurrent limit and instance type (in one row)
                 limit_col, instance_col = st.columns(2)
@@ -312,6 +321,7 @@ def render_advanced_settings():
                         comfyui_url=comfyui_url if comfyui_url else None,
                         comfyui_api_key=comfyui_api_key if comfyui_api_key else None,
                         runninghub_api_key=runninghub_api_key if runninghub_api_key else None,
+                        runninghub_consumer_api_key=runninghub_consumer_api_key if runninghub_consumer_api_key else None,
                         runninghub_concurrent_limit=int(runninghub_concurrent_limit),
                         runninghub_instance_type=instance_type
                     )

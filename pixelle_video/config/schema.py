@@ -73,6 +73,10 @@ class ComfyUIConfig(BaseModel):
     comfyui_url: str = Field(default="http://127.0.0.1:8188", description="ComfyUI Server URL")
     comfyui_api_key: Optional[str] = Field(default=None, description="ComfyUI API Key (optional)")
     runninghub_api_key: Optional[str] = Field(default=None, description="RunningHub API Key (optional)")
+    runninghub_consumer_api_key: Optional[str] = Field(
+        default=None,
+        description="RunningHub 消费级会员 API Key（可选）。若提供，部分工作流（如数字人 digital_image）会优先用此 key 走 openapi/v2 接口，失败时回退到企业级 key。",
+    )
     runninghub_base_url: Optional[str] = Field(
         default=None,
         description="RunningHub API base URL. Use https://www.runninghub.cn for China, https://www.runninghub.ai for international (default).",
