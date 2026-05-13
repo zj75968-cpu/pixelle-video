@@ -63,21 +63,35 @@ def main():
     
     # Get all registered pipelines
     pipelines = get_all_pipeline_uis()
-    
-    # Use Tabs for pipeline selection
-    # Note: st.tabs returns a list of containers, one for each tab
+
+    # NOTE: We intentionally do NOT use st.tabs() here because Streamlit's
+    # built-in tabs lose their selected state on every rerun (any radio /
+    # button click would snap the user back to the first pipeline tab, e.g.
+    # 数字人 → 切换"带货/自定义"瞬间被弹回快速创作)。
+    # Instead, use st.radio backed by session_state for a persistent
+    # tab-like selector.
     tab_labels = [f"{p.icon} {p.display_name}" for p in pipelines]
-    tabs = st.tabs(tab_labels)
-    
-    # Render each pipeline in its corresponding tab
-    for i, pipeline in enumerate(pipelines):
-        with tabs[i]:
-            # Show description if available
-            if pipeline.description:
-                st.caption(pipeline.description)
-            
-            # Delegate rendering
-            pipeline.render(pixelle_video)
+    if "active_pipeline_index" not in st.session_state:
+        st.session_state["active_pipeline_index"] = 0
+    # Clamp in case pipeline registry changed between reruns.
+    if st.session_state["active_pipeline_index"] >= len(pipelines):
+        st.session_state["active_pipeline_index"] = 0
+
+    selected_label = st.radio(
+        "Pipeline",
+        options=tab_labels,
+        index=st.session_state["active_pipeline_index"],
+        horizontal=True,
+        label_visibility="collapsed",
+        key="_home_pipeline_radio",
+    )
+    st.session_state["active_pipeline_index"] = tab_labels.index(selected_label)
+    st.divider()
+
+    active_pipeline = pipelines[st.session_state["active_pipeline_index"]]
+    if active_pipeline.description:
+        st.caption(active_pipeline.description)
+    active_pipeline.render(pixelle_video)
 
 
 if __name__ == "__main__":
