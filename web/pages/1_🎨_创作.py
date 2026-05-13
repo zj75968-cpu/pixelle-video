@@ -42,10 +42,28 @@ def _run_subpage(path: Path) -> None:
         st.set_page_config = _orig  # type: ignore[assignment]
 
 
-tab_video, tab_post = st.tabs(["🎬 视频生成", "📝 图文创作"])
+tab_labels = ["🎬 视频生成", "📝 图文创作"]
+if "create_active_tab_index" not in st.session_state:
+    st.session_state["create_active_tab_index"] = 0
+if st.session_state["create_active_tab_index"] >= len(tab_labels):
+    st.session_state["create_active_tab_index"] = 0
 
-with tab_video:
+# NOTE: We avoid st.tabs() here because Streamlit's built-in tabs reset to
+# the first tab on every rerun (any inner widget change would bounce the
+# user back to "视频生成"). Use a horizontal radio backed by session_state
+# for a persistent tab-like selector.
+selected_label = st.radio(
+    "Create section",
+    options=tab_labels,
+    index=st.session_state["create_active_tab_index"],
+    horizontal=True,
+    label_visibility="collapsed",
+    key="_create_section_radio",
+)
+st.session_state["create_active_tab_index"] = tab_labels.index(selected_label)
+st.divider()
+
+if st.session_state["create_active_tab_index"] == 0:
     _run_subpage(_HERE / "_home.py")
-
-with tab_post:
+else:
     _run_subpage(_HERE / "_post.py")

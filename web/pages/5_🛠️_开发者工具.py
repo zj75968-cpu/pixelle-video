@@ -30,10 +30,25 @@ def _run_subpage(path: Path) -> None:
         st.set_page_config = _orig  # type: ignore[assignment]
 
 
-tab_rh, tab_api = st.tabs(["🟢 RunningHub 渠道状态", "🧪 API 调试"])
+tab_labels = ["🟢 RunningHub 渠道状态", "🧪 API 调试"]
+if "devtools_active_tab_index" not in st.session_state:
+    st.session_state["devtools_active_tab_index"] = 0
+if st.session_state["devtools_active_tab_index"] >= len(tab_labels):
+    st.session_state["devtools_active_tab_index"] = 0
 
-with tab_rh:
+# Persistent radio-based tabs (st.tabs resets to first tab on every rerun).
+selected_label = st.radio(
+    "Developer tools section",
+    options=tab_labels,
+    index=st.session_state["devtools_active_tab_index"],
+    horizontal=True,
+    label_visibility="collapsed",
+    key="_devtools_section_radio",
+)
+st.session_state["devtools_active_tab_index"] = tab_labels.index(selected_label)
+st.divider()
+
+if st.session_state["devtools_active_tab_index"] == 0:
     _run_subpage(_HERE / "_runninghub.py")
-
-with tab_api:
+else:
     _run_subpage(_HERE / "_apidebug.py")
