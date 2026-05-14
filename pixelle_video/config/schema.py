@@ -117,6 +117,10 @@ class XHSPublishConfig(BaseModel):
         default="/sdcard/DCIM/PixelleVideo",
         description="Device-side directory where images are pushed before publishing",
     )
+    lock_pin: str = Field(
+        default="",
+        description="Device unlock PIN (digits only). If set, auto-unlocks the screen before publishing.",
+    )
 
 
 class PixelleVideoConfig(BaseModel):

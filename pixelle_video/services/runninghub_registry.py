@@ -144,6 +144,9 @@ def build_payload(model: dict, user_params: dict, api_key: str) -> dict:
             value = provided
 
         payload[key] = _coerce(value, ftype, spec)
+    
+    # 验证 STRING 字段长度约束
+    validate_string_fields(model, payload)
     return payload
 
 
@@ -164,6 +167,41 @@ def _coerce(value, ftype: str, spec: dict):
     except Exception:
         return value
     return value
+
+
+def validate_string_fields(model: dict, payload: dict) -> None:
+    """验证 STRING 类字段的长度约束（minLength/maxLength）。
+    
+    Args:
+        model: 模型 schema（含 inputs 列表）
+        payload: 已组装的 payload 字典
+    
+    Raises:
+        ValueError: 当任何字段长度不符合约束时
+    """
+    for spec in model.get("inputs") or []:
+        key = spec["fieldKey"]
+        if spec.get("type") != "STRING":
+            continue
+        if key not in payload:
+            continue
+        value = payload[key]
+        if value is None:
+            continue
+        value_str = str(value)
+        min_len = spec.get("minLength")
+        max_len = spec.get("maxLength")
+        
+        if min_len is not None and len(value_str) < min_len:
+            raise ValueError(
+                f"字段 '{key}' 长度不满足最小要求: "
+                f"当前 {len(value_str)} 字符，最少需要 {min_len} 字符。"
+            )
+        if max_len is not None and len(value_str) > max_len:
+            raise ValueError(
+                f"字段 '{key}' 长度超过最大限制: "
+                f"当前 {len(value_str)} 字符，最多 {max_len} 字符。"
+            )
 
 
 def display_label(model: dict) -> str:

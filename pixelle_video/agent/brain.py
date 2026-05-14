@@ -96,6 +96,10 @@ SYSTEM_PROMPT_TEMPLATE = """你是 Pixelle-Video 项目的总控 Agent。\
        `"device_serial": "${{steps[i].result.picks[0].serial}}"`
      （i 是 recommend_device 的步骤下标）。
    - 如果 recommend_device 返回 picks 为空，再退回到不传 device_serial（由系统自动取第一台连接设备）。
+7. **小红书发布类型**（enqueue_publish 的 `kind` 参数）：
+   - 用户说「视频」「纯视频」「视频笔记」或指令含 kind=video → kind="video"（上传 .mp4，默认）
+   - 用户说「图文」「图文点评」「图文笔记」「图文视频」或指令含 kind=image_text → kind="image_text"（自动取 frames/*_composed.png 场景合成图，无需手动传 images）
+   - 未提及发布类型时默认 kind="video"。
 
 用户指令："{instruction}"
 """

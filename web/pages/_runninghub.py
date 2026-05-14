@@ -25,7 +25,7 @@ st.warning(
     "服务端强制要求 **企业级-共享 API Key**。个人 Key 调用任意模型都会返回 "
     "`errorCode 1014 ACCESS_DENIED`，与是否「开通」无关。\n\n"
     "**没有企业级 Key 怎么办？** 请改用左侧导航的常规生成入口（文生图 / 文生视频 / 图生视频），"
-    "底层走 **ComfyUI Workflow API**，已实测 `image_flux` / `video_wan2.2` / `i2v_LTX2` 等"
+    "底层走 **ComfyUI Workflow API**，已实测 `image_flux` / `video_wan2.2` 等"
     "工作流可用个人 Key 直接出片。"
 )
 

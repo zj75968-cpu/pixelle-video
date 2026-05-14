@@ -23,8 +23,8 @@ comfyui:
   comfyui_url: http://127.0.0.1:8188  # ComfyUI server URL (required for selfhost workflows)
   comfyui_api_key: ""  # ComfyUI API key (optional, get from https://platform.comfy.org/profile/api-keys)
   # Note for Docker users: Use host.docker.internal:8188 (Mac/Windows) or host IP address (Linux)
-  runninghub_api_key: ""  # RunningHub API key (required for runninghub workflows)
-  runninghub_consumer_api_key: ""  # 可选：RunningHub 消费级会员 API Key。提供后，数字人 digital_image 工作流会优先走 openapi/v2 + 此 key；失败时自动回退到 runninghub_api_key (v1)。
+  runninghub_api_key: ""  # 【必填，企业级-共享 API Key】RunningHub 主 API Key。所有 runninghub workflows、以及 OpenAPI v2 标准模型 API（registry 中的「低价渠道版」/rhart-* 接口，例如「全能视频V3.1-fast」「全能图片G-2.0」等）**仅接受此类型 key**；消费级 key 调用会返回 errorCode=1014 "Standard Model API is restricted to Enterprise-Shared API Keys only"。注意：「低价渠道版」只是套餐内单价较低（如 ¥0.2/次），鉴权层级仍属于标准模型 API，与"消费级 key"不是一回事。
+  runninghub_consumer_api_key: ""  # 可选：RunningHub 消费级会员 API Key。**仅用于 ComfyUI workflow_id 形式的工作流**（典型场景：数字人 digital_image 工作流，会优先走 openapi/v2 + 此 key，失败回退到 runninghub_api_key v1）。**不能**用于上面的 /rhart-* 标准模型 API（会被服务端拒绝）。
   runninghub_concurrent_limit: 1  # Concurrent execution limit for RunningHub (1-10, default 1 for regular members)
   
   # TTS-specific configuration

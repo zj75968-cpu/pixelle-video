@@ -44,6 +44,7 @@
     "voice.preview": "▶ 试听语音",
     "voice.previewing": "正在生成语音预览...",
     "voice.preview_failed": "预览失败：{error}",
+    "validation.prompt_too_short": "提示词过短（当前 {current_len} 字符，至少 {min_len} 字符）",
     "style.workflow": "工作流选择",
     "style.workflow_what": "决定视频中每帧插图的生成方式和效果（如使用 FLUX、SD 等模型）",
     "style.workflow_how": "将导出的 image_xxx.json 工作流文件（API格式）放入 workflows/selfhost/（本地 ComfyUI）或 workflows/runninghub/（云端）文件夹",

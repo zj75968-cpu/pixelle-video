@@ -161,6 +161,10 @@ class ComfyBaseService:
             if "workflow_id" in content:
                 workflow_info["workflow_id"] = content["workflow_id"]
         
+        # 读取可选的 category 字段（用于过滤分析类、图生视频等）
+        if "category" in content:
+            workflow_info["category"] = content["category"]
+        
         return workflow_info
     
     def _get_default_workflow(self) -> str:

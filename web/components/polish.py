@@ -98,23 +98,34 @@ def render_polish_button(
     target_key = target_key or source_key
     btn_key = button_key or f"polish_btn_{source_key}_{kind}"
 
-    if st.button(label, help=help_text, key=btn_key, type="secondary"):
+    def _on_click() -> None:
         raw = (st.session_state.get(source_key) or "").strip()
         if not raw:
-            st.warning("先输入一些内容再润色。")
+            st.session_state[f"_polish_msg_{btn_key}"] = ("warning", "先输入一些内容再润色。")
             return
         try:
-            with st.spinner("正在用 LLM 润色…"):
-                res = polish_text(raw, kind)
+            res = polish_text(raw, kind)
         except Exception as exc:  # noqa: BLE001
             logger.warning(f"polish failed: {exc}")
-            st.error(f"润色失败：{exc}")
+            st.session_state[f"_polish_msg_{btn_key}"] = ("error", f"润色失败：{exc}")
             return
         polished = (res.polished or "").strip()
         if not polished:
-            st.warning("LLM 返回为空，保留原文。")
+            st.session_state[f"_polish_msg_{btn_key}"] = ("warning", "LLM 返回为空，保留原文。")
             return
+        # Safe to assign here: on_click runs before widgets are re-instantiated this run.
         st.session_state[target_key] = polished
         if res.rationale:
-            st.toast(f"已润色：{res.rationale}", icon="✨")
-        st.rerun()
+            st.session_state[f"_polish_msg_{btn_key}"] = ("toast", f"已润色：{res.rationale}")
+
+    st.button(label, help=help_text, key=btn_key, type="secondary", on_click=_on_click)
+
+    _msg = st.session_state.pop(f"_polish_msg_{btn_key}", None)
+    if _msg:
+        kind_, text_ = _msg
+        if kind_ == "warning":
+            st.warning(text_)
+        elif kind_ == "error":
+            st.error(text_)
+        elif kind_ == "toast":
+            st.toast(text_, icon="✨")

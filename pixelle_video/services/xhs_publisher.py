@@ -77,6 +77,8 @@ class XHSPublisher:
         else:
             self.strict_mode = xhs_cfg.strict_mode if xhs_cfg is not None else True
 
+        self.lock_pin: str = xhs_cfg.lock_pin if xhs_cfg and hasattr(xhs_cfg, "lock_pin") else ""
+
         logger.info(
             f"XHSPublisher initialized: serial={serial}, "
             f"strict_mode={self.strict_mode}, push_dir={self.push_dir}"
@@ -369,6 +371,57 @@ class XHSPublisher:
             time.sleep(1)
         except Exception as e:
             logger.warning(f"_adb_wakeup failed (non-fatal): {e}")
+
+    def _unlock_screen(self) -> None:
+        """Wake up and unlock the device screen.
+
+        Always safe to call. Sends WAKEUP keyevent then swipes up to dismiss
+        the lock screen (harmless if the screen is already on and unlocked).
+        Enters PIN digits if ``lock_pin`` is configured.
+        """
+        import subprocess
+        adb = shutil.which("adb") or "adb"
+
+        def _run(*args: str) -> None:
+            subprocess.run(
+                [adb, "-s", self.serial, "shell"] + list(args),
+                timeout=5, capture_output=True,
+            )
+
+        try:
+            # 1. Wake up screen
+            _run("input", "keyevent", "224")
+            time.sleep(1.5)
+
+            # 2. Get screen dimensions
+            size_out = subprocess.run(
+                [adb, "-s", self.serial, "shell", "wm", "size"],
+                timeout=5, capture_output=True, text=True,
+            ).stdout
+            try:
+                parts = size_out.strip().split()[-1].split("x")
+                sw, sh = int(parts[0]), int(parts[1])
+            except Exception:
+                sw, sh = 1080, 2340
+
+            # 3. Swipe up to dismiss lock screen (safe even if already unlocked)
+            mid_x = sw // 2
+            _run("input", "swipe",
+                 str(mid_x), str(int(sh * 0.85)),
+                 str(mid_x), str(int(sh * 0.15)))
+            time.sleep(1)
+
+            # 4. Enter PIN if configured
+            if self.lock_pin:
+                _run("input", "text", self.lock_pin)
+                time.sleep(0.3)
+                _run("input", "keyevent", "66")  # ENTER
+                time.sleep(1)
+                logger.info(f"[{self.serial}] Screen unlocked with PIN")
+            else:
+                logger.info(f"[{self.serial}] Screen woken and swiped up")
+        except Exception as e:
+            logger.warning(f"_unlock_screen failed (non-fatal): {e}")
 
     def _screen_size(self, d) -> tuple[int, int]:
         """Return (width, height) of the device screen."""
@@ -778,6 +831,7 @@ class XHSPublisher:
 
             # 2. Open XHS and navigate to publish
             logger.info(f"[{self.serial}] Opening XHS publish screen")
+            self._unlock_screen()  # wake up + unlock PIN if configured
             self._open_xhs_publish(d)
             self._screenshot(d, "01_publish_screen")
 
@@ -886,6 +940,7 @@ class XHSPublisher:
 
             # 2. Open XHS publish flow
             logger.info(f"[{self.serial}] Opening XHS publish screen")
+            self._unlock_screen()  # wake up + unlock PIN if configured
             self._open_xhs_publish(d)
             self._screenshot(d, "v01_publish_screen")
 

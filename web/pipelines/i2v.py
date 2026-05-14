@@ -12,7 +12,7 @@ from web.pipelines.base import PipelineUI, register_pipeline_ui
 from web.components.content_input import render_version_info
 from web.utils.async_helpers import run_async
 from web.utils.streamlit_helpers import check_and_warn_selfhost_workflow
-from web.utils.runninghub_i2v import discover_workflow_params, run_runninghub_i2v
+from web.utils.runninghub_i2v import discover_workflow_params, run_runninghub_i2v, run_runninghub_i2v_v2
 from pixelle_video.config import config_manager
 from pixelle_video.utils.os_util import create_task_output_dir
 
@@ -45,6 +45,48 @@ class ImageToVideoPipelineUI(PipelineUI):
             return []
         parts = re.split(r"[\s,，;；、]+", raw_text.strip())
         return [p for p in parts if p.startswith("http://") or p.startswith("https://")]
+
+    @staticmethod
+    def _normalize_named_params(params: dict[str, Any]) -> dict[str, Any]:
+        """Normalize numeric-like string values for named kwargs passed to media service."""
+        out = dict(params)
+
+        def _to_int_like(v):
+            if isinstance(v, bool):
+                return int(v)
+            if isinstance(v, (int, float)):
+                return int(v)
+            if isinstance(v, str):
+                s = v.strip()
+                if not s:
+                    return v
+                try:
+                    return int(float(s))
+                except (TypeError, ValueError):
+                    return v
+            return v
+
+        def _to_float_like(v):
+            if isinstance(v, bool):
+                return float(int(v))
+            if isinstance(v, (int, float)):
+                return float(v)
+            if isinstance(v, str):
+                s = v.strip()
+                if not s:
+                    return v
+                try:
+                    return float(s)
+                except (TypeError, ValueError):
+                    return v
+            return v
+
+        for k in ("duration", "seed", "steps", "width", "height"):
+            if k in out and out[k] not in (None, ""):
+                out[k] = _to_int_like(out[k])
+        if "cfg" in out and out["cfg"] not in (None, ""):
+            out["cfg"] = _to_float_like(out["cfg"])
+        return out
 
     def render(self, pixelle_video: Any):
         # Two-column layout
@@ -104,55 +146,10 @@ class ImageToVideoPipelineUI(PipelineUI):
                     pass
                 return result
 
-            # File uploader for multiple files
-            uploaded_files = st.file_uploader(
-                tr("i2v.assets.upload"),
-                type=["jpg", "jpeg", "png", "webp"],
-                accept_multiple_files=True,
-                help=tr("i2v.assets.upload_help"),
-                key=self._k("material_files")
-            )
-
-            # Save uploaded files to temp directory with unique session ID
-            audio_asset_paths = []
-            if uploaded_files:
-                import uuid
-                session_id = str(uuid.uuid4()).replace('-', '')[:12]
-                temp_dir = Path(f"temp/assets_{session_id}")
-                temp_dir.mkdir(parents=True, exist_ok=True)
-                
-                for uploaded_file in uploaded_files:
-                    file_path = temp_dir / uploaded_file.name
-                    with open(file_path, "wb") as f:
-                        f.write(uploaded_file.getbuffer())
-                    audio_asset_paths.append(str(file_path.absolute()))
-                
-                st.success(tr("i2v.assets.character_sucess"))
-                
-                # Preview uploaded assets
-                with st.expander(tr("i2v.assets.preview"), expanded=True):
-                    # Show in a grid (3 columns)
-                    cols = st.columns(3)
-                    for i, (file, path) in enumerate(zip(uploaded_files, audio_asset_paths)):
-                        with cols[i % 3]:
-                            # Check if image
-                            ext = Path(path).suffix.lower()
-                            if ext in [".jpg", ".jpeg", ".png", ".webp"]:
-                                st.image(file, caption=file.name, width="stretch")
-            else:
-                st.info(tr("i2v.assets.character_empty_hint"))
-            
-            prompt_text = st.text_area(
-                        tr("i2v.input_text"),
-                        placeholder=tr("i2v.input.topic_placeholder"),
-                        height=200,
-                        help=tr("input.text_help_audio"),
-                        key=self._k("audio_box")
-                        )
-            
+            # ── 工作流选择（先选再展示对应图片槽位）─────────────────────
             i2v_workflows = list_i2v_workflows()
-            workflow_options = [wf["display_name"] for wf in i2v_workflows] 
-            workflow_keys = [wf["key"] for wf in i2v_workflows]               
+            workflow_options = [wf["display_name"] for wf in i2v_workflows]
+            workflow_keys = [wf["key"] for wf in i2v_workflows]
             default_workflow_index = 0
 
             workflow_display = st.selectbox(
@@ -160,7 +157,7 @@ class ImageToVideoPipelineUI(PipelineUI):
                 workflow_options if workflow_options else ["No workflow found"],
                 index=default_workflow_index,
                 label_visibility="collapsed",
-                key=self._k("i2v_workflow_select")
+                key=self._k("i2v_workflow_select"),
             )
 
             if workflow_options:
@@ -169,8 +166,111 @@ class ImageToVideoPipelineUI(PipelineUI):
             else:
                 workflow_key = None
 
+            # ── 读取当前工作流的多图槽位声明 ─────────────────────────────
+            import json as _json_i2v
+            import uuid as _uuid_i2v
+            _image_inputs: list[dict] = []
+            _audio_node_id: str | None = None
+            _audio_field: str = "audio"
+            _wf_cfg: dict = {}
+            if workflow_key and workflow_key.startswith("runninghub/"):
+                try:
+                    _wf_path = Path("workflows") / workflow_key
+                    _wf_cfg = _json_i2v.loads(_wf_path.read_text("utf-8"))
+                    _image_inputs = _wf_cfg.get("image_inputs") or []
+                    _audio_node_id = _wf_cfg.get("audio_node_id")
+                    _audio_field = _wf_cfg.get("audio_field") or "audio"
+                except Exception:
+                    _image_inputs = []
+
+            audio_asset_paths: list[str] = []
+            named_image_paths: dict[str, str] = {}  # node_id -> local file path
+
+            def _save_uploaded(uf) -> str:
+                td = Path(f"temp/assets_{_uuid_i2v.uuid4().hex[:10]}")
+                td.mkdir(parents=True, exist_ok=True)
+                fp = td / uf.name
+                with open(fp, "wb") as fh:
+                    fh.write(uf.getbuffer())
+                return str(fp.absolute())
+
+            if _image_inputs:
+                # 首尾帧等多槽位工作流：每个槽位独立上传
+                for _slot in _image_inputs:
+                    _nid = str(_slot["node_id"])
+                    _lbl = _slot.get("label", f"图片（节点 {_nid}）")
+                    _req = _slot.get("required", True)
+                    _up = st.file_uploader(
+                        f"{_lbl}{'（必填）' if _req else '（可选）'}",
+                        type=["jpg", "jpeg", "png", "webp"],
+                        accept_multiple_files=False,
+                        key=self._k(f"img_slot_{_nid}"),
+                    )
+                    if _up:
+                        _p = _save_uploaded(_up)
+                        named_image_paths[_nid] = _p
+                        audio_asset_paths.append(_p)
+                        st.image(_up, caption=_lbl, width=160)
+                    elif _req:
+                        st.caption(f"⬆️ 请上传「{_lbl}」")
+            else:
+                # 普通 i2v：通用多文件上传
+                uploaded_files = st.file_uploader(
+                    tr("i2v.assets.upload"),
+                    type=["jpg", "jpeg", "png", "webp"],
+                    accept_multiple_files=True,
+                    help=tr("i2v.assets.upload_help"),
+                    key=self._k("material_files"),
+                )
+
+                if uploaded_files:
+                    for uploaded_file in uploaded_files:
+                        _p = _save_uploaded(uploaded_file)
+                        audio_asset_paths.append(_p)
+                    st.success(tr("i2v.assets.character_sucess"))
+
+                    with st.expander(tr("i2v.assets.preview"), expanded=True):
+                        cols = st.columns(3)
+                        for i, (file, path) in enumerate(zip(uploaded_files, audio_asset_paths)):
+                            with cols[i % 3]:
+                                ext = Path(path).suffix.lower()
+                                if ext in [".jpg", ".jpeg", ".png", ".webp"]:
+                                    st.image(file, caption=file.name, width="stretch")
+                else:
+                    st.info(tr("i2v.assets.character_empty_hint"))
+
+            # 必填图片完整性校验
+            _required_nids = [str(s["node_id"]) for s in _image_inputs if s.get("required", True)]
+            image_inputs_ok: bool = (
+                all(nid in named_image_paths for nid in _required_nids)
+                if _required_nids else True
+            )
+
+            # 音频上传（仅当工作流声明了 audio_node_id）
+            audio_asset_path: str | None = None
+            if _audio_node_id:
+                _audio_up = st.file_uploader(
+                    "🎵 口播音频（必填）",
+                    type=["mp3", "wav", "m4a", "aac"],
+                    accept_multiple_files=False,
+                    key=self._k("audio_file_upload"),
+                )
+                if _audio_up:
+                    audio_asset_path = _save_uploaded(_audio_up)
+                    st.success(f"✅ 已上传音频: {_audio_up.name}")
+                else:
+                    st.caption("⬆️ 请上传 mp3 / wav / m4a 音频文件")
+
+            prompt_text = st.text_area(
+                        tr("i2v.input_text"),
+                        placeholder=tr("i2v.input.topic_placeholder"),
+                        height=200,
+                        help=tr("input.text_help_audio"),
+                        key=self._k("audio_box")
+                        )
+
             image_urls = []
-            
+
             # Check and warn for selfhost workflow (auto popup if not confirmed)
             check_and_warn_selfhost_workflow(workflow_key)
 
@@ -197,16 +297,41 @@ class ImageToVideoPipelineUI(PipelineUI):
                 "task_options": task_options,
                 "rh_api_params": rh_api_params,
                 "is_rh_api": is_rh_api,
+                "named_image_paths": named_image_paths,
+                "image_inputs_ok": image_inputs_ok,
+                "audio_asset_path": audio_asset_path,
+                "has_audio_input": bool(_audio_node_id),
                 }
 
     def _render_rh_api_params(self, workflow_key: str) -> dict[str, Any]:
         """渲染 RunningHub 低价渠道 / 标准模型 API 的动态参数面板（registry 驱动）。"""
         from pixelle_video.services import runninghub_registry as rh_reg
+        from pixelle_video.config import config_manager as _cfg_mgr
 
         model = rh_reg.get_model_by_workflow_key(workflow_key)
         if not model:
             st.warning(f"未在 registry 中找到模型: {workflow_key}")
             return {}
+
+        # 鉴权前置校验：「低价渠道版」/rhart-* 端点在 RunningHub 服务端归类为
+        # "Standard Model API"，仅接受「企业级-共享 API Key」。若仅配置了
+        # consumer key，服务端会返回 errorCode=1014。此处给出明确提示。
+        _ent_key = (getattr(_cfg_mgr.config.comfyui, "runninghub_api_key", "") or "").strip()
+        _con_key = (getattr(_cfg_mgr.config.comfyui, "runninghub_consumer_api_key", "") or "").strip()
+        if not _ent_key:
+            st.error(
+                "⚠️ 该模型为 RunningHub「标准模型 API」（俗称「低价渠道版」），"
+                "**必须配置「企业级-共享 API Key」**（`config.yaml` → `comfyui.runninghub_api_key`）。\n\n"
+                "**注意**：名字里的「低价渠道版」只表示套餐内单价较低，鉴权层级仍属标准模型 API；"
+                "消费级 key (`runninghub_consumer_api_key`) **不能** 调用 `/rhart-*` 接口，"
+                "会返回 `errorCode=1014: Standard Model API is restricted to Enterprise-Shared API Keys only`。\n\n"
+                "消费级 key 的用途：仅 ComfyUI workflow_id 形式的工作流（如数字人 digital_image）。"
+            )
+        elif _con_key and _ent_key == _con_key:
+            st.warning(
+                "⚠️ 检测到 `runninghub_api_key` 与 `runninghub_consumer_api_key` 相同，"
+                "请确认前者是「企业级-共享 API Key」，否则调用本模型时会收到 1014 错误。"
+            )
 
         with st.expander(f"⚙️ 参数 — {model['name']}", expanded=True):
             highlight = model.get("modelHighlights")
@@ -265,6 +390,12 @@ class ImageToVideoPipelineUI(PipelineUI):
             st.caption("对应 RunningHub `/task/openapi/create` 接口的可选参数")
             col1, col2 = st.columns(2)
             with col1:
+                random_seed = st.checkbox(
+                    "randomSeed（随机种子）",
+                    value=True,
+                    help="开启后每次生成随机；关闭后尽量复用工作流内 seed（结果更可复现）",
+                    key=self._k("rh_random_seed"),
+                )
                 instance_type = st.selectbox(
                     "instanceType（实例类型）",
                     ["default", "plus"],
@@ -295,6 +426,7 @@ class ImageToVideoPipelineUI(PipelineUI):
                     key=self._k("rh_retain_seconds"),
                 )
         return {
+            "randomSeed": random_seed,
             "instanceType": instance_type,
             "addMetadata": add_metadata,
             "usePersonalQueue": use_personal_queue,
@@ -315,6 +447,14 @@ class ImageToVideoPipelineUI(PipelineUI):
             logger.warning(f"[i2v] 读取工作流配置失败: {exc}")
             return []
 
+        # 消费级 v2 工作流：直接从 JSON 配置渲染参数，无需拉取企业级云端 JSON
+        if workflow_config.get("use_consumer_v2"):
+            explicit = workflow_config.get("extra_params") or []
+            if not explicit:
+                return []
+            with st.expander("⚙️ 工作流参数", expanded=False):
+                return self._render_explicit_params(workflow_id, explicit)
+
         @st.cache_data(ttl=600, show_spinner=False)
         def _cached_discover(wid: str, cfg_json: str, _ver: str) -> dict:
             async def _do():
@@ -333,7 +473,16 @@ class ImageToVideoPipelineUI(PipelineUI):
                 cfg_json = json.dumps(workflow_config, ensure_ascii=False, sort_keys=True)
                 discovery = _cached_discover(workflow_id, cfg_json, "v6-explicit-mapping")
             except Exception as exc:
-                st.warning(f"加载工作流参数失败：{exc}")
+                _msg = str(exc)
+                if "WORKFLOW_NOT_SAVED_OR_NOT_RUNNING" in _msg:
+                    st.error(
+                        f"⚠️ RunningHub 工作流 `{workflow_id}` **未发布 API 服务**。\n\n"
+                        "请前往 RunningHub 网页 → 我的工作流 → 找到该工作流 → 点击 **"
+                        "「发布 API」/「启动 API 服务」**，等状态变为「运行中」后再刷新本页。\n\n"
+                        "同时请核对工作流 JSON 中的 `workflow_id` 是否正确。"
+                    )
+                else:
+                    st.warning(f"加载工作流参数失败：{exc}")
                 return []
 
             params = discovery.get("params", []) or []
@@ -379,12 +528,77 @@ class ImageToVideoPipelineUI(PipelineUI):
                             idx_default = options.index(cur)
                         except ValueError:
                             idx_default = 0
-                        v = st.selectbox(label, options, index=idx_default, key=wkey)
+                        disp = meta.get("display_labels")
+                        if isinstance(disp, list) and len(disp) == len(options):
+                            _fmt = lambda x, _o=options, _d=disp: _d[_o.index(x)] if x in _o else str(x)
+                            v = st.selectbox(label, options, index=idx_default, key=wkey, format_func=_fmt)
+                        else:
+                            v = st.selectbox(label, options, index=idx_default, key=wkey)
                     else:
                         v = st.text_input(label, value=str(cur), key=wkey)
                 if v != cur:
                     overrides.append((node_id, field, v))
             return overrides
+
+    def _render_explicit_params(self, workflow_id: str, extra_params: list) -> list[tuple[str, str, Any]]:
+        """为 use_consumer_v2 工作流直接从 JSON 配置渲染 extra_params，无需拉取云端 JSON。"""
+        overrides: list[tuple[str, str, Any]] = []
+        cols = st.columns(2)
+        for idx, p in enumerate(extra_params):
+            nid = str(p.get("node_id", ""))
+            fname = p.get("field_name") or p.get("field") or ""
+            if not nid or not fname:
+                continue
+            label = p.get("label") or f"{fname} (node {nid})"
+            ptype = p.get("type", "str")
+            default = p.get("default")
+            wkey = self._k(f"i2v_param_{workflow_id}_{nid}_{fname}")
+            with cols[idx % 2]:
+                if ptype == "bool":
+                    cur = bool(default) if default is not None else False
+                    v_bool = st.checkbox(label, value=cur, key=wkey)
+                    if v_bool != cur:
+                        overrides.append((nid, fname, str(v_bool).lower()))
+                elif ptype == "int":
+                    try:
+                        cur = int(default) if default is not None else int(p.get("min", 0))
+                    except Exception:
+                        cur = 0
+                    v_int = int(st.number_input(
+                        label, value=cur,
+                        min_value=int(p.get("min", 0)),
+                        max_value=int(p.get("max", 2**31 - 1)),
+                        step=int(p.get("step", 1)),
+                        key=wkey,
+                    ))
+                    if v_int != cur:
+                        overrides.append((nid, fname, v_int))
+                elif ptype in ("enum_str", "enum_int"):
+                    opts = list(p.get("options") or [])
+                    if ptype == "enum_int":
+                        opts = [int(o) for o in opts]
+                        try:
+                            default = int(default) if default is not None else (opts[0] if opts else 0)
+                        except Exception:
+                            default = opts[0] if opts else 0
+                    try:
+                        idx_d = opts.index(default)
+                    except (ValueError, TypeError):
+                        idx_d = 0
+                    disp = p.get("display_labels")
+                    if isinstance(disp, list) and len(disp) == len(opts):
+                        _fmt = lambda x, _o=opts, _d=disp: _d[_o.index(x)] if x in _o else str(x)
+                        v_sel = st.selectbox(label, opts if opts else [""], index=idx_d, key=wkey, format_func=_fmt)
+                    else:
+                        v_sel = st.selectbox(label, opts if opts else [""], index=idx_d, key=wkey)
+                    if v_sel != default:
+                        overrides.append((nid, fname, v_sel))
+                else:  # str 及其它
+                    cur_str = str(default if default is not None else "")
+                    v_str = st.text_input(label, value=cur_str, key=wkey)
+                    if v_str != cur_str:
+                        overrides.append((nid, fname, v_str))
+        return overrides
 
     def _render_output_preview(self, pixelle_video: Any, video_params: dict):
         """Render output preview section"""
@@ -404,10 +618,14 @@ class ImageToVideoPipelineUI(PipelineUI):
             rh_api_params = video_params.get("rh_api_params", {}) or {}
             is_runninghub_workflow = bool(workflow_key and workflow_key.startswith("runninghub/"))
             is_rh_api_workflow = bool(workflow_key and workflow_key.startswith("runninghub-api/"))
+            named_image_paths = video_params.get("named_image_paths", {}) or {}
+            image_inputs_ok = video_params.get("image_inputs_ok", True)
+            audio_asset_path = video_params.get("audio_asset_path")
+            has_audio_input = video_params.get("has_audio_input", False)
 
             logger.info(f"  - video_params: {video_params}")
 
-            if not is_runninghub_workflow and not audio_assets:
+            if not is_runninghub_workflow and not audio_assets and not named_image_paths:
                 st.info(tr("i2v.assets.image_warning"))
                 st.button(
                     tr("btn.generate"),
@@ -429,7 +647,7 @@ class ImageToVideoPipelineUI(PipelineUI):
                 )
                 return
 
-            if is_runninghub_workflow and not audio_assets:
+            if is_runninghub_workflow and not audio_assets and not named_image_paths:
                 st.info("RunningHub 工作流需要先上传图片，请在左侧上传本地图片。")
                 st.button(
                     tr("btn.generate"),
@@ -440,8 +658,53 @@ class ImageToVideoPipelineUI(PipelineUI):
                 )
                 return
 
+            if is_runninghub_workflow and not image_inputs_ok:
+                st.info("请补全所有必填图片（首帧 + 尾帧）后再生成。")
+                st.button(
+                    tr("btn.generate"),
+                    type="primary",
+                    width="stretch",
+                    disabled=True,
+                    key=self._k("audio_visual_generate_incomplete")
+                )
+                return
+
+            if is_runninghub_workflow and has_audio_input and not audio_asset_path:
+                st.info("该工作流需要上传口播音频，请在左侧上传音频文件。")
+                st.button(
+                    tr("btn.generate"),
+                    type="primary",
+                    width="stretch",
+                    disabled=True,
+                    key=self._k("audio_visual_generate_need_audio")
+                )
+                return
+
+            # 校验 prompt 最小长度（针对 RunningHub API）
+            prompt_min = 5
+            if is_rh_api_workflow:
+                try:
+                    from pixelle_video.services import runninghub_registry as _rh_reg
+                    rh_model = _rh_reg.get_model_by_workflow_key(workflow_key)
+                    if rh_model:
+                        prompt_spec = next(
+                            (i for i in (rh_model.get("inputs") or []) if i.get("fieldKey") == "prompt"),
+                            {},
+                        )
+                        prompt_min = prompt_spec.get("minLength", 5)
+                except Exception:
+                    pass
+            
+            prompt_too_short = len(prompt_text.strip()) < prompt_min
+
             # Generate button
-            if st.button(tr("btn.generate"), type="primary", width="stretch", key=self._k("i2v_generate")):
+            if st.button(
+                tr("btn.generate"), 
+                type="primary", 
+                width="stretch", 
+                disabled=prompt_too_short,
+                key=self._k("i2v_generate")
+            ):
                 if not config_manager.validate():
                     st.error(tr("settings.not_configured"))
                     st.stop()
@@ -494,6 +757,7 @@ class ImageToVideoPipelineUI(PipelineUI):
                             for _k in ("duration", "width", "height", "seed", "steps", "cfg", "sampler", "negative_prompt"):
                                 if _k in params:
                                     _named[_k] = params.pop(_k)
+                            _named = self._normalize_named_params(_named)
                             result = await media_svc(
                                 prompt=prompt,
                                 workflow=workflow_key,
@@ -504,8 +768,8 @@ class ImageToVideoPipelineUI(PipelineUI):
                             generated_video_url = result.url
                         elif is_runninghub_workflow:
                             config_manager.reload()
-                            if not image_path:
-                                raise Exception("RunningHub 工作流需要上传首帧图片。")
+                            if not image_path and not named_image_paths:
+                                raise Exception("RunningHub 工作流需要上传图片。")
 
                             with open(workflow_path, 'r', encoding='utf-8') as f:
                                 workflow_config = json.load(f)
@@ -513,16 +777,31 @@ class ImageToVideoPipelineUI(PipelineUI):
                             if not workflow_id:
                                 raise Exception(f"工作流配置中没有 workflow_id: {workflow_key}")
 
-                            generated_video_url = await run_runninghub_i2v(
-                                kit=kit,
-                                workflow_id=workflow_id,
-                                image_path=image_path,
-                                prompt=prompt,
-                                param_overrides=param_overrides,
-                                task_options=task_options,
-                                workflow_config=workflow_config,
-                                status_text=status_text,
-                            )
+                            if workflow_config.get("use_consumer_v2"):
+                                # 走「消费级 key + OpenAPI v2」路径（绕开 ComfyKit/企业级 key）
+                                status_text.text("使用消费级 API Key (v2) 调用 RunningHub...")
+                                generated_video_url = await run_runninghub_i2v_v2(
+                                    workflow_id=workflow_id,
+                                    image_path=image_path,
+                                    prompt=prompt,
+                                    workflow_config=workflow_config,
+                                    named_image_paths=named_image_paths or None,
+                                    audio_path=audio_asset_path,
+                                    param_overrides=param_overrides,
+                                    task_options=task_options,
+                                    status_text=status_text,
+                                )
+                            else:
+                                generated_video_url = await run_runninghub_i2v(
+                                    kit=kit,
+                                    workflow_id=workflow_id,
+                                    image_path=image_path,
+                                    prompt=prompt,
+                                    param_overrides=param_overrides,
+                                    task_options=task_options,
+                                    workflow_config=workflow_config,
+                                    status_text=status_text,
+                                )
                         else:
                             if not workflow_path.exists():
                                 raise Exception(f"The workflow file does not exist: {workflow_path}")

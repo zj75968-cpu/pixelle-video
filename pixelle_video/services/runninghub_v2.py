@@ -87,6 +87,7 @@ class RunningHubV2Client:
         *,
         node_info_list: Optional[list[dict[str, Any]]] = None,
         add_metadata: bool = True,
+        random_seed: Optional[bool] = None,
         instance_type: str = "default",
         use_personal_queue: bool = False,
         retain_seconds: Optional[int] = None,
@@ -103,6 +104,8 @@ class RunningHubV2Client:
             "instanceType": instance_type or "default",
             "usePersonalQueue": "true" if use_personal_queue else "false",
         }
+        if random_seed is not None:
+            body["randomSeed"] = bool(random_seed)
         if retain_seconds is not None:
             body["retainSeconds"] = int(retain_seconds)
         if webhook_url:
@@ -141,8 +144,25 @@ class RunningHubV2Client:
         Raises TimeoutError if it doesn't reach a terminal state in time.
         """
         deadline = asyncio.get_event_loop().time() + max_wait_seconds
+        consecutive_errors = 0
         while True:
-            payload = await self.query_task(task_id)
+            try:
+                payload = await self.query_task(task_id)
+                consecutive_errors = 0
+            except Exception as e:
+                # RunningHub 偶发 5xx（502/503/504/525 SSL handshake failed）等 Cloudflare 抖动，
+                # 不要因为单次查询失败就让整个任务死掉，短暂重试。
+                consecutive_errors += 1
+                if consecutive_errors >= 6:
+                    raise
+                logger.warning(
+                    f"[rh-v2] query_task {task_id} 失败 ({consecutive_errors}/6): {e!r}，"
+                    f"{poll_interval}s 后重试"
+                )
+                if asyncio.get_event_loop().time() >= deadline:
+                    raise
+                await asyncio.sleep(poll_interval)
+                continue
             status = (payload.get("status") or "").upper()
             if status in ("SUCCESS", "FAILED"):
                 return payload

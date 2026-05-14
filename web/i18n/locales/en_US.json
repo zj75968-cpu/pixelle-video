@@ -44,6 +44,7 @@
     "voice.preview": "▶ Preview Voice",
     "voice.previewing": "Generating voice preview...",
     "voice.preview_failed": "Preview failed: {error}",
+    "validation.prompt_too_short": "Prompt too short (current {current_len} chars, minimum {min_len} required)",
     "style.workflow": "Workflow Selection",
     "style.workflow_what": "Determines how each frame's illustration is generated and its effect (e.g., using FLUX, SD models)",
     "style.workflow_how": "Place the exported image_xxx.json workflow file(API format) into the workflows/selfhost/ folder (for local ComfyUI) or the workflows/runninghub/ folder (for cloud)",

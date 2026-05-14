@@ -148,6 +148,8 @@ async def _enqueue_publish(
     hashtags: Optional[List[str]] = None,
     device_serial: Optional[str] = None,
     scheduled_at: Optional[str] = None,
+    kind: str = "video",
+    dry_run: bool = False,
 ) -> Dict[str, Any]:
     """Enqueue a Xiaohongshu publish job for the given video."""
     from pixelle_video.services.device_manager import device_manager
@@ -184,22 +186,36 @@ async def _enqueue_publish(
             raise RuntimeError("No Android device connected; cannot enqueue publish.")
         serial = connected[0]
 
+    # 图文模式：自动从 frames/*_composed.png 取场景合成图
+    from pathlib import Path as _Path
+    images_for_job: list = [video_path]
+    if kind == "image_text":
+        frames_dir = _Path(video_path).parent / "frames"
+        composed = sorted(frames_dir.glob("*_composed.png"))
+        if composed:
+            images_for_job = [str(p) for p in composed]
+            logger.info(f"[agent] image_text: {len(images_for_job)} scene images found")
+        else:
+            logger.warning(f"[agent] image_text: no composed images in {frames_dir}, falling back to video path")
+
     job = publish_scheduler.add_job(
         serial=serial,
         task_id=f"agent-{uuid.uuid4().hex[:8]}",
         title=title,
         body=body,
         hashtags=list(hashtags or []),
-        images=[video_path],
+        images=images_for_job,
         scheduled_at=scheduled_at,
-        kind="video",
+        kind=kind,
         video_path=video_path,
+        dry_run=bool(dry_run),
     )
     return {
         "job_id": job.job_id,
         "serial": job.serial,
         "status": job.status,
         "scheduled_at": job.scheduled_at,
+        "dry_run": job.dry_run,
     }
 
 
@@ -577,6 +593,7 @@ TOOLS: List[ToolSpec] = [
         name="enqueue_publish",
         description=(
             "把已生成的视频加入小红书发布队列。video_path 必填，可由 generate_video 的返回值给出。"
+            "kind 可选 video（视频笔记，默认）或 image_text（图文笔记，自动取场景合成图）。"
             "若未指定 device_serial，自动选取第一台已连接设备。"
         ),
         args_schema={
@@ -597,6 +614,20 @@ TOOLS: List[ToolSpec] = [
                 "scheduled_at": {
                     "type": "string",
                     "description": "可选 ISO-8601 计划发布时间，留空表示立即发布",
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": ["video", "image_text"],
+                    "description": (
+                        "发布类型。video=视频笔记（上传.mp4，默认）；"
+                        "image_text=图文笔记（自动取 frames/*_composed.png 场景合成图上传）。"
+                    ),
+                    "default": "video",
+                },
+                "dry_run": {
+                    "type": "boolean",
+                    "description": "true 表示干跑测试：不点最终发布按钮，仅验证推送/选图/填文链路，避免误发。默认 false。",
+                    "default": False,
                 },
             },
             "required": ["video_path", "title"],

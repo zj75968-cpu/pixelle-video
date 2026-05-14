@@ -64,6 +64,44 @@ class MediaService(ComfyBaseService):
             core: PixelleVideoCore instance (for accessing shared ComfyKit)
         """
         super().__init__(config, service_name="image", core=core)  # Keep "image" for config compatibility
+
+    @staticmethod
+    def _to_int_if_numeric(value):
+        """Convert numeric-like values to int, keep original when not numeric."""
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return int(value)
+        if isinstance(value, (int, float)):
+            return int(value)
+        if isinstance(value, str):
+            s = value.strip()
+            if not s:
+                return value
+            try:
+                return int(float(s))
+            except (TypeError, ValueError):
+                return value
+        return value
+
+    @staticmethod
+    def _to_float_if_numeric(value):
+        """Convert numeric-like values to float, keep original when not numeric."""
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return float(int(value))
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, str):
+            s = value.strip()
+            if not s:
+                return value
+            try:
+                return float(s)
+            except (TypeError, ValueError):
+                return value
+        return value
     
     def _scan_workflows(self):
         """
@@ -89,6 +127,7 @@ class MediaService(ComfyBaseService):
             workflow_files = list_resource_files("workflows", source_name)
             
             # Filter to only files matching image_ or video_ prefix
+            # i2v_ 前缀的文件属于图生视频流水线，不在 media service 的扫描范围内
             matching_files = [
                 f for f in workflow_files 
                 if (f.startswith("image_") or f.startswith("video_")) and f.endswith('.json')
@@ -134,6 +173,8 @@ class MediaService(ComfyBaseService):
         if not show_unavailable:
             # 不展示自部署 selfhost/*（默认无本地 ComfyUI）
             workflows = [wf for wf in workflows if wf.get("source") != "selfhost"]
+        # 过滤分析类工作流（category: video-analysis / image-analysis 等），不列入生成流水线
+        workflows = [wf for wf in workflows if not (wf.get("category") or "").endswith("-analysis")]
         return sorted(workflows, key=lambda w: w["key"])
     
     async def __call__(
@@ -244,10 +285,28 @@ class MediaService(ComfyBaseService):
                     import math
                     g = math.gcd(int(width), int(height))
                     user_params["aspectRatio"] = f"{int(width)//g}:{int(height)//g}"
-            # 时长
+            # 时长：LIST 模型优先保留字符串枚举；INT 模型再做数值约束
             if "duration" in field_keys and "duration" not in user_params and duration is not None:
-                # 部分模型 duration 是字符串枚举（如 "8"），让 build_payload 通过 _coerce 处理
-                user_params["duration"] = int(max(1, duration))
+                duration_spec = next(
+                    (i for i in (model.get("inputs") or []) if i.get("fieldKey") == "duration"),
+                    {},
+                )
+                duration_type = (duration_spec.get("type") or "").upper()
+                if duration_type == "LIST":
+                    user_params["duration"] = str(duration)
+                else:
+                    duration_norm = self._to_int_if_numeric(duration)
+                    if isinstance(duration_norm, int):
+                        user_params["duration"] = max(1, duration_norm)
+                    else:
+                        user_params["duration"] = duration
+
+            # 常见数值参数做温和归一，避免字符串与数字混用
+            for _k in ("seed", "steps", "width", "height"):
+                if _k in user_params and user_params[_k] not in (None, ""):
+                    user_params[_k] = self._to_int_if_numeric(user_params[_k])
+            if "cfg" in user_params and user_params["cfg"] not in (None, ""):
+                user_params["cfg"] = self._to_float_if_numeric(user_params["cfg"])
 
             # image_urls (多图模型) / imageUrl (单图模型) 兼容
             if "imageUrls" in field_keys and "imageUrls" not in user_params:
@@ -262,6 +321,18 @@ class MediaService(ComfyBaseService):
                         img = imgs[0]
                 if img:
                     user_params["imageUrl"] = img
+
+            # 校验 prompt 长度（提前防护，避免触发 RunningHub 1007）
+            prompt_spec = next(
+                (i for i in (model.get("inputs") or []) if i.get("fieldKey") == "prompt"),
+                {},
+            )
+            prompt_min_len = prompt_spec.get("minLength") or 5
+            if len(str(user_params.get("prompt", "")).strip()) < prompt_min_len:
+                raise ValueError(
+                    f"提示词 (prompt) 过短：当前 {len(str(user_params.get('prompt', '')).strip())} 字符，"
+                    f"最少需要 {prompt_min_len} 字符。请输入更详细的描述。"
+                )
 
             api_svc = RunningHubAPIService()
 

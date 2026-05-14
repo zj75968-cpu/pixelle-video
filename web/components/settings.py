@@ -23,6 +23,9 @@ from pixelle_video.config import config_manager
 
 def render_advanced_settings():
     """Render system configuration (required) with 2-column layout"""
+    # Streamlit 长驻进程中，用户可能刚保存过 config.yaml；渲染前主动 reload，
+    # 保证顶部系统配置区展示的是最新值，无需重启进程。
+    config_manager.reload()
     # Check if system is configured
     is_configured = config_manager.validate()
     

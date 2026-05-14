@@ -497,7 +497,21 @@ def _parse_json(text: str) -> dict:
             return json.loads(match.group(0))
         except json.JSONDecodeError:
             pass
-    
+
+    # Last resort: use json_repair to fix malformed JSON (e.g. missing quotes)
+    try:
+        from json_repair import repair_json
+        # Extract raw block from code fence if present, else use full text
+        _block = text
+        _fence = re.search(r'```(?:json)?\s*([\s\S]+?)\s*```', text, re.DOTALL)
+        if _fence:
+            _block = _fence.group(1)
+        repaired = repair_json(_block, return_objects=True)
+        if isinstance(repaired, dict) and repaired:
+            return repaired
+    except Exception:
+        pass
+
     # If all fails, raise error
     raise json.JSONDecodeError("No valid JSON found", text, 0)
 

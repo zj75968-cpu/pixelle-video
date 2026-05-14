@@ -712,12 +712,17 @@ def render_style_config(pixelle_video):
                 rh_model = wf.get("runninghub_model")
                 if rh_model:
                     cat = (rh_model.get("category") or "").lower()
-                    # 按"X-to-Y"中的 Y（输出类型）判断
-                    is_video_out = cat.endswith("-to-video") or cat == "video-tools"
+                    # 仅「文生视频」才放入标准流水线（脚本流/无图上传）；
+                    # 「图生视频」与「首尾帧」需要图片输入，归属 i2v 流水线。
+                    is_video_out = cat in ("text-to-video", "video-tools")
                     is_image_out = cat.endswith("-to-image")
                     return is_video_out if want_video else is_image_out
-                # 旧逻辑（按 key 名）
+                # 文件型工作流：按 key 名判断，并排除显式标记为 i2v 的文件
                 key_low = wf["key"].lower()
+                # 若 JSON 内声明了 category 字段，优先用它
+                wf_cat = (wf.get("category") or "").lower()
+                if wf_cat == "image-to-video" or wf_cat == "start-end-to-video":
+                    return False  # 图生视频不进标准流水线
                 has_video = "video_" in key_low or "/video" in key_low
                 return has_video if want_video else not has_video
 
@@ -769,6 +774,20 @@ def render_style_config(pixelle_video):
                 except Exception:
                     _model = None
                 if _model:
+                    # 鉴权前置校验：「低价渠道版」/rhart-* 端点在 RunningHub 服务端
+                    # 归类为 "Standard Model API"，仅接受「企业级-共享 API Key」。
+                    try:
+                        from pixelle_video.config import config_manager as _cfg_mgr
+                        _ent_key = (getattr(_cfg_mgr.config.comfyui, "runninghub_api_key", "") or "").strip()
+                    except Exception:
+                        _ent_key = ""
+                    if not _ent_key:
+                        st.error(
+                            "⚠️ 该模型为 RunningHub「标准模型 API」（俗称「低价渠道版」），"
+                            "**必须配置「企业级-共享 API Key」**（`config.yaml` → `comfyui.runninghub_api_key`）。\n\n"
+                            "「低价渠道版」仅指套餐内单价较低，鉴权层级仍属标准模型 API；"
+                            "消费级 key 调用 `/rhart-*` 接口会返回 `errorCode=1014`。"
+                        )
                     with st.expander(f"⚙️ 参数 — {_model['name']}", expanded=True):
                         if _model.get("modelHighlights"):
                             st.caption(_model["modelHighlights"])
@@ -862,6 +881,25 @@ def render_style_config(pixelle_video):
                     previewing_text = tr("style.video_previewing") if template_media_type == "video" else tr("style.previewing")
                     with st.spinner(previewing_text):
                         try:
+                            # 校验 prompt 长度（runninghub-api 模型）
+                            from pixelle_video.services import runninghub_registry as _rh_reg
+                            prompt_min = 5
+                            if workflow_key and workflow_key.startswith("runninghub-api/"):
+                                try:
+                                    _rh_model = _rh_reg.get_model_by_workflow_key(workflow_key)
+                                    if _rh_model:
+                                        _prompt_spec = next(
+                                            (i for i in (_rh_model.get("inputs") or []) if i.get("fieldKey") == "prompt"),
+                                            {},
+                                        )
+                                        prompt_min = _prompt_spec.get("minLength", 5)
+                                except Exception:
+                                    pass
+                            
+                            if len(test_prompt.strip()) < prompt_min:
+                                st.error(f"💬 提示词过短：至少需要 {prompt_min} 字符")
+                                st.stop()
+                            
                             from pixelle_video.utils.prompt_helper import build_image_prompt
                         
                             # Build final prompt with prefix
@@ -874,6 +912,22 @@ def render_style_config(pixelle_video):
                             for _ck in ("duration", "seed", "steps", "cfg", "sampler", "negative_prompt"):
                                 if _ck in _extra:
                                     _named[_ck] = _extra.pop(_ck)
+                            # 避免字符串数值透传触发下游类型比较异常
+                            for _int_key in ("duration", "seed", "steps"):
+                                if _int_key in _named and isinstance(_named[_int_key], str):
+                                    _s = _named[_int_key].strip()
+                                    if _s:
+                                        try:
+                                            _named[_int_key] = int(float(_s))
+                                        except (TypeError, ValueError):
+                                            pass
+                            if "cfg" in _named and isinstance(_named["cfg"], str):
+                                _s = _named["cfg"].strip()
+                                if _s:
+                                    try:
+                                        _named["cfg"] = float(_s)
+                                    except (TypeError, ValueError):
+                                        pass
                             media_result = run_async(pixelle_video.media(
                                 prompt=final_prompt,
                                 workflow=workflow_key,

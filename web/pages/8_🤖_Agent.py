@@ -18,6 +18,8 @@ from web.state.session import init_session_state, init_i18n, get_pixelle_video
 from web.utils.async_helpers import run_async
 
 from pixelle_video.agent import AgentBrain, TOOLS, enhance_instruction
+from pixelle_video.agent.brain import _resolve_placeholders
+from pixelle_video.agent.tools import get_tool as _get_tool
 
 st.set_page_config(page_title="Agent 大脑", page_icon="🤖", layout="wide")
 init_session_state()
@@ -25,12 +27,6 @@ init_i18n()
 
 st.title("🤖 Agent 大脑")
 st.caption("用一句话下命令，它自动调用「视频生成 / 设备查询 / 发布入队」等工具完成。")
-
-# ---- 工具盘点 -------------------------------------------------------------
-with st.expander("🧰 可用工具清单", expanded=False):
-    for t in TOOLS:
-        st.markdown(f"**`{t.name}`** — {t.description}")
-        st.code(json.dumps(t.args_schema, ensure_ascii=False, indent=2), language="json")
 
 # ---- 初始化 ---------------------------------------------------------------
 pixelle_video = get_pixelle_video()
@@ -45,6 +41,21 @@ default_examples = [
 ]
 example = st.selectbox("示例指令", ["（自定义）"] + default_examples, index=0)
 default_text = "" if example == "（自定义）" else example
+
+# ── 发布方式单选 ─────────────────────────────────────────────────────────────
+publish_kind = st.radio(
+    "📤 发布方式（涉及发布时生效）",
+    options=["🤖 自动决定", "🎬 视频笔记（纯视频）", "🖼️ 图文笔记（图文点评/图文视频）"],
+    horizontal=True,
+    index=0,
+    key="agent_publish_kind",
+    help="视频笔记上传 .mp4；图文笔记自动取每个场景的合成图片上传",
+)
+_KIND_HINT = {
+    "🎬 视频笔记（纯视频）":          "【发布方式：视频笔记，kind=video】",
+    "🖼️ 图文笔记（图文点评/图文视频）": "【发布方式：图文笔记，kind=image_text】",
+}
+
 instruction = st.text_area(
     "你想做什么？",
     value=default_text,
@@ -146,18 +157,111 @@ if "agent_enhanced_text" in st.session_state:
             st.session_state["agent_enhanced_text"] = enhanced_text_pending
 
 
+# ---- 工具中文名映射 -------------------------------------------------------
+_TOOL_LABELS: dict = {
+    "list_devices":     "查询连接设备",
+    "set_device_info":  "更新设备信息",
+    "list_workflows":   "列出工作流",
+    "generate_video":   "生成视频",
+    "enqueue_publish":  "加入发布队列",
+    "list_jobs":        "查看发布队列",
+    "cancel_job":       "取消发布任务",
+    "list_tasks":       "查看视频任务",
+    "delete_task":      "删除任务",
+    "cleanup_outputs":  "清理输出目录",
+    "recommend_models": "推荐工作流",
+    "recommend_device": "推荐发布设备",
+}
+
+
 # ---- 第二步：执行 ----------------------------------------------------------
 def _run_brain(final_text: str, raw_text: str, enhanced_meta: Optional[dict]) -> None:
-    """Plan + execute via AgentBrain and append to history."""
+    """Plan + execute via AgentBrain with live step-by-step progress."""
+    import time as _time
+
     brain = AgentBrain(llm=pixelle_video.llm)
-    with st.spinner("🧠 规划与执行中..."):
+
+    with st.status("🧠 Agent 执行中…", expanded=True) as _status:
+        # ── Phase 1: Planning ────────────────────────────────────────────────
+        st.write("📋 正在分析指令，生成执行计划…")
         try:
-            result = run_async(brain.run(final_text))
+            plan = run_async(brain.plan(final_text))
         except Exception as e:  # noqa: BLE001
-            st.error(f"运行失败: {type(e).__name__}: {e}")
+            _status.update(label="❌ 规划失败", state="error", expanded=True)
+            st.error(f"规划失败：{type(e).__name__}: {e}")
             return
-    run_dict = _result_to_dict(result)
-    run_dict["raw_instruction"] = raw_text
+
+        step_count = len(plan.steps)
+        st.write(f"✅ **规划完成**：{plan.summary}（共 {step_count} 步）")
+        if plan.notes:
+            st.caption(f"💡 {plan.notes}")
+
+        # ── Phase 2: Execution ───────────────────────────────────────────────
+        executions: list = []
+        prior_results: list = []
+
+        if step_count == 0:
+            _status.update(label=f"✅ {plan.summary}", state="complete", expanded=False)
+        else:
+            prog = st.progress(0, text="准备执行…")
+            for i, step in enumerate(plan.steps):
+                label = _TOOL_LABELS.get(step.tool, step.tool)
+                prog.progress(i / step_count, text=f"步骤 {i + 1}/{step_count}：{label}…")
+                st.write(f"⏳ **步骤 {i + 1}**：{label} — {step.reason or ''}")
+
+                tool = _get_tool(step.tool)
+                t0 = _time.time()
+
+                if tool is None:
+                    err = f"未知工具：{step.tool!r}"
+                    executions.append({"index": i, "tool": step.tool, "args": step.args,
+                                       "ok": False, "result": None, "error": err, "elapsed_ms": 0})
+                    st.error(f"❌ {err}")
+                    prog.progress(i / step_count, text=f"❌ 步骤 {i + 1} 失败")
+                    break
+
+                try:
+                    resolved = _resolve_placeholders(step.args, prior_results)
+                    result = run_async(tool.handler(**resolved))
+                    elapsed = int((_time.time() - t0) * 1000)
+                    prior_results.append(result)
+                    executions.append({"index": i, "tool": step.tool, "args": resolved,
+                                       "ok": True, "result": result, "error": None,
+                                       "elapsed_ms": elapsed})
+                    st.write(f"\u3000\u3000✅ 完成（{elapsed} ms）")
+                except Exception as exc:  # noqa: BLE001
+                    elapsed = int((_time.time() - t0) * 1000)
+                    err_msg = f"{type(exc).__name__}: {exc}"
+                    executions.append({"index": i, "tool": step.tool, "args": step.args,
+                                       "ok": False, "result": None, "error": err_msg,
+                                       "elapsed_ms": elapsed})
+                    st.error(f"❌ 步骤 {i + 1} 失败：{err_msg}")
+                    prog.progress(i / step_count, text=f"❌ 步骤 {i + 1} 失败")
+                    break
+
+            all_ok = bool(executions) and all(e.get("ok") for e in executions)
+            prog.progress(1.0, text="✅ 全部完成" if all_ok else "⚠️ 执行中止")
+            _status.update(
+                label=f"{'✅ 完成' if all_ok else '❌ 部分失败'}：{plan.summary}",
+                state="complete" if all_ok else "error",
+                expanded=not all_ok,
+            )
+
+    # ── Save to history ──────────────────────────────────────────────────────
+    try:
+        plan_dict = json.loads(plan.model_dump_json())
+    except Exception:  # noqa: BLE001
+        plan_dict = plan.model_dump()
+
+    all_ok_outer = bool(executions) and all(e.get("ok") for e in executions)
+    run_dict = {
+        "instruction": final_text,
+        "plan": plan_dict,
+        "executions": executions,
+        "ok": all_ok_outer,
+        "error": None if all_ok_outer else (executions[-1].get("error") if executions else "无步骤执行"),
+        "raw_instruction": raw_text,
+    }
     if enhanced_meta is not None:
         run_dict["enhanced"] = {
             "inferred_intent": enhanced_meta.get("inferred_intent", ""),
@@ -176,12 +280,16 @@ if run_direct_clicked:
     if not raw:
         st.warning("请先输入指令")
     else:
-        _run_brain(final_text=raw, raw_text=raw, enhanced_meta=None)
+        hint = _KIND_HINT.get(publish_kind, "")
+        final = f"{hint}\n{raw}" if hint else raw
+        _run_brain(final_text=final, raw_text=raw, enhanced_meta=None)
 
 if enhanced_text_pending:
     raw = st.session_state.get("agent_enhanced_source") or enhanced_text_pending
     meta = st.session_state.get("agent_enhanced_meta") or {}
-    _run_brain(final_text=enhanced_text_pending, raw_text=raw, enhanced_meta=meta)
+    hint = _KIND_HINT.get(publish_kind, "")
+    final_with_hint = f"{hint}\n{enhanced_text_pending}" if hint else enhanced_text_pending
+    _run_brain(final_text=final_with_hint, raw_text=raw, enhanced_meta=meta)
 
 # ---- 历史 -----------------------------------------------------------------
 st.divider()

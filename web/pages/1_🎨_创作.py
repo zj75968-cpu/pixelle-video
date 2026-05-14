@@ -25,15 +25,13 @@ st.set_page_config(page_title="创作", page_icon="🎨", layout="wide")
 init_session_state()
 init_i18n()
 
-# 顶部统一渲染一次系统设置（避免两个 tab 各自渲染导致 widget key 冲突）。
-from web.components import settings as _settings_module
-_settings_module.render_advanced_settings()
-# 子页内部调用的 render_advanced_settings 全部替换为 no-op，保证只渲染一次。
-_settings_module.render_advanced_settings = lambda *a, **k: None  # type: ignore[assignment]
-
 
 def _run_subpage(path: Path) -> None:
-    """Execute a legacy page script inside the current Streamlit container."""
+    """Execute a legacy page script inside the current Streamlit container.
+
+    The child scripts also call ``st.set_page_config`` — we no-op it during
+    the sub-run because page config has already been set by this parent.
+    """
     _orig = st.set_page_config
     st.set_page_config = lambda *a, **k: None  # type: ignore[assignment]
     try:

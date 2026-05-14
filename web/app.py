@@ -36,6 +36,29 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+# Streamlit may still cap main content width (e.g. 736px) after reruns.
+# Force the main block container to use full available width.
+st.markdown(
+    """
+    <style>
+    [data-testid="stSidebar"] {
+        display: none !important;
+    }
+    [data-testid="stMain"] {
+        width: 100% !important;
+        flex: 1 1 100% !important;
+    }
+    [data-testid="stMainBlockContainer"] {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 
 def main():
     """Main entry point with navigation"""
@@ -77,7 +100,7 @@ def main():
         publish_page,
         devtools_page,
         agent_page,
-    ])
+    ], position="top")
     pg.run()
 
 

@@ -140,6 +140,71 @@ class LLMImageService:
             return f"{api_base}/chat/completions"
         return f"{api_base}/v1/chat/completions"
 
+    async def generate_edit(
+        self,
+        prompt: str,
+        api_key: str,
+        base_url: str,
+        model: str,
+        input_images: list,
+        size: str = "1024x1024",
+    ) -> str:
+        """
+        Generate / edit an image using multimodal chat/completions input.
+
+        Sends *prompt* plus *input_images* (local file paths) to the
+        chat/completions endpoint.  Useful for compositing or style-transfer
+        when the provider's image-generation model accepts vision input.
+
+        Parameters
+        ----------
+        input_images : list[str | Path]
+            Local image file paths to embed as base64 image_url content parts.
+
+        Returns
+        -------
+        str
+            HTTP(S) URL or ``data:image/...;base64,<...>`` data URI.
+        """
+        import base64 as _b64
+
+        api_base = base_url.rstrip("/")
+        chat_url = self._chat_url(api_base)
+
+        # Build multimodal content: text prompt first, then images
+        content_parts: list = [{"type": "text", "text": prompt}]
+        for img_path in input_images:
+            path_str = str(img_path).lower()
+            if path_str.endswith(".png"):
+                mime = "image/png"
+            elif path_str.endswith(".webp"):
+                mime = "image/webp"
+            else:
+                mime = "image/jpeg"
+            with open(img_path, "rb") as _f:
+                b64_str = _b64.b64encode(_f.read()).decode()
+            content_parts.append({
+                "type": "image_url",
+                "image_url": {"url": f"data:{mime};base64,{b64_str}"},
+            })
+
+        body = {
+            "model": model,
+            "messages": [{"role": "user", "content": content_parts}],
+        }
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        }
+        logger.info(
+            f"[LLMImageService] generate_edit model={model} "
+            f"images={len(input_images)} prompt[:80]={prompt[:80]!r}"
+        )
+        async with httpx.AsyncClient(proxy=None, follow_redirects=True, timeout=180) as http:
+            resp = await http.post(chat_url, json=body, headers=headers)
+            data = self._parse_response(resp)
+        return self._extract_image(data, model)
+
     def _parse_response(self, resp: "httpx.Response") -> object:
         """Parse an httpx response into a Python object (dict/str)."""
         logger.debug(f"[LLMImageService] raw response status={resp.status_code} url={resp.url}")

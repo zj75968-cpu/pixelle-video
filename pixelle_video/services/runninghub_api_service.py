@@ -36,11 +36,20 @@ class RunningHubAPIService:
     """OpenAPI v2 wrapper for RunningHub Standard Model endpoints."""
 
     def __init__(self, api_key: Optional[str] = None):
-        key = api_key or config_manager.config.comfyui.runninghub_api_key
+        # 重要：OpenAPI v2 标准模型 API（即 registry 里的 "低价渠道版"）实测仅接受
+        # 「企业级-共享 API Key」，消费级 key 会返回 errorCode=1014。
+        # 因此这里优先用企业级 key，消费级仅作兜底（无企业 key 时尝试）。
+        # 注：消费级 key 适用于 ComfyUI workflow_id 方式（另一条调用链路），
+        #     不通过本 Service 调用。
+        key = (
+            api_key
+            or config_manager.config.comfyui.runninghub_api_key
+            or config_manager.config.comfyui.runninghub_consumer_api_key
+        )
         if not key:
             raise ValueError(
                 "RunningHub API Key not configured. "
-                "Set comfyui.runninghub_api_key in config.yaml."
+                "Set comfyui.runninghub_api_key (or runninghub_consumer_api_key) in config.yaml."
             )
         self._api_key = key
         self._headers = {

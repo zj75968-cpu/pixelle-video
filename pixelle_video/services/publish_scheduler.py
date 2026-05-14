@@ -63,6 +63,7 @@ class PublishJob:
         scheduled_at: Optional[str] = None,
         kind: str = "image_text",
         video_path: Optional[str] = None,
+        dry_run: bool = False,
     ):
         self.job_id = job_id
         self.serial = serial
@@ -74,6 +75,7 @@ class PublishJob:
         self.scheduled_at: Optional[str] = scheduled_at  # ISO-8601 or None (immediate)
         self.kind: str = kind  # "image_text" | "video"
         self.video_path: Optional[str] = video_path
+        self.dry_run: bool = bool(dry_run)
         self.status: str = JobStatus.PENDING
         self.created_at: str = datetime.now().isoformat()
         self.started_at: Optional[str] = None
@@ -91,6 +93,7 @@ class PublishJob:
             "images": self.images,
             "kind": self.kind,
             "video_path": self.video_path,
+            "dry_run": self.dry_run,
             "scheduled_at": self.scheduled_at,
             "status": self.status,
             "created_at": self.created_at,
@@ -112,6 +115,7 @@ class PublishJob:
             scheduled_at=data.get("scheduled_at"),
             kind=data.get("kind", "image_text"),
             video_path=data.get("video_path"),
+            dry_run=bool(data.get("dry_run", False)),
         )
         job.status = data.get("status", JobStatus.PENDING)
         job.created_at = data.get("created_at", datetime.now().isoformat())
@@ -218,6 +222,7 @@ class PublishScheduler:
         scheduled_at: Optional[str] = None,
         kind: str = "image_text",
         video_path: Optional[str] = None,
+        dry_run: bool = False,
     ) -> PublishJob:
         """Add a new publish job to the queue."""
         job = PublishJob(
@@ -231,6 +236,7 @@ class PublishScheduler:
             scheduled_at=scheduled_at,
             kind=kind,
             video_path=video_path,
+            dry_run=dry_run,
         )
         self._jobs[job.job_id] = job
         self._save()
@@ -363,6 +369,7 @@ class PublishScheduler:
                             title=job.title,
                             body=job.body,
                             hashtags=job.hashtags,
+                            dry_run=job.dry_run,
                         ),
                         timeout=PUBLISH_TIMEOUT_SECONDS,
                     )
