@@ -9,7 +9,7 @@ import json
 import sys
 from pathlib import Path
 
-_project_root = Path(__file__).resolve().parent.parent  # web/pages → web → Pixelle-Video
+_project_root = Path(__file__).resolve().parent.parent.parent  # web/pages/file → web/pages → web → Pixelle-Video
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
@@ -72,17 +72,19 @@ def _mask(value: str) -> str:
 
 
 def _key_field(label: str, field_key: str, current_value: str):
-    """带显示/隐藏切换的密钥输入行（默认遮盖）"""
+    """带显示/隐藏切换的密钥输入行。
+    隐藏时只读显示遮码；显示时渲染不同 key 的输入框，避免 Streamlit 用旧 session state 覆盖 value。
+    """
     revealed = st.session_state.reveal_keys.get(field_key, False)
     col1, col2 = st.columns([5, 1])
     with col1:
-        new_val = st.text_input(
-            label,
-            value=current_value if revealed else "",
-            placeholder=_mask(current_value),
-            type="default" if revealed else "password",
-            key=f"input_{field_key}",
-        )
+        if revealed:
+            # 使用 _r 后缀 key，首次渲染时 session state 不存在，value=current_value 生效
+            new_val = st.text_input(label, value=current_value, key=f"input_{field_key}_r")
+        else:
+            # 隐藏态：disabled 只读，仅展示遮码，不参与表单值
+            st.text_input(label, value=_mask(current_value), disabled=True, key=f"input_{field_key}_h")
+            new_val = current_value  # 未修改，沿用原值
     with col2:
         st.markdown("<div style='margin-top:28px'></div>", unsafe_allow_html=True)
         if st.button("隐藏" if revealed else "显示", key=f"toggle_{field_key}", use_container_width=True):
@@ -114,20 +116,20 @@ with st.expander("🤖 LLM 语言模型（文案生成）", expanded=True):
 
 # ── 2. RunningHub 配置 ────────────────────────────────────────────
 with st.expander("☁️ RunningHub API（图片/视频生成）", expanded=True):
-    new_rh_ent = _key_field("企业级-共享 API Key（兜底）",  "rh_enterprise", cfg.runninghub.api_key)
-    new_rh_con = _key_field("消费级会员 API Key（首选）",   "rh_consumer",   cfg.runninghub.consumer_api_key)
+    new_rh_ent = _key_field("企业级-共享 API Key（兆底）",  "rh_enterprise", cfg.comfyui.runninghub_api_key or "")
+    new_rh_con = _key_field("消费级会员 API Key（首选）",   "rh_consumer",   cfg.comfyui.runninghub_consumer_api_key or "")
     new_rh_url = st.text_input("RunningHub Base URL（留空用默认）",
-                               value=cfg.runninghub.base_url or "",
+                               value=cfg.comfyui.runninghub_base_url or "",
                                key="input_rh_url",
                                placeholder="https://www.runninghub.cn  （国内）")
-    new_rh_concurrent = st.number_input("最大并发数", value=cfg.runninghub.concurrent_limit,
+    new_rh_concurrent = st.number_input("最大并发数", value=cfg.comfyui.runninghub_concurrent_limit,
                                         min_value=1, max_value=20, key="input_rh_concurrent")
 
 # ── 3. ComfyUI 本地配置 ───────────────────────────────────────────
 with st.expander("🖥️ ComfyUI 本地（自托管，可选）"):
-    new_comfy_url = st.text_input("ComfyUI URL", value=cfg.comfyui.url or "",
+    new_comfy_url = st.text_input("ComfyUI URL", value=cfg.comfyui.comfyui_url or "",
                                   key="input_comfy_url", placeholder="http://127.0.0.1:8188")
-    new_comfy_key = _key_field("ComfyUI API Key（可选）", "comfy_key", cfg.comfyui.api_key or "")
+    new_comfy_key = _key_field("ComfyUI API Key（可选）", "comfy_key", cfg.comfyui.comfyui_api_key or "")
 
 # ── 4. 修改管理员密钥 ────────────────────────────────────────────
 with st.expander("🔑 修改管理员访问密钥"):
@@ -162,15 +164,13 @@ if st.button("💾 保存配置", type="primary", use_container_width=True):
             "base_url": new_llm_url.strip(),
             "model":    new_llm_model.strip(),
         },
-        "runninghub": {
-            "api_key":          new_rh_ent,
-            "consumer_api_key": new_rh_con,
-            "base_url":         new_rh_url.strip() or None,
-            "concurrent_limit": int(new_rh_concurrent),
-        },
         "comfyui": {
-            "url":     new_comfy_url.strip() or None,
-            "api_key": new_comfy_key or None,
+            "runninghub_api_key":          new_rh_ent or None,
+            "runninghub_consumer_api_key": new_rh_con or None,
+            "runninghub_base_url":         new_rh_url.strip() or None,
+            "runninghub_concurrent_limit": int(new_rh_concurrent),
+            "comfyui_url":     new_comfy_url.strip() or "http://127.0.0.1:8188",
+            "comfyui_api_key": new_comfy_key or None,
         },
     }
 
