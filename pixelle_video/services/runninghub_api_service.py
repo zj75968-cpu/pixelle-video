@@ -36,21 +36,29 @@ class RunningHubAPIService:
     """OpenAPI v2 wrapper for RunningHub Standard Model endpoints."""
 
     def __init__(self, api_key: Optional[str] = None):
-        # 重要：OpenAPI v2 标准模型 API（即 registry 里的 "低价渠道版"）实测仅接受
-        # 「企业级-共享 API Key」，消费级 key 会返回 errorCode=1014。
-        # 因此这里优先用企业级 key，消费级仅作兜底（无企业 key 时尝试）。
-        # 注：消费级 key 适用于 ComfyUI workflow_id 方式（另一条调用链路），
-        #     不通过本 Service 调用。
-        key = (
-            api_key
-            or config_manager.config.comfyui.runninghub_api_key
-            or config_manager.config.comfyui.runninghub_consumer_api_key
-        )
-        if not key:
+        # 优先使用消费级 API Key，不可用（1014）时自动切换企业级 Key 重试。
+        consumer = (config_manager.config.comfyui.runninghub_consumer_api_key or "").strip()
+        enterprise = (config_manager.config.comfyui.runninghub_api_key or "").strip()
+
+        if api_key:
+            # 调用方显式传入时，视为消费级 key；企业级从 config 取
+            consumer = api_key.strip()
+
+        self._consumer_key = consumer
+        self._enterprise_key = enterprise
+
+        # 消费级优先，没有时用企业级
+        initial_key = consumer or enterprise
+        if not initial_key:
             raise ValueError(
                 "RunningHub API Key not configured. "
-                "Set comfyui.runninghub_api_key (or runninghub_consumer_api_key) in config.yaml."
+                "Set comfyui.runninghub_consumer_api_key (preferred) or "
+                "comfyui.runninghub_api_key in config.yaml."
             )
+        self._apply_key(initial_key)
+
+    def _apply_key(self, key: str) -> None:
+        """切换当前使用的 API Key。"""
         self._api_key = key
         self._headers = {
             "Authorization": f"Bearer {key}",
@@ -103,6 +111,7 @@ class RunningHubAPIService:
 
         backoffs = [30, 60, 120]
         attempt = 0
+        _switched_to_enterprise = False  # 只切换一次，防止死循环
         while True:
             try:
                 submit = await self._submit(ep_norm, payload)
@@ -118,6 +127,25 @@ class RunningHubAPIService:
                 return await self._wait_for_completion(task_id, timeout)
             except RunningHubAPIError as e:
                 msg_lower = (e.msg or "").lower()
+
+                # 1014: 消费级 key 无权限 → 切换企业级 key 立即重试（只切一次）
+                is_1014 = str(e.code) == "1014" or "1014" in (e.msg or "")
+                if (
+                    is_1014
+                    and not _switched_to_enterprise
+                    and self._enterprise_key
+                    and self._api_key != self._enterprise_key
+                ):
+                    logger.warning(
+                        f"[RunningHub] 1014 消费级 key 受限，切换企业级 key 重试…"
+                    )
+                    self._apply_key(self._enterprise_key)
+                    # 同步更新 payload 中的 apiKey（部分 registry 注入）
+                    payload.pop("apiKey", None)
+                    _switched_to_enterprise = True
+                    attempt = 0
+                    continue
+
                 is_1011 = (
                     str(e.code) == "1011"
                     or "1011" in (e.msg or "")

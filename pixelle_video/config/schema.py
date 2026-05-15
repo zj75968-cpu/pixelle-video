@@ -72,10 +72,10 @@ class ComfyUIConfig(BaseModel):
     """ComfyUI configuration (includes global settings and service-specific configs)"""
     comfyui_url: str = Field(default="http://127.0.0.1:8188", description="ComfyUI Server URL")
     comfyui_api_key: Optional[str] = Field(default=None, description="ComfyUI API Key (optional)")
-    runninghub_api_key: Optional[str] = Field(default=None, description="RunningHub API Key (optional)")
+    runninghub_api_key: Optional[str] = Field(default=None, description="RunningHub 企业级-共享 API Key（兑底）。消费级 key 不可用时自动切换此 key。")
     runninghub_consumer_api_key: Optional[str] = Field(
         default=None,
-        description="RunningHub 消费级会员 API Key（可选）。若提供，部分工作流（如数字人 digital_image）会优先用此 key 走 openapi/v2 接口，失败时回退到企业级 key。",
+        description="RunningHub 消费级会员 API Key（首选）。所有模型优先使用此 key；返回 1014 时自动切换 runninghub_api_key 作为兖底。",
     )
     runninghub_base_url: Optional[str] = Field(
         default=None,
