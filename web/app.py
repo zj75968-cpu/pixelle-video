@@ -82,12 +82,6 @@ def main():
         icon="📱",
     )
 
-    devtools_page = st.Page(
-        "pages/5_🛠️_开发者工具.py",
-        title="开发者工具",
-        icon="🛠️",
-    )
-
     agent_page = st.Page(
         "pages/8_🤖_Agent.py",
         title="Agent 大脑",
@@ -98,7 +92,6 @@ def main():
         create_page,
         history_page,
         publish_page,
-        devtools_page,
         agent_page,
     ], position="top")
     pg.run()

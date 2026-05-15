@@ -375,9 +375,12 @@ class XHSPublisher:
     def _unlock_screen(self) -> None:
         """Wake up and unlock the device screen.
 
-        Always safe to call. Sends WAKEUP keyevent then swipes up to dismiss
-        the lock screen (harmless if the screen is already on and unlocked).
-        Enters PIN digits if ``lock_pin`` is configured.
+        Always safe to call. Works for no-password (sleep-only) phones:
+        1. Check if screen is already awake — skip entirely if so.
+        2. Send WAKEUP keyevent.
+        3. Swipe up from the bottom third of the screen.
+        4. Send KEYCODE_MENU (82) as backup dismiss (works on Huawei/HarmonyOS).
+        5. Enter PIN digits if ``lock_pin`` is configured.
         """
         import subprocess
         adb = shutil.which("adb") or "adb"
@@ -388,30 +391,45 @@ class XHSPublisher:
                 timeout=5, capture_output=True,
             )
 
+        def _adb_output(*args: str) -> str:
+            r = subprocess.run(
+                [adb, "-s", self.serial, "shell"] + list(args),
+                timeout=5, capture_output=True, text=True,
+            )
+            return r.stdout
+
         try:
+            # 0. Skip wakeup if screen is already on
+            power_state = _adb_output("dumpsys", "power")
+            if "mWakefulness=Awake" in power_state or "mWakefulnessRaw=1" in power_state:
+                logger.info(f"[{self.serial}] Screen already awake, skipping unlock")
+                return
+
             # 1. Wake up screen
             _run("input", "keyevent", "224")
             time.sleep(1.5)
 
             # 2. Get screen dimensions
-            size_out = subprocess.run(
-                [adb, "-s", self.serial, "shell", "wm", "size"],
-                timeout=5, capture_output=True, text=True,
-            ).stdout
+            size_out = _adb_output("wm", "size")
             try:
                 parts = size_out.strip().split()[-1].split("x")
                 sw, sh = int(parts[0]), int(parts[1])
             except Exception:
                 sw, sh = 1080, 2340
 
-            # 3. Swipe up to dismiss lock screen (safe even if already unlocked)
+            # 3. Swipe up from bottom third (300 ms — avoids long-press misread)
             mid_x = sw // 2
             _run("input", "swipe",
                  str(mid_x), str(int(sh * 0.85)),
-                 str(mid_x), str(int(sh * 0.15)))
-            time.sleep(1)
+                 str(mid_x), str(int(sh * 0.15)),
+                 "300")
+            time.sleep(0.8)
 
-            # 4. Enter PIN if configured
+            # 4. KEYCODE_MENU (82) — backup dismiss for Huawei/HarmonyOS no-PIN lock
+            _run("input", "keyevent", "82")
+            time.sleep(0.5)
+
+            # 5. Enter PIN if configured
             if self.lock_pin:
                 _run("input", "text", self.lock_pin)
                 time.sleep(0.3)
@@ -419,7 +437,7 @@ class XHSPublisher:
                 time.sleep(1)
                 logger.info(f"[{self.serial}] Screen unlocked with PIN")
             else:
-                logger.info(f"[{self.serial}] Screen woken and swiped up")
+                logger.info(f"[{self.serial}] Screen woken and unlocked (no PIN)")
         except Exception as e:
             logger.warning(f"_unlock_screen failed (non-fatal): {e}")
 

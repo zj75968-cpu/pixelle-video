@@ -1,0 +1,39 @@
+{
+    "source": "runninghub",
+    "workflow_id": "2054763310544891905",
+    "use_consumer_v2": true,
+    "_comment": "Wan2.2 14B LightX2V 6步极速图生视频。ComfyUI workflow 形式，消费级 API Key 即可。16fps，length 必须为 4N+1。",
+    "image_node_id": "4",
+    "prompt_node_id": "10",
+    "prompt_field": "text",
+    "negative_node_id": "1",
+    "negative_field": "text",
+    "negative_prompt": "低质量, 模糊, 水印, 字幕, 压缩伪影, 畸形手, 畸形脸, 多余肢体, 解剖错误",
+    "extra_params": [
+        {
+            "node_id": "25",
+            "field_name": "value",
+            "label": "视频时长",
+            "type": "enum_int",
+            "options": [33, 49, 65, 81, 97, 113, 129, 161, 241, 321, 481, 721, 1441],
+            "display_labels": ["2 秒", "3 秒", "4 秒", "5 秒", "6 秒", "7 秒", "8 秒", "10 秒", "15 秒", "20 秒", "30 秒", "45 秒", "90 秒"],
+            "default": 81
+        },
+        {
+            "node_id": "23",
+            "field_name": "value",
+            "label": "宽度 width",
+            "type": "enum_int",
+            "options": [480, 544, 640, 704, 768, 832, 960, 1024, 1280],
+            "default": 704
+        },
+        {
+            "node_id": "24",
+            "field_name": "value",
+            "label": "高度 height",
+            "type": "enum_int",
+            "options": [480, 544, 640, 704, 768, 832, 960, 1024, 1280],
+            "default": 544
+        }
+    ]
+}

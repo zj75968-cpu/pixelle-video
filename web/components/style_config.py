@@ -543,7 +543,8 @@ def render_style_config(pixelle_video):
                     if param_type == 'text':
                         custom_values_for_video[param_name] = st.text_input(
                             label,
-                            value=default,
+                            value="",
+                            placeholder=str(default),
                             key=f"video_custom_{param_name}"
                         )
                     elif param_type == 'number':
@@ -575,7 +576,8 @@ def render_style_config(pixelle_video):
                     if param_type == 'text':
                         custom_values_for_video[param_name] = st.text_input(
                             label,
-                            value=default,
+                            value="",
+                            placeholder=str(default),
                             key=f"video_custom_{param_name}"
                         )
                     elif param_type == 'number':

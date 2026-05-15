@@ -1,0 +1,59 @@
+{
+  "source": "runninghub",
+  "workflow_id": "1969069620562980865",
+  "use_consumer_v2": true,
+  "name": "商品带货展示 Wan2.2（图片+音频）",
+  "description": "参考图 + 口播音频 → 带货展示视频（人物展示商品）",
+  "image_node_id": "35",
+  "prompt_node_id": "34",
+  "prompt_field": "prompt",
+  "audio_node_id": "47",
+  "audio_field": "audio",
+  "prompt_prefix": "realistic 3D product, natural hand grip, volumetric shadows, photorealistic product integration, depth and perspective, seamlessly blended, ",
+  "extra_params": [
+    {
+      "node_id": "27",
+      "field_name": "value",
+      "label": "长边尺寸",
+      "type": "int",
+      "default": 832,
+      "min": 512,
+      "max": 2048,
+      "step": 64
+    },
+    {
+      "node_id": "44",
+      "field_name": "value",
+      "label": "片头跳过（秒）",
+      "type": "int",
+      "default": 0,
+      "min": 0,
+      "max": 30,
+      "step": 1
+    },
+    {
+      "node_id": "48",
+      "field_name": "value",
+      "label": "视频时长（秒）",
+      "type": "int",
+      "default": 15,
+      "min": 5,
+      "max": 60,
+      "step": 5
+    },
+    {
+      "node_id": "92",
+      "field_name": "value",
+      "label": "直出",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "node_id": "93",
+      "field_name": "value",
+      "label": "zip加密",
+      "type": "bool",
+      "default": false
+    }
+  ]
+}

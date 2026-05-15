@@ -1,0 +1,65 @@
+{
+  "source": "runninghub",
+  "workflow_id": "2054804641879207938",
+  "use_consumer_v2": true,
+  "name": "Wan2.2 首尾帧联动工作流",
+  "description": "商用级-首尾五帧联动，支持 for 循环全自动生成",
+  "image_node_id": "40",
+  "prompt_node_id": "81",
+  "prompt_field": "text",
+  "negative_node_id": "82",
+  "negative_field": "text",
+  "negative_prompt": "低质量, 模糊, 水印, 字幕, 压缩伪影, 畸形手, 畸形脸, 多余肢体, 解剖错误",
+  "image_inputs": [
+    {"node_id": "39", "field": "image", "label": "🎬 首帧图片", "required": true},
+    {"node_id": "40", "field": "image", "label": "🖼️ 中间参考图", "required": false},
+    {"node_id": "44", "field": "image", "label": "🏁 尾帧图片", "required": true}
+  ],
+  "extra_params": [
+    {
+      "node_id": "59",
+      "field": "value",
+      "label": "视频时长",
+      "type": "int",
+      "default": 81,
+      "min": 33,
+      "max": 1441,
+      "step": 16,
+      "display_labels": [
+        "2秒",
+        "2.5秒",
+        "3秒",
+        "3.5秒",
+        "4秒",
+        "4.5秒",
+        "5秒",
+        "6秒",
+        "8秒",
+        "10秒",
+        "15秒",
+        "22秒",
+        "45秒",
+        "90秒"
+      ]
+    },
+    {
+      "node_id": "87",
+      "field": "LOOPS",
+      "label": "循环次数",
+      "type": "int",
+      "default": 4,
+      "min": 1,
+      "max": 10,
+      "step": 1
+    }
+  ],
+  "important_nodes": {
+    "start_image": "39",
+    "end_image": "44",
+    "middle_images": ["40"],
+    "pos_prompt": "81",
+    "neg_prompt": "82",
+    "duration": "59",
+    "loop_control": "87"
+  }
+}
