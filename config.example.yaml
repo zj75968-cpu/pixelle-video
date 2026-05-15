@@ -4,6 +4,9 @@
 
 project_name: Pixelle-Video
 
+# 管理员密码（可选）：设置后访问「⚙️ 设置」页面需要验证，普通用户无法查看/修改 API Key。留空则无需密码。
+admin_password: ""
+
 # ==================== LLM Configuration ====================
 # Supports any OpenAI SDK compatible API
 llm:

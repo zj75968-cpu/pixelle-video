@@ -88,11 +88,18 @@ def main():
         icon="🤖",
     )
 
+    settings_page = st.Page(
+        "pages/9_⚙️_Settings.py",
+        title="设置",
+        icon="⚙️",
+    )
+
     pg = st.navigation([
         create_page,
         history_page,
         publish_page,
         agent_page,
+        settings_page,
     ], position="top")
     pg.run()
 

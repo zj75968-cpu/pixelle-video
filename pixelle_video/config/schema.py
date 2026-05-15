@@ -126,6 +126,10 @@ class XHSPublishConfig(BaseModel):
 class PixelleVideoConfig(BaseModel):
     """Pixelle-Video main configuration"""
     project_name: str = Field(default="Pixelle-Video", description="Project name")
+    admin_password: str = Field(
+        default="",
+        description="管理员密码。设置后，访问「⚙️ 设置」页面需要输入此密码才能查看/修改 API Key 等敏感配置。留空则无需密码直接进入。",
+    )
     llm: LLMConfig = Field(default_factory=LLMConfig)
     post_model_presets: Dict[str, LLMConfig] = Field(
         default_factory=lambda: {
