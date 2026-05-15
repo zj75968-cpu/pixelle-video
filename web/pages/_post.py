@@ -30,7 +30,6 @@ if str(_project_root) not in sys.path:
 import streamlit as st
 
 from web.state.session import init_session_state, init_i18n, get_pixelle_video
-from web.components.inline_model_config import render_inline_model_config
 from web.utils.async_helpers import run_async
 
 st.set_page_config(
@@ -394,15 +393,9 @@ def main():
         _apply_history_params_to_form(pending_history)
         st.success("已应用历史参数到表单")
 
-    # �?�? Per-post independent model overrides (optional) �?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?�?
+    # Per-post model overrides removed — use global config from admin settings
     content_llm = None
     image_llm = None
-    with st.expander("⚙️ 文案 / 图片模型配置（可选，不填则使用系统全局配置）", expanded=False):
-        col_cm, col_im = st.columns(2)
-        with col_cm:
-            content_llm = render_inline_model_config("post_content", "🖊️ 文案模型")
-        with col_im:
-            image_llm = render_inline_model_config("post_image", "🖼️ 图片模型")
 
     with st.expander("🕘 历史参数复用（避免重复填写）", expanded=False):
         history_items = _list_recent_post_param_history(limit=20)

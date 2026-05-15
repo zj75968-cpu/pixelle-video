@@ -552,11 +552,17 @@ class DigitalHumanPipelineUI(PipelineUI):
 
                 wf_cfg = _wp_dict.get("dh_workflow_config", {})
 
-                # ── ⚙️ 参数配置区（图片模型 + 工作流参数）─────────────────────
+                # 从全局配置读取图片生成模型（已移除用户可见的内联配置入口）
+                from pixelle_video.config import config_manager as _cm
+                _llm = _cm.get_llm_config()
+                _img_cfg = {
+                    "api_key":  _llm.get("api_key", ""),
+                    "base_url": _llm.get("base_url", ""),
+                    "model":    _llm.get("model", ""),
+                }
+
+                # ── ⚙️ 工作流参数配置区 ─────────────────────────────────────
                 with st.expander("⚙️ 工作流参数", expanded=True):
-                    from web.components.inline_model_config import render_inline_model_config
-                    _img_cfg = render_inline_model_config("post_image", "🖼️ 图片生成模型（AI合成图）")
-                    st.divider()
                     extra_params = wf_cfg.get("extra_params") or []
                     _param_overrides: list = []
                     if extra_params:
