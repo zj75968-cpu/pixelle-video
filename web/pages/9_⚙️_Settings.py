@@ -15,7 +15,9 @@ if str(_project_root) not in sys.path:
 import streamlit as st
 from pixelle_video.config import config_manager
 
-# ── 样式 ──────────────────────────────────────────────────────────
+# 每次渲染前重新加载配置，确保 admin_password 等字段是最新值
+config_manager.reload()
+cfg = config_manager.config
 st.markdown("""
 <style>
 [data-testid="stSidebar"] { display: none !important; }
@@ -41,8 +43,6 @@ if "is_admin" not in st.session_state:
     st.session_state.is_admin = False
 if "reveal_keys" not in st.session_state:
     st.session_state.reveal_keys = {}
-
-cfg = config_manager.config
 
 
 def _mask(value: str) -> str:
