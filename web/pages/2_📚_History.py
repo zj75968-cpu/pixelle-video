@@ -189,6 +189,19 @@ def render_grid_task_card(task: dict, pixelle_video):
     
     # Card container
     with st.container():
+        # 批量选择复选框
+        if st.session_state.get("multiselect_mode", False):
+            is_selected = st.checkbox(
+                "选择此项",
+                value=task_id in st.session_state.get("selected_tasks", set()),
+                key=f"select_{task_id}",
+                label_visibility="collapsed",
+            )
+            if is_selected:
+                st.session_state.setdefault("selected_tasks", set()).add(task_id)
+            else:
+                st.session_state.setdefault("selected_tasks", set()).discard(task_id)
+
         # Video preview at top
         if video_path and os.path.exists(video_path):
             st.video(video_path, autoplay=False, loop=False, muted=False)
@@ -377,7 +390,15 @@ def main():
     # Initialize
     init_session_state()
     init_i18n()
-    
+
+    # Multi-select state
+    if "multiselect_mode" not in st.session_state:
+        st.session_state.multiselect_mode = False
+    if "selected_tasks" not in st.session_state:
+        st.session_state.selected_tasks = set()
+    if "confirm_bulk_delete" not in st.session_state:
+        st.session_state.confirm_bulk_delete = False
+
     # Render header
     render_header()
     
@@ -419,7 +440,59 @@ def main():
     
     # Page title with count
     st.markdown(f"##### 📚 {tr('history.page_title')} ({total})")
-    
+
+    # ── 批量操作工具栏 ──────────────────────────────────────────
+    tb1, tb2, tb3, _ = st.columns([1.2, 1, 1.3, 4])
+    with tb1:
+        label = "✕ 退出批量" if st.session_state.multiselect_mode else "☑️ 批量选择"
+        if st.button(label, use_container_width=True):
+            st.session_state.multiselect_mode = not st.session_state.multiselect_mode
+            if not st.session_state.multiselect_mode:
+                st.session_state.selected_tasks = set()
+                st.session_state.confirm_bulk_delete = False
+            st.rerun()
+    if st.session_state.multiselect_mode:
+        with tb2:
+            if st.button("全选本页", use_container_width=True):
+                for t in tasks:
+                    st.session_state.selected_tasks.add(t["task_id"])
+                st.rerun()
+        with tb3:
+            n_sel = len(st.session_state.selected_tasks)
+            if st.button(
+                f"🗑️ 删除 ({n_sel})" if n_sel else "🗑️ 删除",
+                disabled=n_sel == 0,
+                type="primary" if n_sel else "secondary",
+                use_container_width=True,
+            ):
+                st.session_state.confirm_bulk_delete = True
+                st.rerun()
+
+    # 批量删除确认
+    if st.session_state.get("confirm_bulk_delete", False):
+        n_sel = len(st.session_state.selected_tasks)
+        st.warning(f"⚠️ 确认删除选中的 **{n_sel}** 条历史记录？此操作不可恢复。")
+        bc1, bc2 = st.columns(2)
+        with bc1:
+            if st.button("✅ 确认删除", type="primary", use_container_width=True, key="bulk_confirm_yes"):
+                deleted = 0
+                for tid in list(st.session_state.selected_tasks):
+                    try:
+                        if run_async(pixelle_video.history.delete_task(tid)):
+                            deleted += 1
+                    except Exception:
+                        pass
+                st.session_state.selected_tasks = set()
+                st.session_state.confirm_bulk_delete = False
+                st.session_state.multiselect_mode = False
+                st.success(f"✅ 成功删除 {deleted} 条记录")
+                st.rerun()
+        with bc2:
+            if st.button("❌ 取消", use_container_width=True, key="bulk_confirm_no"):
+                st.session_state.confirm_bulk_delete = False
+                st.rerun()
+
+    # ────────────────────────────────────────────────────────────────────────
     # Show task cards in grid layout (4 columns)
     if not tasks:
         st.info(tr("history.no_tasks"))
