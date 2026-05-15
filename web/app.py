@@ -54,8 +54,8 @@ st.markdown(
         padding-left: 1rem !important;
         padding-right: 1rem !important;
     }
-    /* 隐藏导航栏中的「设置」入口，管理员通过直接访问 /Settings 进入 */
-    a[href*="Settings"] {
+    /* 隐藏导航栏中的「设置」入口，管理员通过直接访问 /settings 进入 */
+    a[href*="settings"] {
         display: none !important;
     }
     </style>
@@ -100,6 +100,7 @@ def main():
         "pages/9_⚙️_Settings.py",
         title="设置",
         icon="⚙️",
+        url_path="settings",
     )
 
     # 始终注册设置页（URL /Settings 可用），但通过 CSS 隐藏导航栏入口
