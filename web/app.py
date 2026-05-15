@@ -54,6 +54,10 @@ st.markdown(
         padding-left: 1rem !important;
         padding-right: 1rem !important;
     }
+    /* 隐藏导航栏中的「设置」入口，管理员通过直接访问 /Settings 进入 */
+    a[href*="Settings"] {
+        display: none !important;
+    }
     </style>
     """,
     unsafe_allow_html=True,
@@ -98,20 +102,11 @@ def main():
         icon="⚙️",
     )
 
-    # 普通导航（所有用户可见）
-    pages = [create_page, history_page, publish_page, agent_page]
-
-    # 隐藏入口：URL 带 ?admin_mode=1 或已登录时，才将设置页加入导航
-    admin_mode_param = st.query_params.get("admin_mode") == "1"
-    if st.session_state.is_admin or admin_mode_param:
-        pages.append(settings_page)
-
-    pg = st.navigation(pages, position="top")
-
-    # 检测到 admin_mode 参数且未登录时，自动跳转到设置页进行验证
-    if admin_mode_param and not st.session_state.is_admin:
-        st.switch_page(settings_page)
-
+    # 始终注册设置页（URL /Settings 可用），但通过 CSS 隐藏导航栏入口
+    pg = st.navigation(
+        [create_page, history_page, publish_page, agent_page, settings_page],
+        position="top",
+    )
     pg.run()
 
 
