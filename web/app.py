@@ -54,7 +54,7 @@ st.markdown(
         padding-left: 1rem !important;
         padding-right: 1rem !important;
     }
-    /* 隐藏导航栏中的「设置」入口，管理员通过直接访问 /settings 进入 */
+    /* 设置页导航入口隐藏，管理员通过 /settings?k=密鑰 访问 */
     a[href*="settings"] {
         display: none !important;
     }
@@ -66,10 +66,6 @@ st.markdown(
 
 def main():
     """Main entry point with navigation"""
-    # Initialize admin session state
-    if "is_admin" not in st.session_state:
-        st.session_state.is_admin = False
-
     # Define pages using st.Page
     create_page = st.Page(
         "pages/1_🎨_创作.py",
@@ -103,7 +99,6 @@ def main():
         url_path="settings",
     )
 
-    # 始终注册设置页（URL /Settings 可用），但通过 CSS 隐藏导航栏入口
     pg = st.navigation(
         [create_page, history_page, publish_page, agent_page, settings_page],
         position="top",
