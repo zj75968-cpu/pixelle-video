@@ -4,6 +4,7 @@
 - 未登录时显示密码输入框
 - 登录后显示所有敏感配置（API Key 等），支持查看/修改/保存
 """
+import json
 import sys
 from pathlib import Path
 
@@ -168,6 +169,29 @@ with st.expander("🔑 修改管理员密码"):
     if new_admin_pwd1 and new_admin_pwd1 != new_admin_pwd2:
         st.warning("两次输入的密码不一致。")
 
+# ── 5. RunningHub 工作流 ID 管理 ──────────────────────────────────
+_WF_DIR = _project_root / "workflows" / "runninghub"
+_wf_files = sorted(_WF_DIR.glob("*.json"))
+
+with st.expander("🔗 RunningHub 工作流 ID", expanded=False):
+    st.caption("修改后点击底部「💾 保存配置」一并写入。")
+    wf_new_ids: dict[str, str] = {}
+    cols = st.columns(2)
+    for idx, wf_path in enumerate(_wf_files):
+        try:
+            wf_data = json.loads(wf_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        current_wf_id = wf_data.get("workflow_id", "")
+        label = wf_path.stem  # 文件名去掉 .json
+        with cols[idx % 2]:
+            new_id = st.text_input(
+                label,
+                value=current_wf_id,
+                key=f"wf_{wf_path.stem}",
+            )
+            wf_new_ids[str(wf_path)] = (new_id.strip(), wf_data)
+
 st.divider()
 
 # ── 保存按钮 ──────────────────────────────────────────────────────
@@ -196,7 +220,25 @@ if st.button("💾 保存配置", type="primary", use_container_width=True):
     try:
         config_manager.update(updates)
         config_manager.save()
-        st.success("✅ 配置已保存！新配置立即生效（下次生成任务时使用新 Key）。")
+
+        # 写回工作流 ID
+        wf_errors = []
+        for wf_path_str, (new_id, wf_data) in wf_new_ids.items():
+            if new_id and new_id != wf_data.get("workflow_id", ""):
+                try:
+                    wf_data["workflow_id"] = new_id
+                    Path(wf_path_str).write_text(
+                        json.dumps(wf_data, ensure_ascii=False, indent=4),
+                        encoding="utf-8",
+                    )
+                except Exception as e:
+                    wf_errors.append(f"{Path(wf_path_str).stem}: {e}")
+
+        if wf_errors:
+            st.warning("部分工作流 ID 保存失败：" + "；".join(wf_errors))
+        else:
+            st.success("✅ 配置已保存！新配置立即生效（下次生成任务时使用新 Key）。")
+
         # 清空显示状态，避免明文残留
         st.session_state.reveal_keys = {}
         st.rerun()
