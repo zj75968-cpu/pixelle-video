@@ -221,7 +221,7 @@ def render_grid_task_card(task: dict, pixelle_video):
             if video_path and os.path.exists(video_path):
                 with open(video_path, "rb") as f:
                     st.download_button(
-                        "⬇️",
+                        "⬇️ 下载",
                         data=f,
                         file_name=f"{title}.mp4",
                         mime="video/mp4",
@@ -230,7 +230,7 @@ def render_grid_task_card(task: dict, pixelle_video):
                         width="stretch"
                     )
             else:
-                st.button("⬇️", key=f"download_disabled_{task_id}", disabled=True, width="stretch")
+                st.button("⬇️ 下载", key=f"download_disabled_{task_id}", disabled=True, width="stretch")
         
         with col3:
             if st.button("🗑️", key=f"delete_{task_id}", help=tr("history.task_card.delete"), width="stretch"):
