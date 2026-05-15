@@ -30,7 +30,6 @@ from web.state.session import init_session_state, init_i18n, get_pixelle_video
 
 # Import components
 from web.components.header import render_header
-from web.components.settings import render_advanced_settings
 
 # Page config
 st.set_page_config(
@@ -52,9 +51,6 @@ def main():
     
     # Initialize Pixelle-Video
     pixelle_video = get_pixelle_video()
-    
-    # Render system configuration (LLM + ComfyUI)
-    render_advanced_settings()
     
     # ========================================================================
     # Pipeline Selection & Delegation

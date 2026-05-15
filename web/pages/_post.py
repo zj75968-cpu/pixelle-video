@@ -30,7 +30,6 @@ if str(_project_root) not in sys.path:
 import streamlit as st
 
 from web.state.session import init_session_state, init_i18n, get_pixelle_video
-from web.components.settings import render_advanced_settings
 from web.components.inline_model_config import render_inline_model_config
 from web.utils.async_helpers import run_async
 
@@ -386,9 +385,6 @@ def main():
 
     st.title("📝 图文帖子生成")
     st.caption("AI 驱动的小红书图文帖子一键生成")
-
-    # Keep required system settings in the same module area as post creation.
-    render_advanced_settings()
 
     _init_post_form_defaults()
 
