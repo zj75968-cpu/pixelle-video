@@ -1037,6 +1037,7 @@ class XHSPublisher:
         title: str,
         body: str,
         hashtags: Optional[List[str]] = None,
+        progress_callback=None,
     ) -> bool:
         """
         Publish an image-text note to Xiaohongshu.
@@ -1046,6 +1047,7 @@ class XHSPublisher:
             title: Post title (≤ 20 chars recommended).
             body:  Post body / description.
             hashtags: List of topic tags (without #).
+            progress_callback: Optional callable(msg: str) for real-time progress.
 
         Returns:
             True if publish succeeded.
@@ -1064,6 +1066,7 @@ class XHSPublisher:
             title,
             body,
             hashtags,
+            progress_callback,
         )
 
     def _publish_sync(
@@ -1072,54 +1075,65 @@ class XHSPublisher:
         title: str,
         body: str,
         hashtags: List[str],
+        progress_callback=None,
     ) -> bool:
         """Synchronous publish implementation (runs in executor)."""
+        def _log(msg: str):
+            logger.info(f"[{self.serial}] {msg}")
+            if progress_callback:
+                try:
+                    progress_callback(msg)
+                except Exception:
+                    pass
+
         device_paths = []
         try:
             d = self._get_device()
 
             # 1. Push images to device
-            logger.info(f"[{self.serial}] Pushing {len(images)} images to device")
+            _log(f"1/7 推送 {len(images)} 张图片到设备…")
             device_paths = self._push_images(images)
 
             # 2. Open XHS and navigate to publish
-            logger.info(f"[{self.serial}] Opening XHS publish screen")
+            _log("2/7 打开小红书发布界面…")
             self._unlock_screen()  # wake up + unlock PIN if configured
             self._open_xhs_publish(d)
             self._screenshot(d, "01_publish_screen")
 
             # 3. Select image-text mode
+            _log("3/7 选择图文模式…")
             self._select_image_text_mode(d)
             self._screenshot(d, "02_image_text_mode")
 
             # 4. Select images from gallery
-            logger.info(f"[{self.serial}] Selecting {len(images)} images from album")
+            _log(f"4/7 从相册选择 {len(images)} 张图片…")
             self._select_images_from_album(d, len(images))
             self._screenshot(d, "03_images_selected")
 
             # 5. Fill title and body
-            logger.info(f"[{self.serial}] Filling title and body")
+            _log("5/7 填写标题和正文…")
             self._fill_title_and_body(d, title, body)
             self._screenshot(d, "04_content_filled")
 
             # 6. Add hashtags
             if hashtags:
-                logger.info(f"[{self.serial}] Adding {len(hashtags)} hashtags")
+                _log(f"6/7 添加 {len(hashtags)} 个话题标签…")
                 self._add_hashtags(d, hashtags)
                 self._screenshot(d, "05_hashtags_added")
 
             # 7. Publish
-            logger.info(f"[{self.serial}] Submitting post")
+            _log("7/7 点击发布按钮…")
             self._adb_wakeup()  # ensure screen is on before publishing
             self._publish(d)
 
             # 8. Verify success
+            _log("正在验证发布结果…")
             self._adb_wakeup()  # ensure screen is on for success check
             success = self._check_success(d, expected_title=title)
             if success:
-                logger.info(f"[{self.serial}] ✅ Post published successfully")
+                _log("✅ 图文笔记发布成功")
             else:
-                logger.warning(f"[{self.serial}] ⚠️ Could not confirm publish success")
+                _log("⚠️ 无法确认发布成功")
 
             return success
 
@@ -1339,6 +1353,7 @@ class XHSPublisher:
         body: str,
         hashtags: Optional[List[str]] = None,
         dry_run: bool = False,
+        progress_callback=None,
     ) -> bool:
         """
         Publish a single-video note to Xiaohongshu.
@@ -1351,6 +1366,7 @@ class XHSPublisher:
             dry_run:    If True, run all steps up to (but not including) the
                         final "发布" tap. Useful for end-to-end smoke checks
                         that do not actually post.
+            progress_callback: Optional callable(msg: str) for real-time progress.
 
         Returns:
             True on confirmed success; False otherwise (or True in dry_run
@@ -1366,6 +1382,7 @@ class XHSPublisher:
             body,
             hashtags,
             dry_run,
+            progress_callback,
         )
 
     def _publish_video_sync(
@@ -1375,7 +1392,16 @@ class XHSPublisher:
         body: str,
         hashtags: List[str],
         dry_run: bool,
+        progress_callback=None,
     ) -> bool:
+        def _log(msg: str):
+            logger.info(f"[{self.serial}] {msg}")
+            if progress_callback:
+                try:
+                    progress_callback(msg)
+                except Exception:
+                    pass
+
         if not Path(video_path).exists():
             raise XHSPublishError(f"Video file not found: {video_path}")
 
@@ -1387,52 +1413,54 @@ class XHSPublisher:
             self._set_screen_timeout(300000)  # 5 min — prevent sleep during automation
 
             # 1. Push video to device
-            logger.info(f"[{self.serial}] Pushing video {video_path}")
+            _log(f"1/7 推送视频到设备: {Path(video_path).name}…")
             device_path = self._push_video(video_path)
 
             # 2. Open XHS publish flow
-            logger.info(f"[{self.serial}] Opening XHS publish screen")
+            _log("2/7 打开小红书发布界面…")
             self._unlock_screen()  # wake up + unlock PIN if configured
             self._open_xhs_publish(d)
             self._screenshot(d, "v01_publish_screen")
 
             # 3. Select video mode / video entry
+            _log("3/7 选择视频模式…")
             self._select_video_mode(d)
             self._screenshot(d, "v02_video_mode")
 
             # 4. Pick the freshly pushed video from album
-            logger.info(f"[{self.serial}] Selecting video from album: {Path(video_path).name}")
+            _log(f"4/7 从相册选择视频: {Path(video_path).name}…")
             self._select_video_from_album(d, Path(video_path).name)
             self._screenshot(d, "v03_video_selected")
 
             # 5. Fill title / body (XHS may show a media editor with "下一步" first)
-            logger.info(f"[{self.serial}] Filling title and body")
+            _log("5/7 填写标题和正文…")
             self._fill_title_and_body(d, title, body)
             self._screenshot(d, "v04_content_filled")
 
             # 6. Hashtags
             if hashtags:
-                logger.info(f"[{self.serial}] Adding {len(hashtags)} hashtags")
+                _log(f"6/7 添加 {len(hashtags)} 个话题标签…")
                 self._add_hashtags(d, hashtags)
                 self._screenshot(d, "v05_hashtags_added")
 
             if dry_run:
-                logger.info(f"[{self.serial}] DRY RUN - skipping final publish tap")
+                _log("🔹 DRY RUN - 跳过最终发布")
                 self._screenshot(d, "v06_dry_run_stop")
                 return True
 
             # 7. Publish
-            logger.info(f"[{self.serial}] Submitting video post")
+            _log("等待视频上传并提交发布…")
             self._adb_wakeup()
             self._publish(d)
 
             # 8. Verify
+            _log("正在验证发布结果…")
             self._adb_wakeup()
             success = self._check_success(d, expected_title=title)
             if success:
-                logger.info(f"[{self.serial}] ✅ Video post published")
+                _log("✅ 视频笔记发布成功")
             else:
-                logger.warning(f"[{self.serial}] ⚠️ Could not confirm video publish success")
+                _log("⚠️ 无法确认视频发布成功")
             return success
 
         except XHSPublishError:

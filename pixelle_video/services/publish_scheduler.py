@@ -89,6 +89,7 @@ class PublishJob:
         self.error: Optional[str] = None
         self.retry_count: int = 0
         self.screenshots: List[str] = []
+        self.progress_log: List[str] = []
 
     def to_dict(self) -> dict:
         return {
@@ -112,6 +113,7 @@ class PublishJob:
             "error": self.error,
             "retry_count": self.retry_count,
             "screenshots": self.screenshots,
+            "progress_log": self.progress_log,
         }
 
     @classmethod
@@ -138,6 +140,7 @@ class PublishJob:
         job.error = data.get("error")
         job.retry_count = int(data.get("retry_count", 0))
         job.screenshots = data.get("screenshots") or []
+        job.progress_log = data.get("progress_log") or []
         return job
 
 
@@ -536,6 +539,12 @@ class PublishScheduler:
             publisher = XHSPublisher(serial=job.serial, job_id=job.job_id)
             last_error: Optional[str] = None
 
+            def _progress(msg: str):
+                """Append a timestamped progress entry to the job and persist."""
+                ts = datetime.now().strftime("%H:%M:%S")
+                job.progress_log.append(f"[{ts}] {msg}")
+                self._save()
+
             for attempt in range(MAX_JOB_RETRIES + 1):
                 if attempt > 0:
                     logger.warning(
@@ -569,6 +578,7 @@ class PublishScheduler:
                                 body=job.body,
                                 hashtags=job.hashtags,
                                 dry_run=job.dry_run,
+                                progress_callback=_progress,
                             ),
                             timeout=PUBLISH_TIMEOUT_SECONDS,
                         )
@@ -579,6 +589,7 @@ class PublishScheduler:
                                 title=job.title,
                                 body=job.body,
                                 hashtags=job.hashtags,
+                                progress_callback=_progress,
                             ),
                             timeout=PUBLISH_TIMEOUT_SECONDS,
                         )

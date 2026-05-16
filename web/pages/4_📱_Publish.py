@@ -1096,6 +1096,15 @@ def _render_publish_queue_list(filter_val: str | None):
 
                 st.json(payload)
 
+                # Real-time progress log (written by XHSPublisher callback)
+                progress_log = getattr(job, "progress_log", None) or []
+                if progress_log:
+                    with st.expander(f"📋 执行日志（{len(progress_log)} 条）", expanded=(job.status == "running")):
+                        for entry in progress_log:
+                            st.text(entry)
+                elif job.status == "running":
+                    st.caption("⏳ 正在等待设备回报进度…")
+
                 # Inline preview for video jobs
                 if kind == "video":
                     vp = getattr(job, "video_path", None)
