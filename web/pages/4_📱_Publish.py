@@ -45,6 +45,18 @@ st.set_page_config(
 
 def get_device_manager():
     from pixelle_video.services.device_manager import device_manager
+    # Apply saved ADB server config on first use
+    if not getattr(device_manager, "_adb_server_applied", False):
+        try:
+            from pixelle_video.config import config_manager
+            cfg = getattr(config_manager.config, "xhs_publish", None)
+            if cfg:
+                h = getattr(cfg, "adb_server_host", "127.0.0.1") or "127.0.0.1"
+                p = getattr(cfg, "adb_server_port", 5037) or 5037
+                device_manager.configure_adb_server(h, int(p))
+        except Exception:
+            pass
+        device_manager._adb_server_applied = True
     return device_manager
 
 
@@ -650,6 +662,44 @@ def render_publish_settings():
                 )
                 config_manager.save()
                 st.success("已保存")
+                st.rerun()
+
+        st.markdown("---")
+        st.markdown("##### 🔌 ADB Server 设置（代理/远程）")
+        st.caption(
+            "默认 ADB Server 运行在本机 `127.0.0.1:5037`。"
+            "如果手机接在**同局域网其他电脑**上，可将那台电脑以 "
+            "`adb -a nodaemon server start` 启动监听，然后在此填写该机 IP。"
+        )
+        current_adb_host = getattr(cfg, "adb_server_host", "127.0.0.1") if cfg else "127.0.0.1"
+        current_adb_port = getattr(cfg, "adb_server_port", 5037) if cfg else 5037
+        col_h, col_p, col_abtn = st.columns([3, 1, 1])
+        with col_h:
+            new_adb_host = st.text_input(
+                "ADB Server 地址",
+                value=current_adb_host,
+                key="adb_server_host_input",
+                placeholder="127.0.0.1",
+            )
+        with col_p:
+            new_adb_port = st.number_input(
+                "端口",
+                value=current_adb_port,
+                min_value=1,
+                max_value=65535,
+                key="adb_server_port_input",
+            )
+        with col_abtn:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("💾 保存 ADB", key="save_adb_server"):
+                host_val = new_adb_host.strip() or "127.0.0.1"
+                port_val = int(new_adb_port)
+                config_manager.update(
+                    {"xhs_publish": {"adb_server_host": host_val, "adb_server_port": port_val}}
+                )
+                config_manager.save()
+                get_device_manager().configure_adb_server(host_val, port_val)
+                st.success("ADB Server 设置已保存并生效")
                 st.rerun()
 
 

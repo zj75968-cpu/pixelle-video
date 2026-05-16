@@ -148,6 +148,18 @@ class XHSPublishConfig(BaseModel):
             "自动分配到下一个未占用的时间段。留空则禁用自动排期。"
         ),
     )
+    adb_server_host: str = Field(
+        default="127.0.0.1",
+        description=(
+            "ADB Server 地址。默认 127.0.0.1（本机）。"
+            "若手机连在同网内其他主机上，填写那台主机的 IP（如 192.168.1.5），"
+            "并在那台主机运行 adb -a nodaemon server。"
+        ),
+    )
+    adb_server_port: int = Field(
+        default=5037,
+        description="ADB Server 端口，默认 5037。",
+    )
 
 
 class PixelleVideoConfig(BaseModel):

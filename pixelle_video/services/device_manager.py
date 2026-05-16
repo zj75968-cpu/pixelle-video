@@ -98,6 +98,8 @@ class DeviceManager:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         self._devices: Dict[str, DeviceInfo] = {}
         self._adb_cmd = self._resolve_adb_command()
+        self._adb_server_host: str = "127.0.0.1"
+        self._adb_server_port: int = 5037
         self._lock = threading.RLock()
         self._stop_event = threading.Event()
         self._auto_sync_thread: Optional[threading.Thread] = None
@@ -197,9 +199,23 @@ class DeviceManager:
         """Return current adb command path used by the service."""
         return self._adb_cmd
 
+    def configure_adb_server(self, host: str, port: int) -> None:
+        """Set a remote ADB server to proxy commands through.
+
+        When host differs from 127.0.0.1 or port from 5037, all subsequent
+        adb invocations will prepend ``-H host -P port`` so they target that
+        remote ADB server (where the phone is actually connected).
+        """
+        self._adb_server_host = host.strip() or "127.0.0.1"
+        self._adb_server_port = int(port) if port else 5037
+        logger.info(f"ADB server configured: {self._adb_server_host}:{self._adb_server_port}")
+
     def _adb(self, *args: str, serial: Optional[str] = None) -> subprocess.CompletedProcess:
         """Run an adb command and return the CompletedProcess result."""
         cmd = [self._adb_cmd]
+        # Proxy to remote ADB server when configured
+        if self._adb_server_host != "127.0.0.1" or self._adb_server_port != 5037:
+            cmd += ["-H", self._adb_server_host, "-P", str(self._adb_server_port)]
         if serial:
             cmd += ["-s", serial]
         cmd += list(args)
