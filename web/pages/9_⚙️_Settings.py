@@ -104,6 +104,93 @@ with col_logout:
         st.switch_page("pages/1_🎨_创作.py")
 
 st.caption("修改完成后点击底部「💾 保存配置」生效。")
+
+# ════════════════════════════════════════════════════════════════════
+# 部署状态仪表盘
+# ════════════════════════════════════════════════════════════════════
+with st.expander("📊 部署状态总览", expanded=True):
+    _do_live_check = st.button("🔍 实时检测", key="btn_live_check")
+
+    def _status_card(label: str, ok: bool, detail: str = ""):
+        icon = "✅" if ok else "❌"
+        color = "#1a7a1a" if ok else "#a00000"
+        bg = "#e8f5e9" if ok else "#ffebee"
+        border = "#4caf50" if ok else "#ef9a9a"
+        st.markdown(
+            f"""<div style="border:1px solid {border};border-radius:8px;padding:10px 14px;
+            background:{bg};margin-bottom:6px">
+            <span style="font-size:1.1em;font-weight:600;color:{color}">{icon} {label}</span>
+            {"<br><span style='font-size:.85em;color:#555'>" + detail + "</span>" if detail else ""}
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+    # ── LLM ──
+    llm_ok = bool(cfg.llm.api_key and cfg.llm.base_url and cfg.llm.model)
+    llm_detail = ""
+    if _do_live_check and llm_ok:
+        try:
+            import httpx
+            r = httpx.get(cfg.llm.base_url.rstrip("/").rsplit("/v1", 1)[0] + "/v1/models",
+                          headers={"Authorization": f"Bearer {cfg.llm.api_key}"},
+                          timeout=5)
+            llm_detail = f"连接正常，HTTP {r.status_code}" if r.status_code < 400 else f"HTTP {r.status_code}"
+        except Exception as e:
+            llm_detail = f"连接失败: {e}"
+    elif llm_ok:
+        llm_detail = f"模型: {cfg.llm.model}"
+    else:
+        llm_detail = "API Key / Base URL / 模型 未完整配置"
+
+    # ── RunningHub ──
+    rh_ok = bool(cfg.comfyui.runninghub_consumer_api_key or cfg.comfyui.runninghub_api_key)
+    rh_detail = "消费级 Key 已配置" if cfg.comfyui.runninghub_consumer_api_key else (
+        "企业级 Key 已配置" if cfg.comfyui.runninghub_api_key else "API Key 未配置"
+    )
+
+    # ── Phone Agent ──
+    pa_url = cfg.phone_agent.url.strip()
+    pa_ok = False
+    pa_detail = "URL 未配置"
+    if pa_url:
+        if _do_live_check:
+            from pixelle_video.services.phone_agent_client import ping
+            pa_ok = ping(pa_url, token=cfg.phone_agent.token.strip(), timeout=5)
+            pa_detail = f"在线 ({pa_url.split('//')[1][:30]}...)" if pa_ok else f"无法连接: {pa_url[:40]}..."
+        else:
+            pa_ok = True  # 有 URL 就认为配置完成
+            pa_detail = pa_url.split("//")[1][:40] + "..."
+
+    # ── ADB 设备 ──
+    try:
+        from pixelle_video.services.device_manager import device_manager as _dm
+        connected_devices = [d for d in _dm.get_all() if d.connected]
+        adb_ok = len(connected_devices) > 0
+        adb_detail = f"{len(connected_devices)} 台已连接" if adb_ok else "无已连接设备（可选）"
+    except Exception:
+        adb_ok = False
+        adb_detail = "设备管理器加载失败"
+
+    # ── ComfyUI 本地 ──
+    comfy_ok = bool(cfg.comfyui.comfyui_url)
+    comfy_detail = cfg.comfyui.comfyui_url or "未配置（使用 RunningHub 则可跳过）"
+
+    # 渲染卡片（2列布局）
+    col_a, col_b = st.columns(2)
+    with col_a:
+        _status_card("LLM 语言模型", llm_ok, llm_detail)
+        _status_card("Phone Agent（HTTP）", pa_ok, pa_detail)
+        _status_card("ComfyUI 本地（可选）", comfy_ok, comfy_detail)
+    with col_b:
+        _status_card("RunningHub API", rh_ok, rh_detail)
+        _status_card("ADB 已连接设备（可选）", adb_ok, adb_detail)
+
+    # 总体状态
+    core_ok = llm_ok and rh_ok
+    st.markdown(
+        f"**总体状态：{'🟢 核心配置完整，可正常使用' if core_ok else '🔴 请完善核心配置（LLM + RunningHub）'}**"
+    )
+
 st.divider()
 
 # ── 1. LLM 配置 ───────────────────────────────────────────────────
