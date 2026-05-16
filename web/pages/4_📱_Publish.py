@@ -396,7 +396,7 @@ def _render_device_cards(dm, devices):
                                  help="一键推送 phone_agent.py 到手机，无需 USB 长期连接"):
                         from pixelle_video.services.phone_agent_setup import (
                             is_termux_installed, push_agent_files, open_termux,
-                            try_run_setup_in_termux, _adb,
+                            try_run_setup_in_termux, _adb, install_termux_via_adb,
                         )
 
                         # ── 可视化进度 ──────────────────────────────
@@ -425,16 +425,29 @@ def _render_device_cards(dm, devices):
                             if not s1_ok:
                                 st.stop()
 
-                            # Step 2: Termux 检查
+                            # Step 2: Termux 检查 → 自动安装
                             termux_ok = is_termux_installed(dev.serial)
-                            _step("2️⃣", "Termux 安装检查", termux_ok,
-                                  "已安装" if termux_ok else "未安装 → 请在手机上从 F-Droid 安装 Termux 后重试")
                             if not termux_ok:
-                                st.markdown(
-                                    "👉 [点此打开 F-Droid 下载页](https://f-droid.org/packages/com.termux/)",
-                                    unsafe_allow_html=False,
+                                _step("2️⃣", "Termux 未安装 → 正在自动安装...", True,
+                                      "从 GitHub 下载 APK，约 30~60 秒...")
+                                install_msgs = []
+                                install_result = install_termux_via_adb(
+                                    dev.serial,
+                                    progress_callback=lambda m: install_msgs.append(m),
                                 )
-                                st.stop()
+                                termux_ok = install_result["ok"]
+                                detail_msg = install_result["message"]
+                                if install_msgs:
+                                    detail_msg = install_msgs[-1] + " | " + install_result["message"]
+                                _step("2️⃣", "Termux 自动安装", termux_ok, detail_msg)
+                                if not termux_ok:
+                                    st.markdown(
+                                        "若自动安装失败，请手动在 **F-Droid** 安装：\n"
+                                        "👉 https://f-droid.org/packages/com.termux/"
+                                    )
+                                    st.stop()
+                            else:
+                                _step("2️⃣", "Termux 安装检查", True, "已安装")
 
                             # Step 3: 推送文件
                             push_result = push_agent_files(dev.serial)

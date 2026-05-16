@@ -5,12 +5,16 @@ Phone Agent One-Click Setup
 并引导用户在 Termux 中完成一键安装。
 
 核心功能：
-    setup_phone_agent(serial)  → 推送文件 + 打开 Termux + 返回操作指引
+    setup_phone_agent(serial)       → 推送文件 + 打开 Termux + 返回操作指引
+    install_termux_via_adb(serial)  → 自动下载 Termux APK 并通过 ADB 安装
 """
 
 from __future__ import annotations
 
+import os
 import subprocess
+import tempfile
+import urllib.request
 from pathlib import Path
 
 from loguru import logger
@@ -24,6 +28,9 @@ _INSTALL_BOOT_SH = _SCRIPTS_DIR / "install_termux_boot.sh"
 
 # Termux 包名
 TERMUX_PACKAGE = "com.termux"
+
+# Termux GitHub releases API（获取最新版本）
+_TERMUX_RELEASE_API = "https://api.github.com/repos/termux/termux-app/releases/latest"
 
 
 def _adb(serial: str, *args: str, timeout: int = 30) -> tuple[int, str, str]:
@@ -43,6 +50,127 @@ def is_termux_installed(serial: str) -> bool:
     """检查 Termux 是否已安装。"""
     rc, out, _ = _adb(serial, "shell", "pm", "list", "packages", TERMUX_PACKAGE)
     return rc == 0 and TERMUX_PACKAGE in out
+
+
+def get_device_abi(serial: str) -> str:
+    """获取设备 CPU 架构，返回 ABI 字符串，如 arm64-v8a / armeabi-v7a / x86_64。"""
+    rc, out, _ = _adb(serial, "shell", "getprop", "ro.product.cpu.abi")
+    return out.strip() if rc == 0 else "universal"
+
+
+def get_termux_apk_url(abi: str) -> tuple[str, str]:
+    """
+    从 GitHub API 获取最新 Termux APK 下载地址。
+    返回 (url, filename)，失败时返回 universal 版本的固定 URL。
+    """
+    import json
+
+    # ABI 到 APK 文件名关键词映射
+    abi_map = {
+        "arm64-v8a":    "arm64-v8a",
+        "armeabi-v7a":  "armeabi-v7a",
+        "x86_64":       "x86_64",
+        "x86":          "x86",
+    }
+    target_abi = abi_map.get(abi, "universal")
+
+    try:
+        req = urllib.request.Request(
+            _TERMUX_RELEASE_API,
+            headers={"User-Agent": "Pixelle-Video/1.0", "Accept": "application/vnd.github+json"},
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+        assets = data.get("assets", [])
+        # 优先精确匹配 ABI，找不到则用 universal
+        for keyword in [target_abi, "universal"]:
+            for asset in assets:
+                name: str = asset["name"]
+                if keyword in name and name.endswith(".apk") and "debug" not in name.lower():
+                    return asset["browser_download_url"], name
+        # 兜底：用第一个 .apk
+        for asset in assets:
+            if asset["name"].endswith(".apk"):
+                return asset["browser_download_url"], asset["name"]
+    except Exception as e:
+        logger.warning(f"get_termux_apk_url: GitHub API failed ({e}), using fallback")
+
+    # 兜底固定 URL（universal debug 版，稳定可用）
+    fallback = (
+        "https://github.com/termux/termux-app/releases/download/"
+        "v0.118.1/termux-app_v0.118.1+github-debug_universal.apk"
+    )
+    return fallback, "termux-universal.apk"
+
+
+def install_termux_via_adb(
+    serial: str,
+    progress_callback=None,
+) -> dict:
+    """
+    自动下载 Termux APK 并通过 ADB 安装到手机。
+
+    Args:
+        serial:            ADB device serial
+        progress_callback: callable(message: str)，用于向 UI 报告进度
+
+    Returns:
+        {"ok": bool, "message": str}
+    """
+    def _report(msg: str):
+        logger.info(f"install_termux: {msg}")
+        if progress_callback:
+            progress_callback(msg)
+
+    # 1. 检测设备架构
+    abi = get_device_abi(serial)
+    _report(f"设备架构: {abi}")
+
+    # 2. 获取下载地址
+    url, filename = get_termux_apk_url(abi)
+    _report(f"下载 Termux ({filename})...")
+
+    # 3. 下载 APK 到临时目录
+    try:
+        tmp_dir = tempfile.mkdtemp(prefix="pixelle_termux_")
+        apk_path = os.path.join(tmp_dir, filename)
+
+        def _progress_hook(count, block_size, total_size):
+            if total_size > 0 and count % 50 == 0:
+                pct = min(100, count * block_size * 100 // total_size)
+                _report(f"下载中... {pct}%")
+
+        urllib.request.urlretrieve(url, apk_path, _progress_hook)
+        _report(f"下载完成 ({os.path.getsize(apk_path) // 1024 // 1024:.1f} MB)")
+    except Exception as e:
+        return {"ok": False, "message": f"APK 下载失败: {e}"}
+
+    # 4. ADB 安装
+    _report("正在通过 ADB 安装 Termux...")
+    try:
+        from pixelle_video.services.device_manager import device_manager
+        adb_cmd = device_manager.get_adb_command()
+    except Exception:
+        adb_cmd = "adb"
+
+    result = subprocess.run(
+        [adb_cmd, "-s", serial, "install", "-r", apk_path],
+        capture_output=True, text=True, timeout=120,
+    )
+
+    # 清理临时文件
+    try:
+        os.remove(apk_path)
+        os.rmdir(tmp_dir)
+    except Exception:
+        pass
+
+    if result.returncode == 0 and "Success" in result.stdout:
+        _report("Termux 安装成功！")
+        return {"ok": True, "message": "Termux 安装成功"}
+    else:
+        err = result.stdout.strip() or result.stderr.strip()
+        return {"ok": False, "message": f"ADB install 失败: {err}"}
 
 
 def push_agent_files(serial: str) -> dict:
