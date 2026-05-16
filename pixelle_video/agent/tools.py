@@ -151,6 +151,8 @@ async def _enqueue_publish(
     use_schedule: bool = False,
     kind: str = "video",
     dry_run: bool = False,
+    post_type: str = "content",
+    delete_after_hours: Optional[float] = None,
 ) -> Dict[str, Any]:
     """Enqueue a Xiaohongshu publish job for the given video."""
     from pixelle_video.services.device_manager import device_manager
@@ -220,6 +222,12 @@ async def _enqueue_publish(
         kind=kind,
         video_path=video_path,
         dry_run=bool(dry_run),
+        post_type=post_type if post_type in ("content", "traffic") else "content",
+        delete_after_hours=(
+            float(delete_after_hours)
+            if (delete_after_hours is not None and float(delete_after_hours) > 0)
+            else None
+        ),
     )
     return {
         "job_id": job.job_id,
@@ -227,6 +235,8 @@ async def _enqueue_publish(
         "status": job.status,
         "scheduled_at": job.scheduled_at,
         "dry_run": job.dry_run,
+        "post_type": job.post_type,
+        "delete_after_hours": job.delete_after_hours,
     }
 
 
@@ -595,6 +605,136 @@ async def _recommend_device(
         "candidates": candidates,
     }
 
+
+# --------------------------------------------------------------------------
+# Image-text post pipeline & queue-management tools (added so the agent brain
+# can drive the same set of operations available in the web UI).
+# --------------------------------------------------------------------------
+
+async def _generate_image_text_post(
+    topic: str,
+    image_count: int = 6,
+    post_tone: str = "种草",
+    hashtag_count: int = 5,
+    template_size: str = "1080x1080",
+    style: str = "",
+    aspect_ratio: Optional[str] = None,
+    image_size: Optional[str] = None,
+    post_type: str = "content",
+    traffic_ttl_hours: Optional[float] = None,
+) -> Dict[str, Any]:
+    """Run the image-text post pipeline.
+
+    Returns task_id / output_dir / title / body / hashtags / images / post_type /
+    traffic_ttl_hours. The traffic_ttl_hours is also persisted into
+    output/<task_id>/post_params.json so the publish form can auto-fill
+    delete_after_hours later.
+    """
+    import json
+    from datetime import datetime
+    from pathlib import Path as _Path
+
+    from pixelle_video.service import pixelle_video as core
+
+    if not getattr(core, "_initialized", False):
+        await core.initialize()
+
+    pipeline = (core.pipelines or {}).get("image_text_post")
+    if pipeline is None:
+        raise RuntimeError("image_text_post pipeline not initialised")
+
+    pt = post_type if post_type in ("content", "traffic") else "content"
+    result = await pipeline(
+        topic=topic,
+        image_count=int(image_count),
+        post_tone=post_tone,
+        hashtag_count=int(hashtag_count),
+        template_size=template_size,
+        style=style,
+        aspect_ratio=aspect_ratio,
+        image_size=image_size,
+        post_type=pt,
+    )
+
+    # Persist post_params.json mirroring the web layer so publish UI prefills.
+    try:
+        ttl_val = float(traffic_ttl_hours) if traffic_ttl_hours is not None else 0.0
+    except (TypeError, ValueError):
+        ttl_val = 0.0
+    history = {
+        "topic": topic,
+        "image_count": int(image_count),
+        "post_tone": post_tone,
+        "template_size": template_size,
+        "style": style,
+        "hashtag_count": int(hashtag_count),
+        "aspect_ratio": aspect_ratio,
+        "image_size": image_size,
+        "post_type": pt,
+        "traffic_ttl_hours": ttl_val if pt == "traffic" else 0.0,
+        "saved_at": datetime.now().isoformat(),
+        "source": "agent",
+    }
+    try:
+        (_Path(result.output_dir) / "post_params.json").write_text(
+            json.dumps(history, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning(f"[agent] failed to write post_params.json: {exc}")
+
+    return {
+        "task_id": _Path(result.output_dir).name,
+        "output_dir": str(result.output_dir),
+        "title": result.content.title,
+        "body": result.content.body,
+        "hashtags": list(result.content.hashtags or []),
+        "images": [str(p) for p in sorted((result.output_dir / "frames").glob("*_composed.png"))],
+        "post_type": pt,
+        "traffic_ttl_hours": ttl_val if pt == "traffic" else 0.0,
+    }
+
+
+async def _delete_published_post(job_id: str) -> Dict[str, Any]:
+    """Delete a successfully published XHS post by job_id (uses uiautomator2)."""
+    from pixelle_video.services.publish_scheduler import publish_scheduler
+
+    ok = await publish_scheduler.delete_post_now(job_id)
+    return {"job_id": job_id, "deleted": bool(ok)}
+
+
+async def _remove_job(job_id: str) -> Dict[str, Any]:
+    """Remove a single job from the publish queue regardless of status."""
+    from pixelle_video.services.publish_scheduler import publish_scheduler
+
+    ok = publish_scheduler.remove_job(job_id)
+    return {"job_id": job_id, "removed": bool(ok)}
+
+
+async def _bulk_remove_jobs(statuses: List[str]) -> Dict[str, Any]:
+    """Bulk-remove queue entries whose status matches one of the given statuses."""
+    from pixelle_video.services.publish_scheduler import publish_scheduler
+
+    count = publish_scheduler.bulk_remove(list(statuses or []))
+    return {"statuses": list(statuses or []), "removed_count": int(count)}
+
+
+async def _bulk_cancel_pending_jobs() -> Dict[str, Any]:
+    """Cancel every pending/scheduled job currently in the queue."""
+    from pixelle_video.services.publish_scheduler import publish_scheduler
+
+    count = publish_scheduler.bulk_cancel_pending()
+    return {"cancelled_count": int(count)}
+
+
+async def _execute_job_now(job_id: str) -> Dict[str, Any]:
+    """Force a pending/scheduled job to run immediately (jumps the queue)."""
+    from pixelle_video.services.publish_scheduler import publish_scheduler
+
+    ok = await publish_scheduler.execute_now(job_id)
+    return {"job_id": job_id, "triggered": bool(ok)}
+
+
 # --------------------------------------------------------------------------
 # Registry
 # --------------------------------------------------------------------------
@@ -696,6 +836,16 @@ TOOLS: List[ToolSpec] = [
                     "type": "boolean",
                     "description": "true 表示干跑测试：不点最终发布按钮，仅验证推送/选图/填文链路，避免误发。默认 false。",
                     "default": False,
+                },
+                "post_type": {
+                    "type": "string",
+                    "enum": ["content", "traffic"],
+                    "description": "帖子类型。content=干货帖（长期保留）；traffic=引流帖（可自动删除）。",
+                    "default": "content",
+                },
+                "delete_after_hours": {
+                    "type": "number",
+                    "description": "仅 traffic 帖子有意义：发布成功后经过指定小时数自动删除（>0 启用，留空/0 不删除）。",
                 },
             },
             "required": ["video_path", "title"],
@@ -877,6 +1027,119 @@ TOOLS: List[ToolSpec] = [
             "required": ["topic"],
         },
         handler=_recommend_device,
+    ),
+    ToolSpec(
+        name="generate_image_text_post",
+        description=(
+            "运行图文帖子生成流水线（生成标题/正文/话题/分镜图）。topic 必填。"
+            "post_type='traffic' + traffic_ttl_hours=24 表示：生成一个引流帖，"
+            "在发布到小红书后 24 小时内自动删除（TTL 会写入 post_params.json，"
+            "之后调用 enqueue_publish 时配合 delete_after_hours 使用）。"
+            "返回 task_id / output_dir / title / body / hashtags / images / post_type。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "topic": {"type": "string", "description": "创作主题"},
+                "image_count": {"type": "integer", "description": "图片数量 3-9", "default": 6},
+                "post_tone": {
+                    "type": "string",
+                    "enum": ["种草", "干货", "日常", "搞笑", "情感"],
+                    "default": "种草",
+                },
+                "hashtag_count": {"type": "integer", "description": "话题标签数 3-10", "default": 5},
+                "template_size": {"type": "string", "description": "图片分辨率", "default": "1080x1080"},
+                "style": {"type": "string", "description": "图片风格（可选）", "default": ""},
+                "aspect_ratio": {"type": "string", "description": "aspectRatio（如 1:1 / 3:4 / 9:16），留空不指定"},
+                "image_size": {"type": "string", "description": "imageSize（仅部分 Gemini 模型支持），留空不指定"},
+                "post_type": {
+                    "type": "string",
+                    "enum": ["content", "traffic"],
+                    "description": "content=干货帖；traffic=引流帖",
+                    "default": "content",
+                },
+                "traffic_ttl_hours": {
+                    "type": "number",
+                    "description": "引流帖自动删除 TTL（小时）。仅 post_type='traffic' 有效；0/留空表示不自动删除。",
+                },
+            },
+            "required": ["topic"],
+        },
+        handler=_generate_image_text_post,
+    ),
+    ToolSpec(
+        name="delete_published_post",
+        description=(
+            "通过 uiautomator2 删除一个 *已成功发布* 的小红书帖子（按 job_id 查找标题并在 App 内执行删除）。"
+            "用于配合 traffic 帖子 TTL 到期后清理，或人工误发后撤回。不可恢复。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "job_id": {"type": "string", "description": "publish_scheduler 中的 job_id（必须是 success/已发布的 job）"},
+            },
+            "required": ["job_id"],
+        },
+        handler=_delete_published_post,
+    ),
+    ToolSpec(
+        name="remove_job",
+        description=(
+            "把单个发布任务从队列中移除（仅清记录，不会撤回已发出的帖子）。"
+            "适合清理 success / failed / cancelled 等终态条目。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "job_id": {"type": "string", "description": "publish_scheduler 中的 job_id"},
+            },
+            "required": ["job_id"],
+        },
+        handler=_remove_job,
+    ),
+    ToolSpec(
+        name="bulk_remove_jobs",
+        description=(
+            "按状态批量清理队列条目（仅删记录，不撤回帖子）。常见用法：清理已完成 = "
+            "statuses=['success','done','deleted']；清理失败/取消 = statuses=['failed','cancelled']。"
+            "返回 removed_count。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "statuses": {
+                    "type": "array",
+                    "items": {
+                        "type": "string",
+                        "enum": ["pending", "scheduled", "running", "success", "done", "deleted", "failed", "cancelled"],
+                    },
+                    "description": "要清理的状态列表",
+                },
+            },
+            "required": ["statuses"],
+        },
+        handler=_bulk_remove_jobs,
+    ),
+    ToolSpec(
+        name="bulk_cancel_pending_jobs",
+        description="取消队列中所有 pending/scheduled 状态的任务（一键停掉所有未发布的）。返回 cancelled_count。",
+        args_schema={"type": "object", "properties": {}, "required": []},
+        handler=_bulk_cancel_pending_jobs,
+    ),
+    ToolSpec(
+        name="execute_job_now",
+        description=(
+            "强制立即执行一个 pending/scheduled 的发布任务（跳过队列等待）。"
+            "返回 triggered=true 表示已触发。任务实际状态请用 list_jobs 复查。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "job_id": {"type": "string", "description": "publish_scheduler 中的 job_id"},
+            },
+            "required": ["job_id"],
+        },
+        handler=_execute_job_now,
     ),
 ]
 

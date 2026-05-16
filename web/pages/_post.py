@@ -50,6 +50,7 @@ POST_FORM_DEFAULTS = {
     "aspect_ratio": "（不指定）",
     "image_size": "（不指定）",
     "post_type": "content",
+    "traffic_ttl_hours": 24.0,
 }
 
 
@@ -135,6 +136,11 @@ def _apply_history_params_to_form(params: dict):
     st.session_state["post_form_image_size"] = image_size if image_size in image_size_options else "（不指定）"
     _post_type = str(params.get("post_type", "content"))
     st.session_state["post_form_post_type"] = _post_type if _post_type in ("content", "traffic") else "content"
+    try:
+        _ttl = float(params.get("traffic_ttl_hours", 24.0) or 0.0)
+    except (TypeError, ValueError):
+        _ttl = 24.0
+    st.session_state["post_form_traffic_ttl_hours"] = max(0.0, min(720.0, _ttl))
 
     _apply_model_config("post_content", params.get("content_llm"))
     _apply_model_config("post_image", params.get("image_llm"))
@@ -180,6 +186,22 @@ def render_generate_form() -> dict | None:
             horizontal=True,
             help="干货帖侧重知识价值；引流帖侧重制造钩子和引导互动",
         )
+
+        # Traffic-only: schedule auto-delete TTL at generation time
+        if post_type == "traffic":
+            traffic_ttl_hours = st.number_input(
+                "⏱️ 自动删除时间（小时）",
+                min_value=0.0,
+                max_value=720.0,
+                step=1.0,
+                key="post_form_traffic_ttl_hours",
+                help="引流帖发布后多少小时自动删除（0 = 不自动删除）。"
+                     "该值会预填到发布表单的 delete_after_hours 字段。",
+            )
+        else:
+            traffic_ttl_hours = 0.0
+            # Reset session state so the value is hidden but not stale
+            st.session_state.pop("post_form_traffic_ttl_hours", None)
 
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -238,6 +260,7 @@ def render_generate_form() -> dict | None:
             "aspect_ratio": None if aspect_ratio_opt == "（不指定）" else aspect_ratio_opt,
             "image_size": None if image_size_opt == "（不指定）" else image_size_opt,
             "post_type": post_type,
+            "traffic_ttl_hours": float(traffic_ttl_hours) if post_type == "traffic" else 0.0,
         }
     return None
 
@@ -433,6 +456,9 @@ def main():
     if params:
         # Build pipeline parameters separately from history payload.
         pipeline_params = dict(params)
+        # traffic_ttl_hours is a publish-stage hint, not a pipeline arg; remove
+        # before unpacking into the pipeline call.
+        pipeline_params.pop("traffic_ttl_hours", None)
         pipeline_params["content_llm"] = content_llm if _is_complete_override(content_llm) else None
         pipeline_params["image_llm"] = image_llm if _is_complete_override(image_llm) else None
 
@@ -446,6 +472,7 @@ def main():
             "aspect_ratio": params.get("aspect_ratio"),
             "image_size": params.get("image_size"),
             "post_type": params.get("post_type", "content"),
+            "traffic_ttl_hours": params.get("traffic_ttl_hours", 0.0),
             "content_llm": content_llm or {},
             "image_llm": image_llm or {},
             "saved_at": datetime.now().isoformat(),

@@ -700,6 +700,25 @@ def render_publish_tab():
     dm = get_device_manager()
     _init_publish_form_defaults()
 
+    # Auto-prefill post_type & delete_after_hours from <task>/post_params.json
+    # whenever the form's task_id changes. This honours the TTL set on the
+    # generation page so 引流帖 inherits "auto-delete after N hours" by default.
+    _current_task_id = str(st.session_state.get(PUBLISH_FORM_KEYS["task_id"], "")).strip()
+    if _current_task_id and st.session_state.get("_publish_prefill_task_id") != _current_task_id:
+        _params_path = _project_root / "output" / _current_task_id / "post_params.json"
+        _params = _safe_load_json(_params_path) if _params_path.exists() else None
+        if isinstance(_params, dict):
+            _pt = str(_params.get("post_type") or "content")
+            if _pt in ("content", "traffic"):
+                st.session_state["post_type_select"] = _pt
+            try:
+                _ttl = float(_params.get("traffic_ttl_hours") or 0.0)
+            except (TypeError, ValueError):
+                _ttl = 0.0
+            if _pt == "traffic" and _ttl > 0:
+                st.session_state["delete_after_hours_input"] = max(1.0, min(720.0, _ttl))
+        st.session_state["_publish_prefill_task_id"] = _current_task_id
+
     # ── 每日定时计划配置（行内，无需跳转到设置页）──────────────
     with st.expander("📅 每日发布计划", expanded=False):
         st.caption("设置每天自动发布的时间段（24 小时制 HH:MM，每行一个）。\n选择「按计划自动安排」时，系统自动将任务分配到下一个未被占用的时间槽。")
