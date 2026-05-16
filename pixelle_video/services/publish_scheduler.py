@@ -296,21 +296,16 @@ class PublishScheduler:
             self._schedule_job(job)
         elif not scheduled_at:
             # Immediate jobs: schedule ASAP (next tick).
-            # Use ensure_future when an event loop is already running (e.g. inside an
-            # async context); otherwise fall back to a daemon thread with asyncio.run so
-            # that Streamlit's synchronous main thread doesn't raise RuntimeError.
+            # asyncio.get_running_loop() raises RuntimeError when there is no running
+            # loop (e.g. Streamlit sync thread, plain scripts). Use that to branch:
+            # - inside async context  → ensure_future (non-blocking)
+            # - Streamlit / sync thread → daemon thread + asyncio.run
+            import threading as _threading
+
             try:
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    asyncio.ensure_future(self._execute_job(job.job_id))
-                else:
-                    import threading as _threading
-                    _threading.Thread(
-                        target=lambda jid=job.job_id: asyncio.run(self._execute_job(jid)),
-                        daemon=True,
-                    ).start()
+                _loop = asyncio.get_running_loop()  # raises if no loop running
+                _loop.create_task(self._execute_job(job.job_id))
             except RuntimeError:
-                import threading as _threading
                 _threading.Thread(
                     target=lambda jid=job.job_id: asyncio.run(self._execute_job(jid)),
                     daemon=True,
