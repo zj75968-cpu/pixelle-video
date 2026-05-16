@@ -19,6 +19,8 @@ from loguru import logger
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent / "scripts"
 _PHONE_AGENT_PY = _SCRIPTS_DIR / "phone_agent.py"
 _SETUP_SH = _SCRIPTS_DIR / "setup_termux.sh"
+_BOOT_SCRIPT = _SCRIPTS_DIR / "termux_boot_start_agent.sh"
+_INSTALL_BOOT_SH = _SCRIPTS_DIR / "install_termux_boot.sh"
 
 # Termux 包名
 TERMUX_PACKAGE = "com.termux"
@@ -53,6 +55,8 @@ def push_agent_files(serial: str) -> dict:
     files = [
         (_PHONE_AGENT_PY, "/sdcard/phone_agent.py"),
         (_SETUP_SH, "/sdcard/pixelle_setup.sh"),
+        (_BOOT_SCRIPT, "/sdcard/termux_boot_start_agent.sh"),
+        (_INSTALL_BOOT_SH, "/sdcard/install_termux_boot.sh"),
     ]
     pushed = []
     errors = []

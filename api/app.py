@@ -59,6 +59,7 @@ from api.routers import (
     publish_router,
     runninghub_router,
     webhooks_router,
+    phone_agent_router,
 )
 
 
@@ -150,6 +151,7 @@ app.include_router(publish_router, prefix=api_config.api_prefix)
 app.include_router(runninghub_router, prefix=api_config.api_prefix)
 # Webhooks have no /api prefix so external services (e.g. RunningHub) can hit a stable URL.
 app.include_router(webhooks_router)
+app.include_router(phone_agent_router, prefix=api_config.api_prefix)
 
 
 @app.get("/")

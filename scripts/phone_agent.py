@@ -7,24 +7,24 @@ Pixelle-Video Phone HTTP Agent
 
 依赖安装（Termux）：
     pkg install python
-    pip install flask
+    pip install flask requests
 
-启动方式：
+启动方式（手动）：
     python phone_agent.py --token YOUR_SECRET_TOKEN --port 7777
 
-配合 cloudflared 穿透（无需公网 IP）：
-    # 另开一个 Termux 窗口
-    pkg install cloudflared
-    cloudflared tunnel --url http://localhost:7777
-    # 输出的 URL 填写到 Pixelle-Video 的 config.yaml 中
+自动启动 cloudflared 并上报 URL（推荐，开机自启使用）：
+    python phone_agent.py --token TOKEN --port 7777 \\
+        --auto-cloudflare \\
+        --pixelle-url http://your-server.com:8000
 """
 
 import argparse
-import hashlib
 import hmac
 import os
+import re
 import subprocess
 import threading
+import time
 from pathlib import Path
 
 try:
@@ -254,6 +254,86 @@ def _trigger_media_scan(device_path: str):
 # -------------------------------------------------------------------
 # 入口
 # -------------------------------------------------------------------
+def _start_cloudflared_and_report(port: int, pixelle_url: str, token: str):
+    """
+    子线程：启动 cloudflared，解析 trycloudflare.com URL，
+    然后 POST 给 Pixelle-Video /api/phone-agent/register。
+    """
+    cf_cmd = os.path.expanduser("~/cloudflared")
+    if not os.path.exists(cf_cmd):
+        cf_cmd = "cloudflared"  # 尝试系统 PATH
+
+    print(f"[cloudflared] 启动中...")
+    proc = subprocess.Popen(
+        [cf_cmd, "tunnel", "--url", f"http://localhost:{port}"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+
+    tunnel_url = None
+    url_pattern = re.compile(r"https://[a-zA-Z0-9\-]+\.trycloudflare\.com")
+
+    # 最多等 60 秒解析出 URL
+    deadline = time.time() + 60
+    while time.time() < deadline:
+        line = proc.stdout.readline()
+        if not line:
+            break
+        print(f"[cloudflared] {line.rstrip()}")
+        m = url_pattern.search(line)
+        if m:
+            tunnel_url = m.group(0)
+            break
+
+    if not tunnel_url:
+        print("[cloudflared] ⚠ 未能解析到隧道 URL，请手动填写到 Pixelle-Video 设置页")
+        return
+
+    print(f"[cloudflared] ✅ 隧道 URL: {tunnel_url}")
+
+    # 写入本地文件，方便手动查看
+    url_file = os.path.expanduser("~/pixelle_agent_url.txt")
+    with open(url_file, "w") as f:
+        f.write(tunnel_url + "\n")
+    print(f"[cloudflared] URL 已写入 {url_file}")
+
+    # 上报给 Pixelle-Video
+    if pixelle_url:
+        _report_url_to_pixelle(tunnel_url, token, pixelle_url)
+
+    # 继续读取 cloudflared 输出，保持进程运行
+    for line in proc.stdout:
+        print(f"[cloudflared] {line.rstrip()}")
+
+
+def _report_url_to_pixelle(tunnel_url: str, agent_token: str, pixelle_url: str, retries: int = 5):
+    """将 cloudflared URL 上报给 Pixelle-Video，支持重试。"""
+    try:
+        import urllib.request
+        import json as _json
+
+        endpoint = pixelle_url.rstrip("/") + "/api/phone-agent/register"
+        payload = _json.dumps({"url": tunnel_url, "token": agent_token}).encode()
+        req = urllib.request.Request(
+            endpoint,
+            data=payload,
+            headers={"Content-Type": "application/json", "X-Token": agent_token},
+            method="POST",
+        )
+        for attempt in range(1, retries + 1):
+            try:
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    body = resp.read().decode()
+                    print(f"[report] ✅ URL 已上报到 Pixelle-Video: {body}")
+                    return
+            except Exception as e:
+                print(f"[report] 第 {attempt}/{retries} 次上报失败: {e}")
+                time.sleep(5)
+    except Exception as e:
+        print(f"[report] 上报模块加载失败: {e}")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pixelle Phone HTTP Agent")
     parser.add_argument("--token", default=os.getenv("AGENT_TOKEN", ""),
@@ -262,6 +342,11 @@ if __name__ == "__main__":
                         help="监听端口（默认 7777）")
     parser.add_argument("--push-dir", default=os.getenv("AGENT_PUSH_DIR", "/sdcard/DCIM/PixelleVideo"),
                         help="文件推送目标目录")
+    parser.add_argument("--auto-cloudflare", action="store_true",
+                        default=os.getenv("AGENT_AUTO_CLOUDFLARE", "").lower() in ("1", "true", "yes"),
+                        help="自动启动 cloudflared 并解析隧道 URL")
+    parser.add_argument("--pixelle-url", default=os.getenv("PIXELLE_SERVER_URL", ""),
+                        help="Pixelle-Video 服务器地址，用于自动上报隧道 URL")
     args = parser.parse_args()
 
     global _TOKEN, _PUSH_DIR
@@ -275,9 +360,19 @@ if __name__ == "__main__":
 
     print(f"[info] 推送目录: {_PUSH_DIR}")
     print(f"[info] 启动服务: http://0.0.0.0:{args.port}")
-    print()
-    print("配合 cloudflared 穿透（另开 Termux 窗口）：")
-    print(f"  cloudflared tunnel --url http://localhost:{args.port}")
-    print()
+
+    # 自动启动 cloudflared（开机自启模式）
+    if args.auto_cloudflare:
+        cf_thread = threading.Thread(
+            target=_start_cloudflared_and_report,
+            args=(args.port, args.pixelle_url, args.token),
+            daemon=True,
+        )
+        cf_thread.start()
+    else:
+        print()
+        print("提示：加 --auto-cloudflare 可自动启动 cloudflared 并上报 URL")
+        print(f"  cloudflared tunnel --url http://localhost:{args.port}")
+        print()
 
     app.run(host="0.0.0.0", port=args.port, debug=False)
