@@ -209,33 +209,43 @@ def _run_brain(final_text: str, raw_text: str, enhanced_meta: Optional[dict]) ->
                 prog.progress(i / step_count, text=f"步骤 {i + 1}/{step_count}：{label}…")
                 st.write(f"⏳ **步骤 {i + 1}**：{label} — {step.reason or ''}")
 
-                tool = _get_tool(step.tool)
-                t0 = _time.time()
+                # Delegate to brain so retry+LLM-repair is exercised here too.
+                exec_record = run_async(
+                    brain._run_step_with_repair(
+                        index=i,
+                        step=step,
+                        prior_results=prior_results,
+                    )
+                )
+                row = {
+                    "index": exec_record.index,
+                    "tool": exec_record.tool,
+                    "args": exec_record.args,
+                    "ok": exec_record.ok,
+                    "result": exec_record.result,
+                    "error": exec_record.error,
+                    "elapsed_ms": exec_record.elapsed_ms,
+                    "attempts": exec_record.attempts,
+                    "repair_notes": exec_record.repair_notes,
+                }
+                executions.append(row)
 
-                if tool is None:
-                    err = f"未知工具：{step.tool!r}"
-                    executions.append({"index": i, "tool": step.tool, "args": step.args,
-                                       "ok": False, "result": None, "error": err, "elapsed_ms": 0})
-                    st.error(f"❌ {err}")
-                    prog.progress(i / step_count, text=f"❌ 步骤 {i + 1} 失败")
-                    break
-
-                try:
-                    resolved = _resolve_placeholders(step.args, prior_results)
-                    result = run_async(tool.handler(**resolved))
-                    elapsed = int((_time.time() - t0) * 1000)
-                    prior_results.append(result)
-                    executions.append({"index": i, "tool": step.tool, "args": resolved,
-                                       "ok": True, "result": result, "error": None,
-                                       "elapsed_ms": elapsed})
-                    st.write(f"\u3000\u3000✅ 完成（{elapsed} ms）")
-                except Exception as exc:  # noqa: BLE001
-                    elapsed = int((_time.time() - t0) * 1000)
-                    err_msg = f"{type(exc).__name__}: {exc}"
-                    executions.append({"index": i, "tool": step.tool, "args": step.args,
-                                       "ok": False, "result": None, "error": err_msg,
-                                       "elapsed_ms": elapsed})
-                    st.error(f"❌ 步骤 {i + 1} 失败：{err_msg}")
+                if exec_record.ok:
+                    suffix = (
+                        f"（{exec_record.elapsed_ms} ms，重试 {exec_record.attempts - 1} 次"
+                        f"，修复：{exec_record.repair_notes}）"
+                        if exec_record.attempts > 1 and exec_record.repair_notes
+                        else f"（{exec_record.elapsed_ms} ms）"
+                    )
+                    prior_results.append(exec_record.result)
+                    st.write(f"\u3000\u3000✅ 完成{suffix}")
+                else:
+                    st.error(
+                        f"❌ 步骤 {i + 1} 失败（尝试 {exec_record.attempts} 次）："
+                        f"{exec_record.error}"
+                    )
+                    if exec_record.repair_notes:
+                        st.caption(f"🛠️ 修复尝试记录：{exec_record.repair_notes}")
                     prog.progress(i / step_count, text=f"❌ 步骤 {i + 1} 失败")
                     break
 

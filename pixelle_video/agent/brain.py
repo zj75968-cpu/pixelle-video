@@ -50,6 +50,17 @@ class StepExecution(BaseModel):
     result: Optional[Any] = None
     error: Optional[str] = None
     elapsed_ms: int = 0
+    attempts: int = 1
+    repair_notes: Optional[str] = None
+
+
+class RepairedStep(BaseModel):
+    """LLM-corrected version of a failed step."""
+
+    tool: str = Field(description="工具名（通常与失败步骤一致；若需换工具可改）")
+    args: Dict[str, Any] = Field(default_factory=dict)
+    reason: str = Field(default="", description="修复思路（中文一句话）")
+    give_up: bool = Field(default=False, description="如果无法修复请置 true 让 Agent 停止")
 
 
 class AgentRunResult(BaseModel):
@@ -159,8 +170,51 @@ def _resolve_placeholders(args: Dict[str, Any], prior_results: List[Any]) -> Dic
     return {k: _resolve_one(v) for k, v in args.items()}
 
 
+def _classify_error(exc: Exception, tool=None) -> str:
+    """Turn a raw exception into an LLM-friendly diagnostic string.
+
+    The goal is to give the repair LLM enough context to fix the args:
+    explicitly call out missing / unexpected keyword arguments, validation
+    errors, and external resource failures.
+    """
+    etype = type(exc).__name__
+    msg = str(exc) or repr(exc)
+
+    if isinstance(exc, TypeError):
+        # e.g. _enqueue_publish() missing 1 required positional argument: 'title'
+        #      _enqueue_publish() got an unexpected keyword argument 'devid'
+        hint = ""
+        if "missing" in msg and "required" in msg:
+            hint = "（修复方向：在 args 里补上缺失的字段）"
+        elif "unexpected keyword argument" in msg:
+            hint = "（修复方向：从 args 中删掉这个非法字段，或改成 schema 里允许的字段名）"
+        elif "positional" in msg:
+            hint = "（修复方向：检查参数是不是写成了位置参数；agent 调用都用关键字参数）"
+        return f"{etype}: {msg}{hint}"
+
+    if isinstance(exc, ValueError):
+        return f"{etype}: {msg}（修复方向：值类型/枚举/范围不合法，按 schema 调整）"
+
+    if isinstance(exc, KeyError):
+        return f"{etype}: missing key {msg}（修复方向：上一步结果里没有该字段，检查占位符路径）"
+
+    if isinstance(exc, FileNotFoundError):
+        return f"{etype}: {msg}（修复方向：路径不存在，确认是否需要先 generate_video 或纠正占位符）"
+
+    if isinstance(exc, RuntimeError):
+        # Common for "No Android device connected" / "LLM service not configured".
+        return f"{etype}: {msg}（修复方向：运行时前置条件不满足，可能需要换工具或换设备）"
+
+    # Generic fallback.
+    return f"{etype}: {msg}"
+
+
 class AgentBrain:
     """Orchestrates planning + execution for one instruction."""
+
+    # How many LLM-driven repair attempts to allow per failing step before
+    # giving up. Total tries per step = 1 (original) + MAX_STEP_REPAIRS.
+    MAX_STEP_REPAIRS: int = 2
 
     def __init__(self, llm=None):
         """`llm` is a LLMService instance; defaults to pixelle_video.llm.
@@ -206,36 +260,198 @@ class AgentBrain:
         executions: List[StepExecution] = []
         prior_results: List[Any] = []
         for i, step in enumerate(plan.steps):
-            tool = get_tool(step.tool)
+            exec_record = await self._run_step_with_repair(
+                index=i,
+                step=step,
+                prior_results=prior_results,
+            )
+            executions.append(exec_record)
+            if not exec_record.ok:
+                break
+            prior_results.append(exec_record.result)
+        return executions
+
+    async def _run_step_with_repair(
+        self,
+        index: int,
+        step: AgentStep,
+        prior_results: List[Any],
+    ) -> StepExecution:
+        """Run a single step, asking the LLM to repair invalid args on failure.
+
+        Total tries = 1 + MAX_STEP_REPAIRS. Returns the final StepExecution
+        (success on first/repaired try, or failure after exhausting retries).
+        """
+        current_tool_name = step.tool
+        current_args = step.args
+        current_reason = step.reason
+        repair_history: List[Dict[str, str]] = []
+        attempts = 0
+        last_error: Optional[str] = None
+        last_resolved_args: Dict[str, Any] = dict(current_args)
+
+        max_tries = 1 + max(0, self.MAX_STEP_REPAIRS)
+        for attempt_no in range(1, max_tries + 1):
+            attempts = attempt_no
+            tool = get_tool(current_tool_name)
             t0 = time.time()
             if tool is None:
-                err = f"Unknown tool: {step.tool!r}"
-                logger.error(f"[agent] step {i} {err}")
-                executions.append(StepExecution(
-                    index=i, tool=step.tool, args=step.args,
-                    ok=False, error=err, elapsed_ms=0,
-                ))
+                last_error = (
+                    f"Unknown tool: {current_tool_name!r}. "
+                    f"Available: {[t.name for t in TOOLS]}"
+                )
+                logger.error(f"[agent] step {index} attempt {attempt_no}: {last_error}")
+            else:
+                try:
+                    resolved = _resolve_placeholders(current_args, prior_results)
+                    last_resolved_args = resolved
+                    logger.info(
+                        f"[agent] step {index} attempt {attempt_no}: "
+                        f"{current_tool_name}({resolved})"
+                    )
+                    result = await tool.handler(**resolved)
+                    return StepExecution(
+                        index=index,
+                        tool=current_tool_name,
+                        args=resolved,
+                        ok=True,
+                        result=result,
+                        elapsed_ms=int((time.time() - t0) * 1000),
+                        attempts=attempt_no,
+                        repair_notes=("; ".join(h["reason"] for h in repair_history) or None),
+                    )
+                except Exception as e:  # noqa: BLE001
+                    last_error = _classify_error(e, tool)
+                    logger.warning(
+                        f"[agent] step {index} attempt {attempt_no} failed: {last_error}"
+                    )
+
+            # If we've used all attempts, stop.
+            if attempt_no >= max_tries:
                 break
 
+            # Ask LLM for a repaired step.
             try:
-                resolved = _resolve_placeholders(step.args, prior_results)
-                logger.info(f"[agent] step {i}: {step.tool}({resolved})")
-                result = await tool.handler(**resolved)
-                prior_results.append(result)
-                executions.append(StepExecution(
-                    index=i, tool=step.tool, args=resolved,
-                    ok=True, result=result,
-                    elapsed_ms=int((time.time() - t0) * 1000),
-                ))
-            except Exception as e:  # noqa: BLE001
-                logger.exception(f"[agent] step {i} failed")
-                executions.append(StepExecution(
-                    index=i, tool=step.tool, args=step.args,
-                    ok=False, error=f"{type(e).__name__}: {e}",
-                    elapsed_ms=int((time.time() - t0) * 1000),
-                ))
+                repaired = await self._repair_step(
+                    step_index=index,
+                    failed_tool=current_tool_name,
+                    failed_args=current_args,
+                    failed_reason=current_reason,
+                    error=last_error or "<unknown>",
+                    prior_results=prior_results,
+                    history=repair_history,
+                )
+            except Exception as repair_exc:  # noqa: BLE001
+                logger.warning(
+                    f"[agent] step {index}: repair LLM call failed: {repair_exc}; aborting"
+                )
                 break
-        return executions
+
+            if repaired.give_up:
+                logger.info(f"[agent] step {index}: LLM gave up repair ({repaired.reason})")
+                last_error = f"{last_error} | LLM gave up: {repaired.reason}"
+                break
+
+            repair_history.append({
+                "from_tool": current_tool_name,
+                "from_args": json.dumps(current_args, ensure_ascii=False),
+                "error": last_error or "",
+                "reason": repaired.reason or "",
+            })
+            current_tool_name = repaired.tool
+            current_args = repaired.args
+            current_reason = repaired.reason
+
+        # All attempts exhausted.
+        return StepExecution(
+            index=index,
+            tool=current_tool_name,
+            args=last_resolved_args,
+            ok=False,
+            error=last_error,
+            elapsed_ms=0,
+            attempts=attempts,
+            repair_notes=("; ".join(h["reason"] for h in repair_history) or None),
+        )
+
+    async def _repair_step(
+        self,
+        step_index: int,
+        failed_tool: str,
+        failed_args: Dict[str, Any],
+        failed_reason: str,
+        error: str,
+        prior_results: List[Any],
+        history: List[Dict[str, str]],
+    ) -> RepairedStep:
+        """Ask the LLM to produce a corrected step given the failure context."""
+        await self._ensure_llm()
+        tool_spec = get_tool(failed_tool)
+        tool_schema_json = (
+            json.dumps(
+                {
+                    "name": tool_spec.name,
+                    "description": tool_spec.description,
+                    "args_schema": tool_spec.args_schema,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            if tool_spec is not None
+            else json.dumps(tools_manifest(), ensure_ascii=False)
+        )
+
+        # Compact prior-result summaries so the LLM can re-target placeholders.
+        prior_summary = []
+        for i, r in enumerate(prior_results):
+            try:
+                preview = json.dumps(r, ensure_ascii=False, default=str)
+            except Exception:  # noqa: BLE001
+                preview = str(r)
+            if len(preview) > 800:
+                preview = preview[:800] + "...<truncated>"
+            prior_summary.append({"step": i, "result_preview": preview})
+
+        history_block = (
+            "\n以下是之前的修复尝试（最新在最后）：\n"
+            + json.dumps(history, ensure_ascii=False, indent=2)
+            if history else ""
+        )
+
+        repair_prompt = f"""你正在修复 Pixelle-Video Agent 的一个失败步骤。
+
+失败步骤：
+  index = {step_index}
+  tool  = {failed_tool}
+  args  = {json.dumps(failed_args, ensure_ascii=False)}
+  reason = {failed_reason!r}
+
+错误信息：
+  {error}
+
+该工具完整 schema：
+{tool_schema_json}
+
+已执行步骤的返回值预览（用于占位符引用）：
+{json.dumps(prior_summary, ensure_ascii=False, indent=2)}
+{history_block}
+
+修复规则：
+1. 优先**只调整 args**——比如补缺失字段、删多余字段、转换类型、修正占位符路径。
+2. 占位符语法： "${{steps[i].result.<field>}}"，i 必须 < {len(prior_results)}。
+3. 不要使用 schema 不允许的字段；若不知道某字段值，留空即可。
+4. 如果错误来源是"工具不存在"或本步骤根本无法修复，请设 give_up=true 并简要说明。
+5. 返回的 tool 通常应等于 {failed_tool}；如确有必要换工具，必须用清单中存在的工具名。
+
+请输出修复后的 RepairedStep（JSON）。"""
+
+        repaired: RepairedStep = await self._llm(
+            prompt=repair_prompt,
+            response_type=RepairedStep,
+            temperature=0.1,
+            max_tokens=600,
+        )
+        return repaired
 
     async def run(self, instruction: str) -> AgentRunResult:
         try:
