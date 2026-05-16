@@ -236,7 +236,11 @@ _TOOL_LABELS: dict = {
 
 
 # ---- 第二步：执行 ----------------------------------------------------------
-def _run_brain(final_text: str, raw_text: str, enhanced_meta: Optional[dict]) -> None:
+def _run_brain(
+    final_text: str, raw_text: str, enhanced_meta: Optional[dict],
+    *, preset_steps: list | None = None, resume_from: int = 0,
+    initial_prior_results: list | None = None,
+) -> None:
     """Plan + execute via AgentBrain with live step-by-step progress."""
     import time as _time
 
@@ -244,28 +248,47 @@ def _run_brain(final_text: str, raw_text: str, enhanced_meta: Optional[dict]) ->
 
     with st.status("🧠 Agent 执行中…", expanded=True) as _status:
         # ── Phase 1: Planning ────────────────────────────────────────────────
-        st.write("📋 正在分析指令，生成执行计划…")
-        try:
-            plan = run_async(brain.plan(final_text))
-        except Exception as e:  # noqa: BLE001
-            _status.update(label="❌ 规划失败", state="error", expanded=True)
-            st.error(f"规划失败：{type(e).__name__}: {e}")
-            return
-
-        step_count = len(plan.steps)
-        st.write(f"✅ **规划完成**：{plan.summary}（共 {step_count} 步）")
-        if plan.notes:
-            st.caption(f"💡 {plan.notes}")
+        if preset_steps is not None:
+            plan_steps = preset_steps
+            _trim = raw_text[:40] + ("…" if len(raw_text) > 40 else "")
+            _plan_summary = f"恢复执行：{_trim}"
+            _plan_dict: dict = {
+                "summary": _plan_summary,
+                "steps": [s.model_dump() for s in preset_steps],
+                "notes": None,
+            }
+            step_count = len(plan_steps)
+            st.write(f"⏩ **恢复执行**（从步骤 {resume_from + 1} 开始，共 {step_count} 步）")
+        else:
+            st.write("📋 正在分析指令，生成执行计划…")
+            try:
+                plan = run_async(brain.plan(final_text))
+            except Exception as e:  # noqa: BLE001
+                _status.update(label="❌ 规划失败", state="error", expanded=True)
+                st.error(f"规划失败：{type(e).__name__}: {e}")
+                return
+            plan_steps = plan.steps
+            try:
+                _plan_dict = json.loads(plan.model_dump_json())
+            except Exception:  # noqa: BLE001
+                _plan_dict = plan.model_dump()
+            _plan_summary = plan.summary
+            step_count = len(plan_steps)
+            st.write(f"✅ **规划完成**：{_plan_summary}（共 {step_count} 步）")
+            if plan.notes:
+                st.caption(f"💡 {plan.notes}")
 
         # ── Phase 2: Execution ───────────────────────────────────────────────
         executions: list = []
-        prior_results: list = []
+        prior_results: list = list(initial_prior_results or [])
 
         if step_count == 0:
-            _status.update(label=f"✅ {plan.summary}", state="complete", expanded=False)
+            _status.update(label=f"✅ {_plan_summary}", state="complete", expanded=False)
         else:
             prog = st.progress(0, text="准备执行…")
-            for i, step in enumerate(plan.steps):
+            for i, step in enumerate(plan_steps):
+                if i < resume_from:
+                    continue
                 label = _TOOL_LABELS.get(step.tool, step.tool)
                 prog.progress(i / step_count, text=f"步骤 {i + 1}/{step_count}：{label}…")
                 st.write(f"⏳ **步骤 {i + 1}**：{label} — {step.reason or ''}")
@@ -286,7 +309,7 @@ def _run_brain(final_text: str, raw_text: str, enhanced_meta: Optional[dict]) ->
                         st.warning("⚠️ 没有已连接设备，请在下方手动选择设备后入队")
                         prog.progress(i / step_count, text="⚠️ 等待人工选择设备…")
                         _status.update(
-                            label=f"⚠️ {plan.summary}（等待选择设备）",
+                            label=f"⚠️ {_plan_summary}（等待选择设备）",
                             state="error", expanded=True,
                         )
                         break
@@ -334,21 +357,16 @@ def _run_brain(final_text: str, raw_text: str, enhanced_meta: Optional[dict]) ->
             all_ok = bool(executions) and all(e.get("ok") for e in executions)
             prog.progress(1.0, text="✅ 全部完成" if all_ok else "⚠️ 执行中止")
             _status.update(
-                label=f"{'✅ 完成' if all_ok else '❌ 部分失败'}：{plan.summary}",
+                label=f"{'✅ 完成' if all_ok else '❌ 部分失败'}：{_plan_summary}",
                 state="complete" if all_ok else "error",
                 expanded=not all_ok,
             )
 
     # ── Save to history ──────────────────────────────────────────────────────
-    try:
-        plan_dict = json.loads(plan.model_dump_json())
-    except Exception:  # noqa: BLE001
-        plan_dict = plan.model_dump()
-
     all_ok_outer = bool(executions) and all(e.get("ok") for e in executions)
     run_dict = {
         "instruction": final_text,
-        "plan": plan_dict,
+        "plan": _plan_dict,
         "executions": executions,
         "ok": all_ok_outer,
         "error": None if all_ok_outer else (executions[-1].get("error") if executions else "无步骤执行"),
@@ -383,6 +401,29 @@ if enhanced_text_pending:
     hint = _compose_hint()
     final_with_hint = f"{hint}\n{enhanced_text_pending}" if hint else enhanced_text_pending
     _run_brain(final_text=final_with_hint, raw_text=raw, enhanced_meta=meta)
+
+# ---- 历史恢复/重试执行 -------------------------------------------------------
+_resume_run = st.session_state.pop("_resume_run", None)
+if _resume_run:
+    from pixelle_video.agent.brain import AgentStep as _AgentStep
+    _preset = [_AgentStep(**s) for s in _resume_run["steps"]]
+    _run_brain(
+        final_text=_resume_run["instruction"],
+        raw_text=_resume_run["raw"],
+        enhanced_meta=None,
+        preset_steps=_preset,
+        resume_from=_resume_run["from_step"],
+        initial_prior_results=_resume_run.get("prior_results") or [],
+    )
+
+_retry_run = st.session_state.pop("_retry_run", None)
+if _retry_run:
+    _run_brain(
+        final_text=_retry_run["instruction"],
+        raw_text=_retry_run["raw"],
+        enhanced_meta=None,
+    )
+
 # ---- 人工选择发布设备（当 recommend_device 返回空 picks 时） -----------------
 _pending_eq = st.session_state.get("_pending_enqueue")
 if _pending_eq:
@@ -517,7 +558,45 @@ else:
                     elif ex:
                         st.error(ex.get("error") or "失败")
                     else:
-                        st.write("（未执行）")
+                        st.caption("（未执行）")
+                        if st.button(
+                            "▶️ 从此步开始", key=f"run_from_{idx}_{i}",
+                            help=f"保留前 {i} 步的成功结果，从步骤 {i + 1} 开始恢复执行",
+                        ):
+                            _prior = [e["result"] for e in executions[:i] if e.get("ok")]
+                            st.session_state["_resume_run"] = {
+                                "instruction": run["instruction"],
+                                "raw": run.get("raw_instruction", run["instruction"]),
+                                "steps": steps,
+                                "from_step": i,
+                                "prior_results": _prior,
+                            }
+                            st.rerun()
 
             if not ok and run.get("error"):
                 st.error(run["error"])
+
+            # ── 恢复/重试按钮 ─────────────────────────────────────────────────
+            if not ok and steps:
+                _n_exec = len(executions)
+                _has_unexec = 0 < _n_exec < len(steps)
+                _rbtn_c1, _rbtn_c2, _ = st.columns([1, 1, 4])
+                if _rbtn_c1.button("🔄 重新执行", key=f"retry_{idx}", help="从头完整重跑此指令"):
+                    st.session_state["_retry_run"] = {
+                        "instruction": run["instruction"],
+                        "raw": run.get("raw_instruction", run["instruction"]),
+                    }
+                    st.rerun()
+                if _has_unexec and _rbtn_c2.button(
+                    "⏩ 继续执行", key=f"resume_{idx}",
+                    help=f"跳过前 {_n_exec} 步，从步骤 {_n_exec + 1} 开始",
+                ):
+                    _prior = [e["result"] for e in executions if e.get("ok")]
+                    st.session_state["_resume_run"] = {
+                        "instruction": run["instruction"],
+                        "raw": run.get("raw_instruction", run["instruction"]),
+                        "steps": steps,
+                        "from_step": _n_exec,
+                        "prior_results": _prior,
+                    }
+                    st.rerun()

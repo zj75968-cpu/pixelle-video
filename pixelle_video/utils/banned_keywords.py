@@ -401,6 +401,55 @@ def append_prompt_block(prompt: str, *, language: str = "auto") -> str:
 
 # ---- 审计日志 ---------------------------------------------------------------
 
+_AUDIT_FILE = _DATA_DIR / "banned_audit.log"
+_audit_lock = threading.Lock()
+
+
+def append_audit(
+    *,
+    task_id: str,
+    serial: str,
+    job_id: str,
+    hits: List[str],
+) -> None:
+    """向 data/banned_audit.log 追加一条 JSONL 审计记录。"""
+    entry = {
+        "ts": datetime.now().isoformat(),
+        "task_id": task_id,
+        "serial": serial,
+        "job_id": job_id,
+        "hits": list(hits),
+    }
+    line = json.dumps(entry, ensure_ascii=False)
+    with _audit_lock:
+        _DATA_DIR.mkdir(parents=True, exist_ok=True)
+        with open(_AUDIT_FILE, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+
+
+def read_audit(last_n: int = 50) -> List[dict]:
+    """读取最近 last_n 条审计记录，按时间升序返回。"""
+    with _audit_lock:
+        if not _AUDIT_FILE.exists():
+            return []
+        try:
+            lines = _AUDIT_FILE.read_text(encoding="utf-8").splitlines()
+        except Exception:
+            return []
+    records: List[dict] = []
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            records.append(json.loads(line))
+        except Exception:
+            continue
+    return records[-last_n:]
+
+
+# ---- 审计日志 ---------------------------------------------------------------
+
 def _audit_log_path() -> "Path":
     from pathlib import Path
     p = Path(__file__).resolve().parents[2] / "data" / "banned_audit.log"
