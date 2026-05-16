@@ -224,6 +224,77 @@ def open_app_http(
         return False
 
 
+def publish_http(
+    title: str,
+    agent_url: str,
+    token: str = "",
+    body: str = "",
+    hashtags: Optional[list[str]] = None,
+    media_path: str = "",
+    platform: str = "xhs",
+    timeout: int = 15,
+) -> dict:
+    """
+    调用手机 HTTP Agent 的 /publish 接口，在手机本地用 uiautomator2 发布内容。
+    手机端需已安装 uiautomator2（pip install uiautomator2）并完成 init。
+
+    Returns:
+        {"ok": True, "task_id": "..."}  — 异步任务已提交
+        {"ok": False, "error": "..."}   — 提交失败
+    """
+    try:
+        session = _make_session(token)
+        resp = session.post(
+            f"{agent_url.rstrip('/')}/publish",
+            json={
+                "title": title,
+                "body": body,
+                "hashtags": hashtags or [],
+                "media_path": media_path,
+                "platform": platform,
+            },
+            timeout=timeout,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except requests.RequestException as e:
+        logger.error(f"publish_http: {e}")
+        return {"ok": False, "error": str(e)}
+
+
+def wait_for_publish(
+    task_id: str,
+    agent_url: str,
+    token: str = "",
+    poll_interval: float = 3.0,
+    max_wait: float = 300.0,
+) -> dict:
+    """
+    轮询 /publish-status/<task_id> 直到任务完成（success/failed）或超时。
+
+    Returns:
+        {"status": "success"/"failed", "message": "..."}
+    """
+    deadline = time.time() + max_wait
+    session = _make_session(token)
+    url = f"{agent_url.rstrip('/')}/publish-status/{task_id}"
+
+    while time.time() < deadline:
+        try:
+            resp = session.get(url, timeout=10)
+            resp.raise_for_status()
+            result = resp.json()
+            status = result.get("status", "")
+            logger.debug(f"wait_for_publish [{task_id[:8]}]: {status} — {result.get('message', '')}")
+            if status in ("success", "failed"):
+                return result
+        except requests.RequestException as e:
+            logger.warning(f"wait_for_publish poll error: {e}")
+        time.sleep(poll_interval)
+
+    return {"status": "failed", "message": "等待超时"}
+
+
 def push_images_auto(
     local_paths: list[str],
     serial: str = "",

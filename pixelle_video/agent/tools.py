@@ -148,6 +148,7 @@ async def _enqueue_publish(
     hashtags: Optional[List[str]] = None,
     device_serial: Optional[str] = None,
     scheduled_at: Optional[str] = None,
+    use_schedule: bool = False,
     kind: str = "video",
     dry_run: bool = False,
 ) -> Dict[str, Any]:
@@ -198,6 +199,16 @@ async def _enqueue_publish(
         else:
             logger.warning(f"[agent] image_text: no composed images in {frames_dir}, falling back to video path")
 
+    # 按每日计划自动安排：若 use_schedule=True 且未手动指定 scheduled_at，
+    # 则从 daily_schedule_times 中取该设备下一个未被占用的时间槽。
+    if use_schedule and not scheduled_at:
+        next_slot = publish_scheduler.next_available_slot(serial)
+        if next_slot:
+            scheduled_at = next_slot.isoformat()
+            logger.info(f"[agent] use_schedule: assigned slot {scheduled_at} for {serial}")
+        else:
+            logger.warning(f"[agent] use_schedule: no available slot found for {serial}; queuing immediately")
+
     job = publish_scheduler.add_job(
         serial=serial,
         task_id=f"agent-{uuid.uuid4().hex[:8]}",
@@ -217,6 +228,53 @@ async def _enqueue_publish(
         "scheduled_at": job.scheduled_at,
         "dry_run": job.dry_run,
     }
+
+
+async def _phone_publish(
+    title: str,
+    media_path: str = "",
+    body: str = "",
+    hashtags: Optional[List[str]] = None,
+    wait: bool = True,
+    platform: str = "xhs",
+) -> Dict[str, Any]:
+    """通过手机 HTTP Agent 发布内容（手机本地 uiautomator2 自控，无需 ADB/USB）。"""
+    import asyncio
+    from pixelle_video.config import config_manager
+    from pixelle_video.services.phone_agent_client import publish_http, wait_for_publish
+
+    cfg = config_manager.config
+    agent_url = cfg.phone_agent.url.strip()
+    agent_token = cfg.phone_agent.token.strip()
+
+    if not agent_url:
+        raise RuntimeError(
+            "未配置 phone_agent.url，请在设置页面填写手机 HTTP Agent 地址（如 http://192.168.x.x:7777）"
+        )
+
+    result = publish_http(
+        title=title,
+        agent_url=agent_url,
+        token=agent_token,
+        body=body,
+        hashtags=list(hashtags or []),
+        media_path=media_path,
+        platform=platform,
+    )
+    if not result.get("ok"):
+        raise RuntimeError(f"phone_publish 提交失败: {result.get('error')}")
+
+    task_id = result["task_id"]
+    logger.info(f"[agent] phone_publish: task_id={task_id}")
+
+    if wait:
+        final = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: wait_for_publish(task_id, agent_url=agent_url, token=agent_token, max_wait=300),
+        )
+        return {"task_id": task_id, **final}
+
+    return {"task_id": task_id, "status": "queued", "message": "任务已提交（未等待）"}
 
 
 async def _list_tasks(
@@ -595,6 +653,8 @@ TOOLS: List[ToolSpec] = [
             "把已生成的视频加入小红书发布队列。video_path 必填，可由 generate_video 的返回值给出。"
             "kind 可选 video（视频笔记，默认）或 image_text（图文笔记，自动取场景合成图）。"
             "若未指定 device_serial，自动选取第一台已连接设备。"
+            "若希望按每日计划自动分配时间，设置 use_schedule=true；"
+            "或手动指定 scheduled_at（ISO-8601）；两者都不填则立即发布。"
         ),
         args_schema={
             "type": "object",
@@ -615,6 +675,14 @@ TOOLS: List[ToolSpec] = [
                     "type": "string",
                     "description": "可选 ISO-8601 计划发布时间，留空表示立即发布",
                 },
+                "use_schedule": {
+                    "type": "boolean",
+                    "description": (
+                        "true 表示按每日计划自动安排：从配置的时间段中取该设备下一个未被占用的时间槽。"
+                        "与 scheduled_at 互斥；scheduled_at 有值时忽略本参数。"
+                    ),
+                    "default": False,
+                },
                 "kind": {
                     "type": "string",
                     "enum": ["video", "image_text"],
@@ -633,6 +701,45 @@ TOOLS: List[ToolSpec] = [
             "required": ["video_path", "title"],
         },
         handler=_enqueue_publish,
+    ),
+    ToolSpec(
+        name="phone_publish",
+        description=(
+            "通过手机 HTTP Agent 在手机本地发布小红书内容（无需 USB/ADB）。"
+            "手机端运行 phone_agent.py，使用本机 uiautomator2 自动操作 XHS 界面。"
+            "需在设置页面配置 phone_agent.url 和 token。"
+            "media_path 为手机本地媒体文件路径（先用 push_file 推送，或留空仅发纯文字笔记）。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "title": {"type": "string", "description": "笔记标题（必填，最多20字）"},
+                "media_path": {
+                    "type": "string",
+                    "description": "手机端媒体文件路径，如 /sdcard/DCIM/PixelleVideo/xxx.mp4",
+                    "default": "",
+                },
+                "body": {"type": "string", "description": "笔记正文", "default": ""},
+                "hashtags": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "话题标签，如 [\"健康\", \"养生\"]",
+                },
+                "wait": {
+                    "type": "boolean",
+                    "description": "true（默认）= 等待发布完成再返回；false = 立即返回 task_id 异步查询",
+                    "default": True,
+                },
+                "platform": {
+                    "type": "string",
+                    "enum": ["xhs"],
+                    "description": "目标平台，目前仅支持 xhs（小红书）",
+                    "default": "xhs",
+                },
+            },
+            "required": ["title"],
+        },
+        handler=_phone_publish,
     ),
     ToolSpec(
         name="list_jobs",

@@ -58,8 +58,10 @@ STATUS_BADGE = {
     "scheduled": "🕐 已计划",
     "running":   "🔵 发布中",
     "success":   "✅ 成功",
+    "done":      "✅ 成功",
     "failed":    "❌ 失败",
     "cancelled": "⛔ 已取消",
+    "deleted":   "🗑️ 已删除",
 }
 
 PUBLISH_FORM_KEYS = {
@@ -698,6 +700,30 @@ def render_publish_tab():
     dm = get_device_manager()
     _init_publish_form_defaults()
 
+    # ── 每日定时计划配置（行内，无需跳转到设置页）──────────────
+    with st.expander("📅 每日发布计划", expanded=False):
+        st.caption("设置每天自动发布的时间段（24 小时制 HH:MM，每行一个）。\n选择「按计划自动安排」时，系统自动将任务分配到下一个未被占用的时间槽。")
+        _times_val = "\n".join(_xhs_cfg.daily_schedule_times)
+        _new_times_raw = st.text_area(
+            "发布时间段",
+            value=_times_val,
+            height=120,
+            key="inline_xhs_schedule_times",
+            placeholder="09:00\n12:00\n18:00",
+        )
+        if st.button("💾 保存时间段", key="save_inline_schedule"):
+            _parsed = [t.strip() for t in _new_times_raw.splitlines() if t.strip() and ":" in t.strip()]
+            if not _parsed:
+                st.error("请至少填写一个有效时间（格式 HH:MM）")
+            else:
+                try:
+                    _cm.update({"xhs_publish": {"daily_schedule_times": _parsed}})
+                    _cm.save()
+                    st.success(f"✅ 已保存 {len(_parsed)} 个时间段：{', '.join(_parsed)}")
+                    st.rerun()
+                except Exception as _e:
+                    st.error(f"保存失败：{_e}")
+
     # New publish job form
     with st.expander(
         "➕ 新建发布任务",
@@ -742,6 +768,32 @@ def render_publish_tab():
                 key=PUBLISH_FORM_KEYS["images_raw"],
                 height=100,
             )
+
+            # Post type & TTL
+            post_type_col1, post_type_col2 = st.columns([1, 2])
+            with post_type_col1:
+                post_type = st.selectbox(
+                    "帖子类型",
+                    options=["content", "traffic"],
+                    format_func=lambda x: "📚 干货帖（长期保留）" if x == "content" else "📢 引流帖（可自动删除）",
+                    key="post_type_select",
+                )
+            with post_type_col2:
+                delete_after_hours: float | None = None
+                if post_type == "traffic":
+                    delete_after_hours = st.number_input(
+                        "⏱️ 自动删除倒计时（小时）",
+                        min_value=1.0,
+                        max_value=720.0,
+                        value=24.0,
+                        step=1.0,
+                        help="发布成功后，经过指定小时数自动删除帖子（0 = 不自动删除）",
+                        key="delete_after_hours_input",
+                    )
+                    if delete_after_hours <= 0:
+                        delete_after_hours = None
+                else:
+                    st.caption("干货帖不设自动删除")
 
             schedule_col1, schedule_col2 = st.columns([1, 2])
             with schedule_col1:
@@ -851,6 +903,8 @@ def render_publish_tab():
                                 hashtags=hashtags,
                                 images=images,
                                 scheduled_at=_scheduled_at,
+                                post_type=post_type,
+                                delete_after_hours=delete_after_hours,
                             )
                             created_jobs.append(job.job_id)
                         except Exception as e:
@@ -870,7 +924,7 @@ def render_publish_tab():
     st.markdown("---")
     status_filter = st.selectbox(
         "筛选状态",
-        options=["全部", "pending", "scheduled", "running", "success", "failed", "cancelled"],
+        options=["全部", "pending", "scheduled", "running", "success", "done", "failed", "cancelled", "deleted"],
         index=0,
     )
     filter_val = None if status_filter == "全部" else status_filter
@@ -895,7 +949,11 @@ def _render_publish_queue_list(filter_val: str | None):
         badge = STATUS_BADGE.get(job.status, job.status)
         kind = getattr(job, "kind", "image_text") or "image_text"
         kind_tag = "🎬 视频" if kind == "video" else "🖼️ 图文"
-        label = f"{badge}  |  {kind_tag}  |  {job.title[:30]}  |  {job.serial}  |  {job.created_at[:16]}"
+        post_type = getattr(job, "post_type", "content") or "content"
+        type_tag = "📢 引流帖" if post_type == "traffic" else "📚 干货帖"
+        delete_after = getattr(job, "delete_after_hours", None)
+        ttl_tag = f"  |  ⏱️ TTL {delete_after}h" if delete_after else ""
+        label = f"{badge}  |  {kind_tag}  |  {type_tag}{ttl_tag}  |  {job.title[:30]}  |  {job.serial}  |  {job.created_at[:16]}"
         with st.expander(label):
             col1, col2 = st.columns([3, 1])
             with col1:
@@ -910,6 +968,8 @@ def _render_publish_queue_list(filter_val: str | None):
                 payload = {
                     "job_id": job.job_id,
                     "kind": kind,
+                    "post_type": post_type,
+                    "delete_after_hours": delete_after,
                     "device": job.serial,
                     "task_id": job.task_id,
                     "status": job.status,
@@ -924,6 +984,23 @@ def _render_publish_queue_list(filter_val: str | None):
                     payload["images"] = job.images
                 if elapsed is not None:
                     payload["running_seconds"] = elapsed
+
+                # Show TTL expiry for traffic posts
+                if delete_after and job.finished_at:
+                    try:
+                        expire_at = datetime.fromisoformat(job.finished_at) + timedelta(hours=delete_after)
+                        now = datetime.now()
+                        if now < expire_at:
+                            remaining = expire_at - now
+                            h, rem = divmod(int(remaining.total_seconds()), 3600)
+                            m = rem // 60
+                            payload["auto_delete_at"] = expire_at.strftime("%Y-%m-%d %H:%M")
+                            payload["delete_in"] = f"{h}h {m}m"
+                        else:
+                            payload["auto_delete_at"] = "已过期（等待下次检查）"
+                    except Exception:
+                        pass
+
                 st.json(payload)
 
                 # Inline preview for video jobs
@@ -950,6 +1027,17 @@ def _render_publish_queue_list(filter_val: str | None):
                     if st.button("❌ 取消", key=f"cancel_{job.job_id}"):
                         scheduler.cancel_job(job.job_id)
                         st.rerun()
+                # Delete button for completed posts
+                if job.status in ("done", "success") and job.status != "deleted":
+                    if st.button("🗑️ 删除帖子", key=f"delete_{job.job_id}"):
+                        import asyncio
+                        with st.spinner("正在删除帖子…"):
+                            ok = asyncio.run(scheduler.delete_post_now(job.job_id))
+                        if ok:
+                            st.success("帖子已删除")
+                            st.rerun()
+                        else:
+                            st.error("删除失败，请手动删除或查看日志")
 
 
 # ---- Main --------------------------------------------------------------------

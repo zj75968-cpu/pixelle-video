@@ -110,12 +110,22 @@ class XHSPublisher:
             logger.warning(f"Could not load xhs_ui_selectors.yaml: {exc}")
         return {}
 
-    def _click_by_selector_key(self, d, key: str, timeout: float = 10.0) -> bool:
+    def _click_by_selector_key(
+        self,
+        d,
+        key: str,
+        timeout: float = 10.0,
+        scroll_to_find: bool = False,
+    ) -> bool:
         """Try clicking an element by a named selector key from xhs_ui_selectors.yaml.
 
-        Strategy order: resource_id → text → description → fallback_texts.
-        Polls until ``timeout`` seconds have elapsed.
+        Strategy order: resource_id → text (exact) → text (contains) → description →
+                        description (contains) → fallback_texts (exact + contains).
+        If scroll_to_find is True (or YAML entry has scroll_to_find: true), after the
+        initial timeout the method performs two gentle swipes (up then down) and
+        retries each strategy once before giving up.
         Returns True on first successful click, False otherwise.
+        On failure, saves a debug screenshot to output/xhs_debug_<key>_<ts>.png.
         """
         sel = self._selectors.get(key, {})
         if not sel:
@@ -125,9 +135,9 @@ class XHSPublisher:
         text = sel.get("text")
         desc = sel.get("description")
         fallback_texts: list = sel.get("fallback_texts") or []
+        _scroll = scroll_to_find or bool(sel.get("scroll_to_find", False))
 
-        deadline = time.time() + timeout
-        while time.time() < deadline:
+        def _try_once() -> bool:
             if rid:
                 el = d(resourceId=rid)
                 if el.exists(timeout=0.5):
@@ -138,9 +148,18 @@ class XHSPublisher:
                 if el.exists(timeout=0.5):
                     el.click()
                     return True
+                # Contains fallback for minor text changes
+                el = d(textContains=text)
+                if el.exists(timeout=0.3):
+                    el.click()
+                    return True
             if desc:
                 el = d(description=desc)
                 if el.exists(timeout=0.5):
+                    el.click()
+                    return True
+                el = d(descriptionContains=desc)
+                if el.exists(timeout=0.3):
                     el.click()
                     return True
             for ft in fallback_texts:
@@ -152,7 +171,38 @@ class XHSPublisher:
                 if el.exists(timeout=0.3):
                     el.click()
                     return True
+            return False
+
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if _try_once():
+                return True
             time.sleep(0.5)
+
+        # Scroll-and-retry: gentle swipe up then down, try once each
+        if _scroll:
+            for _direction in ("up", "down"):
+                try:
+                    d.swipe_ext(_direction, scale=0.4)
+                    time.sleep(0.5)
+                except Exception:  # noqa: BLE001
+                    pass
+                if _try_once():
+                    return True
+
+        # Save debug screenshot on failure
+        try:
+            import os
+            from pathlib import Path as _P
+            _out = _P(__file__).resolve().parent.parent.parent / "output"
+            _out.mkdir(exist_ok=True)
+            _ts = int(time.time())
+            _img_path = _out / f"xhs_debug_{key}_{_ts}.png"
+            d.screenshot(str(_img_path))
+            logger.warning(f"[xhs] selector '{key}' not found; screenshot saved → {_img_path.name}")
+        except Exception as _se:
+            logger.debug(f"[xhs] screenshot on fail error: {_se}")
+
         return False
 
     def _get_device(self):
@@ -438,6 +488,32 @@ class XHSPublisher:
         except Exception as e:
             logger.warning(f"_adb_wakeup failed (non-fatal): {e}")
 
+    def _get_screen_timeout(self) -> int:
+        """Return current screen_off_timeout in ms (default 30000 on error)."""
+        import subprocess
+        try:
+            adb = shutil.which("adb") or "adb"
+            r = subprocess.run(
+                [adb, "-s", self.serial, "shell", "settings get system screen_off_timeout"],
+                timeout=5, capture_output=True, text=True,
+            )
+            return int(r.stdout.strip())
+        except Exception:
+            return 30000
+
+    def _set_screen_timeout(self, ms: int) -> None:
+        """Set screen_off_timeout in ms via ADB settings."""
+        import subprocess
+        try:
+            adb = shutil.which("adb") or "adb"
+            subprocess.run(
+                [adb, "-s", self.serial, "shell", f"settings put system screen_off_timeout {ms}"],
+                timeout=5, capture_output=True,
+            )
+            logger.debug(f"[{self.serial}] screen_off_timeout set to {ms} ms")
+        except Exception as e:
+            logger.warning(f"_set_screen_timeout failed (non-fatal): {e}")
+
     def _unlock_screen(self) -> None:
         """Wake up and unlock the device screen.
 
@@ -465,15 +541,29 @@ class XHSPublisher:
             return r.stdout
 
         try:
-            # 0. Skip wakeup if screen is already on
-            power_state = _adb_output("dumpsys", "power")
-            if "mWakefulness=Awake" in power_state or "mWakefulnessRaw=1" in power_state:
-                logger.info(f"[{self.serial}] Screen already awake, skipping unlock")
+            # 0. Check if keyguard (lock screen) is active via window manager.
+            #    mState=ON can be true on the lock screen, so we MUST check keyguard separately.
+            km_output = _adb_output("dumpsys", "window")
+            is_locked = (
+                "isKeyguardShowing=true" in km_output
+                or "mKeyguardShowing=true" in km_output
+                or "mShowingLockscreen=true" in km_output
+            )
+            display_state = _adb_output("dumpsys", "display")
+            screen_on = "mState=ON" in display_state or "mState=2" in display_state or "state=ON" in display_state
+
+            if screen_on and not is_locked:
+                logger.info(f"[{self.serial}] Screen on and unlocked, skipping unlock")
                 return
 
-            # 1. Wake up screen
+            # 1. Wake up screen: WAKEUP keyevent first, then check display
             _run("input", "keyevent", "224")
-            time.sleep(1.5)
+            time.sleep(1.0)
+            # Re-check: if still off, use POWER toggle once
+            display_state2 = _adb_output("dumpsys", "display")
+            if "mState=ON" not in display_state2 and "mState=2" not in display_state2 and "state=ON" not in display_state2:
+                _run("input", "keyevent", "26")  # POWER toggle ON
+                time.sleep(1.0)
 
             # 2. Get screen dimensions
             size_out = _adb_output("wm", "size")
@@ -539,16 +629,26 @@ class XHSPublisher:
         # Grant any immediate permissions
         self._grant_permissions(d)
         self._dismiss_blocking_dialogs(d)
+        self._adb_wakeup()  # 确保 app 启动后屏幕仍亮着
 
-        # Strict mode: do not use coordinate fallback.
-        # If key selectors are missing, fail fast to avoid mis-clicking arbitrary UI.
-        published = (
-            self._click_by_selector_key(d, "nav_publish", timeout=6)
-            or self._click_resource(d, f"{XHS_PACKAGE}:id/tab_add", timeout=6)
-            or self._click_resource(d, f"{XHS_PACKAGE}:id/create", timeout=3)
-            or self._click_desc(d, "发布", "加号", "创作", timeout=6)
-            or self._click_text(d, "+", "发笔记", "创作", timeout=6)
-        )
+        # 并联短超时：所有 selector 在同一轮内快速轮询，总耗时 ≤ 8s
+        def _try_publish_btn(timeout=8.0) -> bool:
+            deadline = time.time() + timeout
+            while time.time() < deadline:
+                if self._click_by_selector_key(d, "nav_publish", timeout=0.5):
+                    return True
+                if self._click_resource(d, f"{XHS_PACKAGE}:id/tab_add", timeout=0.5):
+                    return True
+                if self._click_resource(d, f"{XHS_PACKAGE}:id/create", timeout=0.5):
+                    return True
+                if self._click_desc(d, "发布", "加号", "创作", timeout=0.5):
+                    return True
+                if self._click_text(d, "+", "发笔记", "创作", timeout=0.5):
+                    return True
+                time.sleep(0.3)
+            return False
+
+        published = _try_publish_btn(timeout=8)
         if not published:
             self._screenshot(d, "open_publish_fail")
             if self.strict_mode:
@@ -562,6 +662,7 @@ class XHSPublisher:
             w, h = self._screen_size(d)
             d.click(w // 2, int(h * 0.972))
         time.sleep(2)
+        self._adb_wakeup()  # 防止屏幕在 selector 逐一尝试期间熟眠
         if not self._is_publish_chooser_screen(d):
             self._screenshot(d, "open_publish_wrong_screen")
             if self.strict_mode:
@@ -571,7 +672,7 @@ class XHSPublisher:
                 )
             logger.warning("Did not enter creation screen; compatible mode: continuing anyway")
 
-    def _select_image_text_mode(self, d):
+
         """Select image-text post type (图文).
 
         After tapping the publish (+) button, XHS shows a camera/creation page
@@ -968,6 +1069,103 @@ class XHSPublisher:
                 self._cleanup_device_images(device_paths)
 
     # -------------------------------------------------------------------------
+    # Delete Post API
+    # -------------------------------------------------------------------------
+
+    def _delete_post_sync(self, post_title: str) -> bool:
+        """
+        Navigate to My Profile → Notes, find the post by title, and delete it.
+
+        Strategy:
+          1. Open XHS → profile tab
+          2. Tap "发布" notes list (first tab under profile)
+          3. Long-press the note matching post_title
+          4. Tap "删除" in the context menu
+          5. Confirm deletion dialog
+        Returns True if the post was deleted, False otherwise.
+        """
+        import subprocess
+
+        adb = shutil.which("adb") or "adb"
+
+        def _run(*args: str):
+            subprocess.run([adb, "-s", self.serial, "shell"] + list(args),
+                           timeout=10, capture_output=True)
+
+        d = self._get_device()
+        orig_timeout = self._get_screen_timeout()
+        self._set_screen_timeout(300000)
+        try:
+            self._unlock_screen()
+            # 1. Start XHS and go to profile tab
+            d.app_start(XHS_PACKAGE, stop=True)
+            time.sleep(3)
+            self._grant_permissions(d)
+            self._dismiss_blocking_dialogs(d)
+
+            # 2. Tap profile/me tab (rightmost bottom nav item)
+            profile_tapped = (
+                self._click_desc(d, "我", "我的", "个人中心", timeout=4)
+                or self._click_text(d, "我", "我的", timeout=4)
+                or self._click_resource(d, f"{XHS_PACKAGE}:id/tab_me", timeout=3)
+            )
+            if not profile_tapped:
+                w, h = self._screen_size(d)
+                d.click(int(w * 0.9), int(h * 0.972))  # far-right nav tab
+            time.sleep(2)
+
+            # 3. Find and long-press the note by title
+            # Try text match first
+            note_el = d(text=post_title)
+            if not note_el.exists(timeout=3):
+                note_el = d(textContains=post_title[:6])  # partial match
+            if not note_el.exists(timeout=3):
+                self._screenshot(d, "delete_note_not_found")
+                logger.warning(f"[{self.serial}] delete_post: note '{post_title}' not found")
+                return False
+
+            note_el.long_click()
+            time.sleep(1.5)
+
+            # 4. Tap 删除 in context menu
+            deleted = (
+                self._click_text(d, "删除", timeout=4)
+                or self._click_text_contains(d, "删除", timeout=4)
+            )
+            if not deleted:
+                self._screenshot(d, "delete_menu_not_found")
+                logger.warning(f"[{self.serial}] delete_post: '删除' menu item not found")
+                _run("input", "keyevent", "4")  # BACK to dismiss
+                return False
+
+            time.sleep(1)
+
+            # 5. Confirm deletion (dialog may appear with 确认/确定)
+            confirmed = (
+                self._click_text(d, "确认", "确定", "删除", timeout=4)
+                or self._click_text_contains(d, "确认", timeout=4)
+            )
+            if not confirmed:
+                # Some versions don't have a confirm dialog — deletion may have happened
+                logger.warning(f"[{self.serial}] delete_post: confirm dialog not found, may be OK")
+
+            time.sleep(2)
+            self._screenshot(d, "delete_post_done")
+            logger.info(f"[{self.serial}] ✅ Post '{post_title}' deleted")
+            return True
+
+        except Exception as exc:
+            logger.error(f"[{self.serial}] delete_post error: {exc}")
+            return False
+        finally:
+            self._set_screen_timeout(orig_timeout)
+
+    async def delete_post(self, post_title: str) -> bool:
+        """Delete a published Xiaohongshu post by title (async wrapper)."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._delete_post_sync, post_title)
+
+    # -------------------------------------------------------------------------
     # Video Publish API
     # -------------------------------------------------------------------------
 
@@ -1019,8 +1217,11 @@ class XHSPublisher:
             raise XHSPublishError(f"Video file not found: {video_path}")
 
         device_path: Optional[str] = None
+        _orig_screen_timeout: Optional[int] = None
         try:
             d = self._get_device()
+            _orig_screen_timeout = self._get_screen_timeout()
+            self._set_screen_timeout(300000)  # 5 min — prevent sleep during automation
 
             # 1. Push video to device
             logger.info(f"[{self.serial}] Pushing video {video_path}")
@@ -1076,6 +1277,8 @@ class XHSPublisher:
         except Exception as exc:
             raise XHSPublishError(f"Video publish failed on {self.serial}: {exc}") from exc
         finally:
+            if _orig_screen_timeout is not None:
+                self._set_screen_timeout(_orig_screen_timeout)  # restore original timeout
             if device_path:
                 try:
                     self._adb("shell", "rm", "-f", device_path)

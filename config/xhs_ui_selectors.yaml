@@ -6,6 +6,13 @@
 #
 # XHS Package: com.xingin.xhs
 # Tested app version: 8.x
+#
+# Keys supported per entry:
+#   resource_id    : uiautomator2 resourceId (most reliable)
+#   text           : exact text match (then auto-falls to textContains)
+#   description    : content-description (then auto-falls to descriptionContains)
+#   fallback_texts : list of extra text/textContains attempts
+#   scroll_to_find : (bool) swipe up/down and retry if not found in viewport
 
 package: com.xingin.xhs
 
@@ -13,42 +20,66 @@ package: com.xingin.xhs
 nav_home:
   resource_id: com.xingin.xhs:id/tab_home
   text: 首页
+  fallback_texts:
+    - 主页
 
 nav_explore:
   resource_id: com.xingin.xhs:id/tab_explore
   text: 发现
+  fallback_texts:
+    - 探索
 
 nav_publish:
   resource_id: com.xingin.xhs:id/tab_add
   description: 发布
+  fallback_texts:
+    - 创作
+    - "+"
+    - 新建
 
 nav_messages:
   resource_id: com.xingin.xhs:id/tab_message
   text: 消息
+  fallback_texts:
+    - 通知
 
 nav_profile:
   resource_id: com.xingin.xhs:id/tab_me
   text: 我
+  fallback_texts:
+    - 个人
+    - 主页
 
 # ---- Publish entry ----
 # The "+" (publish) button in the bottom nav
 publish_button:
   resource_id: com.xingin.xhs:id/tab_add
-  fallback_text: 发布
+  description: 发布
+  fallback_texts:
+    - 创作
 
 # ---- Post type selection (after pressing "+") ----
 post_type_image_text:
   text: 图文
   resource_id: com.xingin.xhs:id/image_text_tab
+  fallback_texts:
+    - 图片
+    - 照片
 
 post_type_video:
   text: 视频
   resource_id: com.xingin.xhs:id/video_tab
+  fallback_texts:
+    - 视频创作
 
 # ---- Image picker ----
 album_button:
   resource_id: com.xingin.xhs:id/album_btn
   text: 相册
+  fallback_texts:
+    - 图库
+    - 从相册选择
+    - 所有照片
 
 image_grid_item:
   resource_id: com.xingin.xhs:id/photo_item
@@ -56,56 +87,79 @@ image_grid_item:
 image_confirm_button:
   text: 下一步
   resource_id: com.xingin.xhs:id/next_btn
+  scroll_to_find: true
   fallback_texts:
     - 下一步
     - 完成
     - 确定
+    - 去编辑
 
 # ---- Edit screen ----
 title_input:
   resource_id: com.xingin.xhs:id/title_input
   hint: 填写标题会有更多赞哦～
+  scroll_to_find: true
 
 body_input:
   resource_id: com.xingin.xhs:id/desc_input
   hint: 分享这一刻的想法...
   fallback_class: android.widget.EditText
+  scroll_to_find: true
 
 hashtag_button:
   resource_id: com.xingin.xhs:id/topic_btn
   text: "#话题"
-  fallback_text: 话题
+  fallback_texts:
+    - 话题
+    - 添加话题
+    - "#"
+  scroll_to_find: true
 
 hashtag_search_input:
   resource_id: com.xingin.xhs:id/search_input
+  fallback_texts:
+    - 搜索话题
+    - 搜索
 
 hashtag_first_result:
   resource_id: com.xingin.xhs:id/topic_item_container
+  scroll_to_find: true
 
 # ---- Publish action ----
 publish_confirm_button:
   text: 发布
   resource_id: com.xingin.xhs:id/publish_btn
+  scroll_to_find: true
   fallback_texts:
     - 发布笔记
     - 发 布
+    - 立即发布
+    - 确认发布
 
 # ---- Success indicators ----
 publish_success_toast:
   text: 发布成功
+  fallback_texts:
+    - 已发布
+    - 发布完成
 
 # ---- Permissions dialog ----
 permission_allow_button:
-  texts:
+  fallback_texts:
     - 允许
     - 始终允许
     - ALLOW
+    - 同意
 
 # ---- Generic actions ----
 back_button:
   resource_id: com.xingin.xhs:id/back_btn
   description: 返回
+  fallback_texts:
+    - 返回
 
 close_button:
   description: 关闭
   resource_id: com.xingin.xhs:id/close_btn
+  fallback_texts:
+    - 取消

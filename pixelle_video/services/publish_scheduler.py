@@ -64,6 +64,8 @@ class PublishJob:
         kind: str = "image_text",
         video_path: Optional[str] = None,
         dry_run: bool = False,
+        post_type: str = "content",          # "content" | "traffic"
+        delete_after_hours: Optional[float] = None,  # auto-delete TTL (traffic posts)
     ):
         self.job_id = job_id
         self.serial = serial
@@ -76,6 +78,8 @@ class PublishJob:
         self.kind: str = kind  # "image_text" | "video"
         self.video_path: Optional[str] = video_path
         self.dry_run: bool = bool(dry_run)
+        self.post_type: str = post_type  # "content" | "traffic"
+        self.delete_after_hours: Optional[float] = delete_after_hours
         self.status: str = JobStatus.PENDING
         self.created_at: str = datetime.now().isoformat()
         self.started_at: Optional[str] = None
@@ -94,6 +98,8 @@ class PublishJob:
             "kind": self.kind,
             "video_path": self.video_path,
             "dry_run": self.dry_run,
+            "post_type": self.post_type,
+            "delete_after_hours": self.delete_after_hours,
             "scheduled_at": self.scheduled_at,
             "status": self.status,
             "created_at": self.created_at,
@@ -116,6 +122,8 @@ class PublishJob:
             kind=data.get("kind", "image_text"),
             video_path=data.get("video_path"),
             dry_run=bool(data.get("dry_run", False)),
+            post_type=data.get("post_type", "content"),
+            delete_after_hours=data.get("delete_after_hours"),
         )
         job.status = data.get("status", JobStatus.PENDING)
         job.created_at = data.get("created_at", datetime.now().isoformat())
@@ -223,6 +231,8 @@ class PublishScheduler:
         kind: str = "image_text",
         video_path: Optional[str] = None,
         dry_run: bool = False,
+        post_type: str = "content",
+        delete_after_hours: Optional[float] = None,
     ) -> PublishJob:
         """Add a new publish job to the queue."""
         job = PublishJob(
@@ -237,6 +247,8 @@ class PublishScheduler:
             kind=kind,
             video_path=video_path,
             dry_run=dry_run,
+            post_type=post_type,
+            delete_after_hours=delete_after_hours,
         )
         self._jobs[job.job_id] = job
         self._save()
@@ -357,6 +369,15 @@ class PublishScheduler:
             if job.status == JobStatus.SCHEDULED and job.scheduled_at:
                 self._schedule_job(job)
 
+        # Periodic auto-delete check (every 15 minutes)
+        self._scheduler.add_job(
+            self.check_and_delete_expired,
+            "interval",
+            minutes=15,
+            id="auto_delete_check",
+            replace_existing=True,
+        )
+
         logger.info("Publish scheduler started")
 
     def stop_scheduler(self):
@@ -462,6 +483,56 @@ class PublishScheduler:
             return False
         await self._execute_job(job_id)
         return True
+
+    # -------------------------------------------------------------------------
+    # Auto-Delete (TTL) Logic
+    # -------------------------------------------------------------------------
+
+    async def delete_post_now(self, job_id: str) -> bool:
+        """Manually trigger deletion of a completed job's post."""
+        job = self._jobs.get(job_id)
+        if not job or job.status != JobStatus.DONE:
+            logger.warning(f"delete_post_now: job {job_id} not in DONE state")
+            return False
+        return await self._do_delete_job(job)
+
+    async def _do_delete_job(self, job: "PublishJob") -> bool:
+        """Call XHSPublisher.delete_post for a finished job."""
+        from pixelle_video.services.xhs_publisher import XHSPublisher
+        publisher = XHSPublisher(serial=job.serial, strict_mode=False)
+        try:
+            success = await publisher.delete_post(post_title=job.title)
+            if success:
+                job.status = "deleted"
+                self._save()
+                logger.info(f"Auto-deleted post for job {job.job_id} ('{job.title}')")
+            return success
+        except Exception as exc:
+            logger.error(f"Auto-delete failed for job {job.job_id}: {exc}")
+            return False
+
+    async def check_and_delete_expired(self):
+        """
+        Check all completed jobs for expired TTL and delete them.
+        Called by the scheduler every 15 minutes.
+        """
+        now = datetime.now()
+        for job in list(self._jobs.values()):
+            if job.status != JobStatus.DONE:
+                continue
+            if not job.delete_after_hours or not job.finished_at:
+                continue
+            try:
+                finished = datetime.fromisoformat(job.finished_at)
+                expire_at = finished + timedelta(hours=job.delete_after_hours)
+                if now >= expire_at:
+                    logger.info(
+                        f"Job {job.job_id} ('{job.title}') expired "
+                        f"(TTL={job.delete_after_hours}h), deleting..."
+                    )
+                    await self._do_delete_job(job)
+            except Exception as exc:
+                logger.warning(f"check_and_delete_expired error for {job.job_id}: {exc}")
 
 
 # Module-level singleton
