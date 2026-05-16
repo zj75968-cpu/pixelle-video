@@ -1432,62 +1432,95 @@ class XHSPublisher:
         identified by `filename`.
 
         Strategy:
-          1. Make sure we are on an album/grid screen; if photos are shown,
-             try to switch to the "视频" tab.
-          2. Prefer matching the cell whose contentDescription contains the
-             filename. Fall back to the first video-like clickable cell.
+          1. Navigate to the video-only tab ("视频") to filter out photos.
+          2. Wait briefly for media-scanner to index the freshly-pushed file.
+          3. Attempt to match by contentDescription (filename / stem).
+          4. Fall back to the first grid cell (most-recent-first sort).
+          5. Scroll UP (album sometimes loads in wrong order) and retry.
+          6. Scroll DOWN once (in case newest is below fold) and retry.
+          7. Obfuscated-grid fallback for newer XHS builds.
+          8. Coordinate tap (compatible mode) as absolute last resort.
         """
         self._grant_permissions(d)
 
-        # Try switching album content type to videos if a tab exists
-        switched = (
+        # Try to switch to the video-only album tab ("视频").
+        _switched_to_video = (
             self._click_text(d, "视频", timeout=3)
             or self._click_text_contains(d, "视频", timeout=2)
         )
-        if switched:
-            time.sleep(1)
+        if _switched_to_video:
+            logger.debug(f"[{self.serial}] Switched to video tab in album")
+            time.sleep(1.5)  # wait for tab content to render
             self._grant_permissions(d)
 
-        # 1) Prefer description match (newer XHS sets desc to filename or duration)
-        target_desc = filename
-        el = d(descriptionContains=target_desc)
-        if el.exists(timeout=3):
-            el.click()
+        # Give media-scanner time to index the just-pushed file (2 s extra).
+        time.sleep(2)
+
+        stem = Path(filename).stem  # filename without extension
+
+        def _try_pick() -> bool:
+            """Try to find and click the target video cell. Returns True if clicked."""
+            # Strategy A: contentDescription contains filename or stem
+            for _probe in (filename, stem):
+                if not _probe:
+                    continue
+                el = d(descriptionContains=_probe)
+                if el.exists(timeout=1):
+                    el.click()
+                    return True
+            # Strategy B: classic resource-id first cell (most recently added = first)
+            items = d(resourceId=f"{XHS_PACKAGE}:id/photo_item")
+            if items.exists(timeout=1) and items.count > 0:
+                items[0].click()
+                return True
+            # Strategy C: obfuscated grid (newer builds)
+            if self._is_album_grid_screen(d):
+                picked = self._select_images_from_obfuscated_grid(d, 1)
+                if picked > 0:
+                    return True
+            return False
+
+        # First attempt
+        if _try_pick():
             time.sleep(1)
             self._confirm_album_selection(d)
             return
 
-        # 2) Stem match (drop extension)
-        stem = Path(filename).stem
-        if stem and stem != target_desc:
-            el2 = d(descriptionContains=stem)
-            if el2.exists(timeout=1.5):
-                el2.click()
-                time.sleep(1)
-                self._confirm_album_selection(d)
-                return
+        # Scroll UP to bring newest items to top (album may not sort newest-first)
+        w, h = self._screen_size(d)
+        d.swipe(w // 2, int(h * 0.5), w // 2, int(h * 0.8), duration=0.4)
+        time.sleep(0.8)
 
-        # 3) Classic resource-id (treat as a single-select grid)
-        items = d(resourceId=f"{XHS_PACKAGE}:id/photo_item")
-        if items.exists(timeout=2) and items.count > 0:
-            items[0].click()
+        if _try_pick():
             time.sleep(1)
             self._confirm_album_selection(d)
             return
 
-        # 4) Obfuscated grid fallback: first big clickable image cell.
-        if self._is_album_grid_screen(d):
-            picked = self._select_images_from_obfuscated_grid(d, 1)
-            if picked > 0:
-                time.sleep(1)
-                self._confirm_album_selection(d)
-                return
+        # Scroll DOWN once (in case newest item is below the visible fold)
+        d.swipe(w // 2, int(h * 0.7), w // 2, int(h * 0.3), duration=0.4)
+        time.sleep(0.8)
+
+        if _try_pick():
+            time.sleep(1)
+            self._confirm_album_selection(d)
+            return
 
         self._screenshot(d, "video_pick_fail")
         if self.strict_mode:
             raise XHSPublishError(
                 f"Could not locate pushed video '{filename}' in album; strict mode aborted"
             )
+
+        # Compatible mode: tap the first grid cell via coordinates as last resort
+        logger.warning(
+            f"[{self.serial}] Could not locate '{filename}'; "
+            "compatible mode: tapping first grid cell by coordinates"
+        )
+        _cell_size = w // 3
+        _top_offset = int(h * 0.15)
+        d.click(_cell_size // 2, _top_offset + _cell_size // 2)
+        time.sleep(1)
+        self._confirm_album_selection(d)
 
     def _confirm_album_selection(self, d):
         """Tap 下一步/完成 after picking media."""
