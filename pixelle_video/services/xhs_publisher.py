@@ -924,63 +924,104 @@ class XHSPublisher:
         self._screenshot(d, "after_publish")
 
     def _check_success(self, d, expected_title: Optional[str] = None) -> bool:
-        """Check if publish succeeded by looking for explicit success indicators."""
-        # Most reliable: success toast / confirmation text
-        if d(text="发布成功").exists(timeout=5):
-            logger.info("_check_success: found '发布成功' toast")
-            return True
-        if d(text="笔记已发布").exists(timeout=5):
-            logger.info("_check_success: found '笔记已发布' text")
-            return True
+        """Check if publish succeeded by looking for explicit success indicators.
 
-        # Newer XHS builds often return directly to feed without toast.
-        # Use "expected title + 刚刚" as a strong post-publish signal.
-        if expected_title:
-            title_probe = expected_title.strip()[:8]
-            if title_probe and (
-                d(textContains=title_probe).exists(timeout=2)
-                or d(text=title_probe).exists(timeout=2)
-            ):
-                if d(text="刚刚").exists(timeout=2) or d(textContains="刚刚").exists(timeout=2):
-                    logger.info("_check_success: found expected title with '刚刚' in feed")
-                    return True
-
-        # Strict mode: do not treat "back to home" as success by itself.
-        # Home tab visibility is only an indirect signal and can cause false positives.
-
-        # Log current UI state for diagnosis
-        try:
-            xml = d.dump_hierarchy()
-            # Look for any success-related text in the full hierarchy
-            for indicator in ["发布成功", "笔记已发布", "发布中", "上传中"]:
-                if indicator in xml:
-                    logger.info(f"_check_success: found '{indicator}' in UI hierarchy")
-                    return indicator in ["发布成功", "笔记已发布"]
-
-            if expected_title:
-                title_probe = expected_title.strip()[:8]
-                if title_probe and title_probe in xml and "刚刚" in xml:
-                    logger.info("_check_success: hierarchy contains expected title + 刚刚")
-                    return True
-
-            # Heuristic fallback for obfuscated builds:
-            # feed re-opened + just-now marker + like text.
-            # Keep this as the last success path to avoid false positives.
-            if (
-                "刚刚" in xml
-                and "赞" in xml
-                and ("首页" in xml or "市集" in xml)
-            ):
-                logger.info("_check_success: heuristic matched (刚刚 + 赞 + feed tabs)")
+        Tiered approach:
+          Tier 1 — definitive: "发布成功" / "笔记已发布" toast (2 s timeout).
+          Tier 2 — in-progress wait: if "发布中"/"上传中" detected, poll up to
+                   60 s for the upload to finish before moving on.
+          Tier 3 — strong: expected_title[:10] + "刚刚" both visible in feed.
+          Tier 4 — negative gate: title/body input still visible → still editing.
+          Tier 5 — hierarchy scan: full XML dump for tier-1/3 signals.
+          Tier 6 — weak heuristic: 刚刚 + 赞 + feed tab (last resort, logged
+                   as warning to flag potential false positives).
+        """
+        # Tier 1: definitive success toasts (2 s each — toasts are brief)
+        for _t1 in ("发布成功", "笔记已发布"):
+            if d(text=_t1).exists(timeout=2):
+                logger.info(f"_check_success: ✅ tier-1 '{_t1}'")
                 return True
 
-            # Check what's currently on screen
+        # Tier 2: if still uploading/publishing, wait for completion
+        # (video uploads can take 30-60 s after the publish tap)
+        _upload_phrases = ("发布中", "上传中", "正在发布", "视频上传中")
+        _waiting = any(d(textContains=_p).exists(timeout=0.5) for _p in _upload_phrases)
+        if _waiting:
+            logger.info("_check_success: upload/publish in progress — polling up to 60 s…")
+            for _ in range(60):
+                time.sleep(1)
+                # Re-check tier-1
+                for _t1 in ("发布成功", "笔记已发布"):
+                    if d(text=_t1).exists(timeout=0.5):
+                        logger.info(f"_check_success: ✅ tier-1 '{_t1}' after upload wait")
+                        return True
+                # Still uploading?
+                if not any(d(textContains=_p).exists(timeout=0.5) for _p in _upload_phrases):
+                    break  # upload finished — fall through to other tiers
+
+        # Tier 4 (negative gate): still on the edit screen → publish not finished
+        _still_editing = (
+            d(resourceId=f"{XHS_PACKAGE}:id/title_input").exists(timeout=1)
+            or d(resourceId=f"{XHS_PACKAGE}:id/desc_input").exists(timeout=1)
+        )
+        if _still_editing:
+            logger.warning("_check_success: ❌ still on edit page after publish call")
+            self._screenshot(d, "check_success_still_editing")
+            return False
+
+        # Tier 3: expected title visible in feed alongside "刚刚"
+        # Use ≥10 chars for better disambiguation vs. other posts.
+        if expected_title:
+            _probe = expected_title.strip()[:10]
+            if _probe:
+                _title_visible = (
+                    d(textContains=_probe).exists(timeout=2)
+                    or d(descriptionContains=_probe).exists(timeout=1)
+                )
+                _just_now = (
+                    d(text="刚刚").exists(timeout=1)
+                    or d(textContains="刚刚").exists(timeout=1)
+                )
+                if _title_visible and _just_now:
+                    logger.info(f"_check_success: ✅ tier-3 title '{_probe}' + '刚刚'")
+                    return True
+
+        # Tier 5: full hierarchy scan for tier-1 / tier-3 signals
+        try:
+            xml = d.dump_hierarchy()
+
+            # Tier-1 in XML
+            for _t1 in ("发布成功", "笔记已发布"):
+                if _t1 in xml:
+                    logger.info(f"_check_success: ✅ tier-1 in XML '{_t1}'")
+                    return True
+
+            # Note "发布中"/"上传中" still in XML after wait = unconfirmed (not success)
+            for _p in ("发布中", "上传中"):
+                if _p in xml:
+                    logger.warning(f"_check_success: '{_p}' still in XML — treating as unconfirmed")
+                    break
+
+            # Tier-3 in XML
+            if expected_title:
+                _probe = expected_title.strip()[:10]
+                if _probe and _probe in xml and "刚刚" in xml:
+                    logger.info("_check_success: ✅ tier-3 in XML (title + 刚刚)")
+                    return True
+
+            # Tier 6: weak heuristic — feed-like state without title verification
+            if "刚刚" in xml and "赞" in xml and ("首页" in xml or "市集" in xml):
+                logger.warning(
+                    "_check_success: ⚠️ tier-6 weak heuristic (刚刚 + 赞 + feed) — "
+                    "possible false positive if title could not be verified"
+                )
+                return True
+
             try:
                 info = d.info
-                logger.warning(f"_check_success: no success indicator found. current activity info: {info}")
+                logger.warning(f"_check_success: ❌ no indicator found. device info: {info}")
             except Exception:
                 pass
-            # Save a screenshot for manual inspection
             self._screenshot(d, "check_success_fail")
         except Exception as e:
             logger.warning(f"_check_success: dump_hierarchy failed: {e}")
