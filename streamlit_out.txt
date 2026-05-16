@@ -4,3 +4,128 @@
   Local URL: http://localhost:8501
   Network URL: http://198.18.0.1:8501
 
++------------------------- Traceback (most recent call last) --------------------------+
+| D:\vscocde                                                                           |
+| file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scrip |
+| trunner\exec_code.py:129 in exec_func_with_error_handling                            |
+|                                                                                      |
+| D:\vscocde                                                                           |
+| file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scrip |
+| trunner\script_runner.py:672 in code_to_exec                                         |
+|                                                                                      |
+| D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py:114 in <module>           |
+|                                                                                      |
+|   111                                                                                |
+|   112                                                                                |
+|   113 if __name__ == "__main__":                                                     |
+| > 114     main()                                                                     |
+|   115                                                                                |
+|                                                                                      |
+| D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py:110 in main               |
+|                                                                                      |
+|   107         [create_page, history_page, publish_page, agent_page, settings_page],  |
+|   108         position="top",                                                        |
+|   109     )                                                                          |
+| > 110     pg.run()                                                                   |
+|   111                                                                                |
+|   112                                                                                |
+|   113 if __name__ == "__main__":                                                     |
+|                                                                                      |
+| D:\vscocde                                                                           |
+| file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\navigation\pa |
+| ge.py:310 in run                                                                     |
+|                                                                                      |
+| +------------------------- Traceback (most recent call last) --------------------------+
+| D:\vscocde                                                                           |
+| file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scrip |
+| trunner\exec_code.py:129 in exec_func_with_error_handling                            |
+|                                                                                      |
+| D:\vscocde                                                                           |
+| file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scrip |
+| trunner\script_runner.py:672 in code_to_exec                                         |
+|                                                                                      |
+| D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py:114 in <module>           |
+|                                                                                      |
+|   111                                                                                |
+|   112                                                                                |
+|   113 if __name__ == "__main__":                                                     |
+| > 114     main()                                                                     |
+|   115                                                                                |
+|                                                                                      |
+| D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py:110 in main               |
+|                                                                                      |
+|   107         [create_page, history_page, publish_page, agent_page, settings_page],  |
+|   108         position="top",                                                        |
+|   109     )                                                                          |
+| > 110     pg.run()                                                                   |
+|   111                                                                                |
+|   112                                                                                |
+|   113 if __name__ == "__main__":                                                     |
+|                                                                                      |
+| D:\vscocde                                                                           |
+| file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\navigation\pa |
+| ge.py:310 in run                                                                     |
+|                                                                                      |
+| +------------------------- Traceback (most recent call last) --------------------------+
+| D:\vscocde                                                                           |
+| file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scrip |
+| trunner\exec_code.py:129 in exec_func_with_error_handling                            |
+|                                                                                      |
+| D:\vscocde                                                                           |
+| file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scrip |
+| trunner\script_runner.py:672 in code_to_exec                                         |
+|                                                                                      |
+| D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py:114 in <module>           |
+|                                                                                      |
+|   111                                                                                |
+|   112                                                                                |
+|   113 if __name__ == "__main__":                                                     |
+| > 114     main()                                                                     |
+|   115                                                                                |
+|                                                                                      |
+| D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py:110 in main               |
+|                                                                                      |
+|   107         [create_page, history_page, publish_page, agent_page, settings_page],  |
+|   108         position="top",                                                        |
+|   109     )                                                                          |
+| > 110     pg.run()                                                                   |
+|   111                                                                                |
+|   112                                                                                |
+|   113 if __name__ == "__main__":                                                     |
+|                                                                                      |
+| D:\vscocde                                                                           |
+| file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\navigation\pa |
+| ge.py:310 in run                                                                     |
+|                                                                                      |
+| +------------------------- Traceback (most recent call last) --------------------------+
+| D:\vscocde                                                                           |
+| file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scrip |
+| trunner\exec_code.py:129 in exec_func_with_error_handling                            |
+|                                                                                      |
+| D:\vscocde                                                                           |
+| file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scrip |
+| trunner\script_runner.py:672 in code_to_exec                                         |
+|                                                                                      |
+| D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py:115 in <module>           |
+|                                                                                      |
+|   112                                                                                |
+|   113                                                                                |
+|   114 if __name__ == "__main__":                                                     |
+| > 115     main()                                                                     |
+|   116                                                                                |
+|                                                                                      |
+| D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py:111 in main               |
+|                                                                                      |
+|   108         [create_page, history_page, publish_page, agent_page, settings_page],  |
+|   109         position="top",                                                        |
+|   110     )                                                                          |
+| > 111     pg.run()                                                                   |
+|   112                                                                                |
+|   113                                                                                |
+|   114 if __name__ == "__main__":                                                     |
+|                                                                                      |
+| D:\vscocde                                                                           |
+| file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\navigation\pa |
+| ge.py:310 in run                                                                     |
+|                                                                                      |
+| 

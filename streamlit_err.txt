@@ -1605,3 +1605,574 @@
 2026-05-15 12:53:58.435 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_nano_banana.json
 2026-05-15 12:53:58.436 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_qwen.json
 2026-05-15 12:53:58.437 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/video_animatediff_sd15.json
+2026-05-15 12:58:42.865 | DEBUG    | web.i18n:load_locales:43 - Loaded locale: en_US
+2026-05-15 12:58:42.866 | DEBUG    | web.i18n:load_locales:43 - Loaded locale: zh_CN
+2026-05-15 12:58:42.867 | INFO     | web.i18n:load_locales:47 - Loaded 2 locales: ['en_US', 'zh_CN']
+2026-05-15 12:58:42.867 | DEBUG    | web.i18n:detect_system_language:194 - System locale from getdefaultlocale(): zh_CN
+2026-05-15 12:58:42.868 | INFO     | web.i18n:detect_system_language:224 - System language matched: zh_CN
+2026-05-15 12:58:42.868 | INFO     | web.i18n:<module>:248 - Default language initialized to: zh_CN
+2026-05-15 12:58:42.870 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 12:58:42.873 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 12:58:42.880 | DEBUG    | web.state.session:get_pixelle_video:69 - [session] pipeline_src_hash computed: 60fd49cf...
+2026-05-15 12:58:42.880 | INFO     | web.state.session:get_pixelle_video:78 - [session] combined_hash = 8f3f4c678deccfa2...
+2026-05-15 12:58:42.881 | INFO     | web.state.session:get_pixelle_video:85 - [session] Creating new PixelleVideoCore instance (first time)
+2026-05-15 12:58:42.881 | INFO     | pixelle_video.service:initialize:197 - \U0001f680 Initializing Pixelle-Video...
+2026-05-15 12:58:42.882 | INFO     | pixelle_video.service:initialize:219 - \U0001f4f9 Registered pipelines: standard, custom, asset_based, image_text_post
+2026-05-15 12:58:42.883 | INFO     | pixelle_video.service:initialize:225 - \u2705 Pixelle-Video initialized successfully
+
+2026-05-15 12:58:42.883 | INFO     | web.state.session:get_pixelle_video:105 - [session] \u2705 PixelleVideoCore initialized and cached with hash 8f3f4c678deccfa2...
+2026-05-15 12:58:42.886 | INFO     | pixelle_video.config.loader:load_config_dict:43 - Configuration loaded from config.yaml
+2026-05-15 12:58:42- pixelle_video.utils.template_util - INFO - template_util.py:371 - resolve_template_path - Backward compatibility: migrated '1080x1920/default.html' to '1080x1920/image_default.html'
+2026-05-15 12:58:42.887 | DEBUG    | pixelle_video.config.manager:_validate_template:64 - Template validation passed: 1080x1920/default.html -> D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html
+2026-05-15 12:58:42.887 | INFO     | pixelle_video.config.manager:reload:74 - Configuration reloaded
+2026-05-15 12:58:42- pixelle_video.utils.template_util - WARNING - template_util.py:422 - get_template_type - Template 'asset_default.html' doesn't follow naming convention (static_/image_/video_). Defaulting to 'image' type.
+2026-05-15 12:58:43.058 | DEBUG    | pixelle_video.services.frame_html:_load_template:120 - Template loaded: 14828 chars
+2026-05-15 12:58:43.058 | DEBUG    | pixelle_video.services.frame_html:__init__:73 - Loaded HTML template: D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html (size: 1080x1920)
+2026-05-15 12:58:43.059 | DEBUG    | pixelle_video.services.frame_html:parse_template_parameters:225 - Parsed 3 custom parameter(s) from template: ['author', 'describe', 'brand']
+2026-05-15 12:58:43.061 | DEBUG    | pixelle_video.services.frame_html:_parse_media_size_from_meta:147 - Found media size in meta tags: 1024x1024
+2026-05-15 12:58:43.072 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_Z-image.json
+2026-05-15 12:58:43.072 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux.json
+2026-05-15 12:58:43.073 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux2.json
+2026-05-15 12:58:43.073 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen.json
+2026-05-15 12:58:43.074 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen_chinese_cartoon.json
+2026-05-15 12:58:43.075 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sd3.5.json
+2026-05-15 12:58:43.075 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sdxl.json
+2026-05-15 12:58:43.076 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_qwen_wan2.2.json
+2026-05-15 12:58:43.077 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_understanding.json
+2026-05-15 12:58:43.077 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan2.2.json
+2026-05-15 12:58:43.078 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan22_14b.json
+2026-05-15 12:58:43.080 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_flux.json
+2026-05-15 12:58:43.081 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_nano_banana.json
+2026-05-15 12:58:43.082 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_qwen.json
+2026-05-15 12:58:43.083 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/video_animatediff_sd15.json
+2026-05-15 21:40:10.198 | DEBUG    | web.i18n:load_locales:43 - Loaded locale: en_US
+2026-05-15 21:40:10.210 | DEBUG    | web.i18n:load_locales:43 - Loaded locale: zh_CN
+2026-05-15 21:40:10.210 | INFO     | web.i18n:load_locales:47 - Loaded 2 locales: ['en_US', 'zh_CN']
+2026-05-15 21:40:10.210 | DEBUG    | web.i18n:detect_system_language:194 - System locale from getdefaultlocale(): zh_CN
+2026-05-15 21:40:10.210 | INFO     | web.i18n:detect_system_language:224 - System language matched: zh_CN
+2026-05-15 21:40:10.211 | INFO     | web.i18n:<module>:248 - Default language initialized to: zh_CN
+2026-05-15 21:40:10.214 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:40:10.222 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:40:10.236 | DEBUG    | web.state.session:get_pixelle_video:69 - [session] pipeline_src_hash computed: 60fd49cf...
+2026-05-15 21:40:10.236 | INFO     | web.state.session:get_pixelle_video:78 - [session] combined_hash = 8f3f4c678deccfa2...
+2026-05-15 21:40:10.236 | INFO     | web.state.session:get_pixelle_video:85 - [session] Creating new PixelleVideoCore instance (first time)
+2026-05-15 21:40:10.237 | INFO     | pixelle_video.service:initialize:197 - \U0001f680 Initializing Pixelle-Video...
+2026-05-15 21:40:10.239 | INFO     | pixelle_video.service:initialize:219 - \U0001f4f9 Registered pipelines: standard, custom, asset_based, image_text_post
+2026-05-15 21:40:10.239 | INFO     | pixelle_video.service:initialize:225 - \u2705 Pixelle-Video initialized successfully
+
+2026-05-15 21:40:10.241 | INFO     | web.state.session:get_pixelle_video:105 - [session] \u2705 PixelleVideoCore initialized and cached with hash 8f3f4c678deccfa2...
+2026-05-15 21:40:10.247 | INFO     | pixelle_video.config.loader:load_config_dict:43 - Configuration loaded from config.yaml
+2026-05-15 21:40:10- pixelle_video.utils.template_util - INFO - template_util.py:371 - resolve_template_path - Backward compatibility: migrated '1080x1920/default.html' to '1080x1920/image_default.html'
+2026-05-15 21:40:10.250 | DEBUG    | pixelle_video.config.manager:_validate_template:64 - Template validation passed: 1080x1920/default.html -> D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html
+2026-05-15 21:40:10.250 | INFO     | pixelle_video.config.manager:reload:74 - Configuration reloaded
+2026-05-15 21:40:10- pixelle_video.utils.template_util - WARNING - template_util.py:422 - get_template_type - Template 'asset_default.html' doesn't follow naming convention (static_/image_/video_). Defaulting to 'image' type.
+2026-05-15 21:40:10.446 | DEBUG    | pixelle_video.services.frame_html:_load_template:120 - Template loaded: 14828 chars
+2026-05-15 21:40:10.447 | DEBUG    | pixelle_video.services.frame_html:__init__:73 - Loaded HTML template: D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html (size: 1080x1920)
+2026-05-15 21:40:10.447 | DEBUG    | pixelle_video.services.frame_html:parse_template_parameters:225 - Parsed 3 custom parameter(s) from template: ['author', 'describe', 'brand']
+2026-05-15 21:40:10.450 | DEBUG    | pixelle_video.services.frame_html:_parse_media_size_from_meta:147 - Found media size in meta tags: 1024x1024
+2026-05-15 21:40:10.461 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_Z-image.json
+2026-05-15 21:40:10.461 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux.json
+2026-05-15 21:40:10.463 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux2.json
+2026-05-15 21:40:10.464 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen.json
+2026-05-15 21:40:10.464 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen_chinese_cartoon.json
+2026-05-15 21:40:10.464 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sd3.5.json
+2026-05-15 21:40:10.466 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sdxl.json
+2026-05-15 21:40:10.466 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_qwen_wan2.2.json
+2026-05-15 21:40:10.467 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_understanding.json
+2026-05-15 21:40:10.467 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan2.2.json
+2026-05-15 21:40:10.469 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan22_14b.json
+2026-05-15 21:40:10.469 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_flux.json
+2026-05-15 21:40:10.470 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_nano_banana.json
+2026-05-15 21:40:10.470 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_qwen.json
+2026-05-15 21:40:10.472 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/video_animatediff_sd15.json
+2026-05-15 21:40:16.054 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:40:16.056 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:40:16.064 | DEBUG    | web.state.session:get_pixelle_video:69 - [session] pipeline_src_hash computed: 60fd49cf...
+2026-05-15 21:40:16.064 | INFO     | web.state.session:get_pixelle_video:78 - [session] combined_hash = 8f3f4c678deccfa2...
+2026-05-15 21:40:16.064 | INFO     | web.state.session:get_pixelle_video:85 - [session] Creating new PixelleVideoCore instance (first time)
+2026-05-15 21:40:16.065 | INFO     | pixelle_video.service:initialize:197 - \U0001f680 Initializing Pixelle-Video...
+2026-05-15 21:40:16.065 | INFO     | pixelle_video.service:initialize:219 - \U0001f4f9 Registered pipelines: standard, custom, asset_based, image_text_post
+2026-05-15 21:40:16.065 | INFO     | pixelle_video.service:initialize:225 - \u2705 Pixelle-Video initialized successfully
+
+2026-05-15 21:40:16.065 | INFO     | web.state.session:get_pixelle_video:105 - [session] \u2705 PixelleVideoCore initialized and cached with hash 8f3f4c678deccfa2...
+2026-05-15 21:40:16.068 | INFO     | pixelle_video.config.loader:load_config_dict:43 - Configuration loaded from config.yaml
+2026-05-15 21:40:16- pixelle_video.utils.template_util - INFO - template_util.py:371 - resolve_template_path - Backward compatibility: migrated '1080x1920/default.html' to '1080x1920/image_default.html'
+2026-05-15 21:40:16.070 | DEBUG    | pixelle_video.config.manager:_validate_template:64 - Template validation passed: 1080x1920/default.html -> D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html
+2026-05-15 21:40:16.070 | INFO     | pixelle_video.config.manager:reload:74 - Configuration reloaded
+2026-05-15 21:40:16- pixelle_video.utils.template_util - WARNING - template_util.py:422 - get_template_type - Template 'asset_default.html' doesn't follow naming convention (static_/image_/video_). Defaulting to 'image' type.
+2026-05-15 21:40:16.219 | DEBUG    | pixelle_video.services.frame_html:_load_template:120 - Template loaded: 14828 chars
+2026-05-15 21:40:16.219 | DEBUG    | pixelle_video.services.frame_html:__init__:73 - Loaded HTML template: D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html (size: 1080x1920)
+2026-05-15 21:40:16.219 | DEBUG    | pixelle_video.services.frame_html:parse_template_parameters:225 - Parsed 3 custom parameter(s) from template: ['author', 'describe', 'brand']
+2026-05-15 21:40:16.222 | DEBUG    | pixelle_video.services.frame_html:_parse_media_size_from_meta:147 - Found media size in meta tags: 1024x1024
+2026-05-15 21:40:16.231 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_Z-image.json
+2026-05-15 21:40:16.232 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux.json
+2026-05-15 21:40:16.232 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux2.json
+2026-05-15 21:40:16.234 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen.json
+2026-05-15 21:40:16.234 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen_chinese_cartoon.json
+2026-05-15 21:40:16.234 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sd3.5.json
+2026-05-15 21:40:16.236 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sdxl.json
+2026-05-15 21:40:16.236 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_qwen_wan2.2.json
+2026-05-15 21:40:16.237 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_understanding.json
+2026-05-15 21:40:16.237 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan2.2.json
+2026-05-15 21:40:16.239 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan22_14b.json
+2026-05-15 21:40:16.240 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_flux.json
+2026-05-15 21:40:16.240 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_nano_banana.json
+2026-05-15 21:40:16.242 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_qwen.json
+2026-05-15 21:40:16.242 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/video_animatediff_sd15.json
+2026-05-15 21:40:17.408 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:40:17.421 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:40:17.428 | DEBUG    | web.state.session:get_pixelle_video:69 - [session] pipeline_src_hash computed: 60fd49cf...
+2026-05-15 21:40:17.429 | INFO     | web.state.session:get_pixelle_video:78 - [session] combined_hash = 8f3f4c678deccfa2...
+2026-05-15 21:40:17.429 | INFO     | web.state.session:get_pixelle_video:85 - [session] Creating new PixelleVideoCore instance (first time)
+2026-05-15 21:40:17.430 | INFO     | pixelle_video.service:initialize:197 - \U0001f680 Initializing Pixelle-Video...
+2026-05-15 21:40:17.431 | INFO     | pixelle_video.service:initialize:219 - \U0001f4f9 Registered pipelines: standard, custom, asset_based, image_text_post
+2026-05-15 21:40:17.431 | INFO     | pixelle_video.service:initialize:225 - \u2705 Pixelle-Video initialized successfully
+
+2026-05-15 21:40:17.432 | INFO     | web.state.session:get_pixelle_video:105 - [session] \u2705 PixelleVideoCore initialized and cached with hash 8f3f4c678deccfa2...
+2026-05-15 21:40:17.434 | INFO     | pixelle_video.config.loader:load_config_dict:43 - Configuration loaded from config.yaml
+2026-05-15 21:40:17- pixelle_video.utils.template_util - INFO - template_util.py:371 - resolve_template_path - Backward compatibility: migrated '1080x1920/default.html' to '1080x1920/image_default.html'
+2026-05-15 21:40:17.435 | DEBUG    | pixelle_video.config.manager:_validate_template:64 - Template validation passed: 1080x1920/default.html -> D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html
+2026-05-15 21:40:17.435 | INFO     | pixelle_video.config.manager:reload:74 - Configuration reloaded
+2026-05-15 21:40:17- pixelle_video.utils.template_util - WARNING - template_util.py:422 - get_template_type - Template 'asset_default.html' doesn't follow naming convention (static_/image_/video_). Defaulting to 'image' type.
+2026-05-15 21:40:17.586 | DEBUG    | pixelle_video.services.frame_html:_load_template:120 - Template loaded: 14828 chars
+2026-05-15 21:40:17.586 | DEBUG    | pixelle_video.services.frame_html:__init__:73 - Loaded HTML template: D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html (size: 1080x1920)
+2026-05-15 21:40:17.586 | DEBUG    | pixelle_video.services.frame_html:parse_template_parameters:225 - Parsed 3 custom parameter(s) from template: ['author', 'describe', 'brand']
+2026-05-15 21:40:17.588 | DEBUG    | pixelle_video.services.frame_html:_parse_media_size_from_meta:147 - Found media size in meta tags: 1024x1024
+2026-05-15 21:40:17.597 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_Z-image.json
+2026-05-15 21:40:17.598 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux.json
+2026-05-15 21:40:17.598 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux2.json
+2026-05-15 21:40:17.600 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen.json
+2026-05-15 21:40:17.600 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen_chinese_cartoon.json
+2026-05-15 21:40:17.601 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sd3.5.json
+2026-05-15 21:40:17.602 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sdxl.json
+2026-05-15 21:40:17.603 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_qwen_wan2.2.json
+2026-05-15 21:40:17.604 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_understanding.json
+2026-05-15 21:40:17.604 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan2.2.json
+2026-05-15 21:40:17.605 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan22_14b.json
+2026-05-15 21:40:17.607 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_flux.json
+2026-05-15 21:40:17.608 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_nano_banana.json
+2026-05-15 21:40:17.609 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_qwen.json
+2026-05-15 21:40:17.609 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/video_animatediff_sd15.json
+2026-05-15 21:41:00.258 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:41:00.262 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:41:00.267 | DEBUG    | web.state.session:get_pixelle_video:69 - [session] pipeline_src_hash computed: 60fd49cf...
+2026-05-15 21:41:00.269 | INFO     | web.state.session:get_pixelle_video:78 - [session] combined_hash = 8f3f4c678deccfa2...
+2026-05-15 21:41:00.269 | INFO     | web.state.session:get_pixelle_video:85 - [session] Creating new PixelleVideoCore instance (first time)
+2026-05-15 21:41:00.269 | INFO     | pixelle_video.service:initialize:197 - \U0001f680 Initializing Pixelle-Video...
+2026-05-15 21:41:00.270 | INFO     | pixelle_video.service:initialize:219 - \U0001f4f9 Registered pipelines: standard, custom, asset_based, image_text_post
+2026-05-15 21:41:00.270 | INFO     | pixelle_video.service:initialize:225 - \u2705 Pixelle-Video initialized successfully
+
+2026-05-15 21:41:00.270 | INFO     | web.state.session:get_pixelle_video:105 - [session] \u2705 PixelleVideoCore initialized and cached with hash 8f3f4c678deccfa2...
+2026-05-15 21:41:00.274 | INFO     | pixelle_video.config.loader:load_config_dict:43 - Configuration loaded from config.yaml
+2026-05-15 21:41:00- pixelle_video.utils.template_util - INFO - template_util.py:371 - resolve_template_path - Backward compatibility: migrated '1080x1920/default.html' to '1080x1920/image_default.html'
+2026-05-15 21:41:00.274 | DEBUG    | pixelle_video.config.manager:_validate_template:64 - Template validation passed: 1080x1920/default.html -> D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html
+2026-05-15 21:41:00.274 | INFO     | pixelle_video.config.manager:reload:74 - Configuration reloaded
+2026-05-15 21:41:00- pixelle_video.utils.template_util - WARNING - template_util.py:422 - get_template_type - Template 'asset_default.html' doesn't follow naming convention (static_/image_/video_). Defaulting to 'image' type.
+2026-05-15 21:41:00.431 | DEBUG    | pixelle_video.services.frame_html:_load_template:120 - Template loaded: 14828 chars
+2026-05-15 21:41:00.431 | DEBUG    | pixelle_video.services.frame_html:__init__:73 - Loaded HTML template: D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html (size: 1080x1920)
+2026-05-15 21:41:00.433 | DEBUG    | pixelle_video.services.frame_html:parse_template_parameters:225 - Parsed 3 custom parameter(s) from template: ['author', 'describe', 'brand']
+2026-05-15 21:41:00.434 | DEBUG    | pixelle_video.services.frame_html:_parse_media_size_from_meta:147 - Found media size in meta tags: 1024x1024
+2026-05-15 21:41:00.444 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_Z-image.json
+2026-05-15 21:41:00.445 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux.json
+2026-05-15 21:41:00.446 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux2.json
+2026-05-15 21:41:00.446 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen.json
+2026-05-15 21:41:00.448 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen_chinese_cartoon.json
+2026-05-15 21:41:00.448 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sd3.5.json
+2026-05-15 21:41:00.449 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sdxl.json
+2026-05-15 21:41:00.449 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_qwen_wan2.2.json
+2026-05-15 21:41:00.451 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_understanding.json
+2026-05-15 21:41:00.452 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan2.2.json
+2026-05-15 21:41:00.452 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan22_14b.json
+2026-05-15 21:41:00.454 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_flux.json
+2026-05-15 21:41:00.455 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_nano_banana.json
+2026-05-15 21:41:00.455 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_qwen.json
+2026-05-15 21:41:00.457 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/video_animatediff_sd15.json
+2026-05-15 21:41:45.561 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:41:45.564 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:41:45.569 | DEBUG    | web.state.session:get_pixelle_video:69 - [session] pipeline_src_hash computed: 60fd49cf...
+2026-05-15 21:41:45.570 | INFO     | web.state.session:get_pixelle_video:78 - [session] combined_hash = 8f3f4c678deccfa2...
+2026-05-15 21:41:45.570 | INFO     | web.state.session:get_pixelle_video:85 - [session] Creating new PixelleVideoCore instance (first time)
+2026-05-15 21:41:45.570 | INFO     | pixelle_video.service:initialize:197 - \U0001f680 Initializing Pixelle-Video...
+2026-05-15 21:41:45.570 | INFO     | pixelle_video.service:initialize:219 - \U0001f4f9 Registered pipelines: standard, custom, asset_based, image_text_post
+2026-05-15 21:41:45.570 | INFO     | pixelle_video.service:initialize:225 - \u2705 Pixelle-Video initialized successfully
+
+2026-05-15 21:41:45.572 | INFO     | web.state.session:get_pixelle_video:105 - [session] \u2705 PixelleVideoCore initialized and cached with hash 8f3f4c678deccfa2...
+2026-05-15 21:41:45.574 | INFO     | pixelle_video.config.loader:load_config_dict:43 - Configuration loaded from config.yaml
+2026-05-15 21:41:45- pixelle_video.utils.template_util - INFO - template_util.py:371 - resolve_template_path - Backward compatibility: migrated '1080x1920/default.html' to '1080x1920/image_default.html'
+2026-05-15 21:41:45.576 | DEBUG    | pixelle_video.config.manager:_validate_template:64 - Template validation passed: 1080x1920/default.html -> D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html
+2026-05-15 21:41:45.576 | INFO     | pixelle_video.config.manager:reload:74 - Configuration reloaded
+2026-05-15 21:41:45- pixelle_video.utils.template_util - WARNING - template_util.py:422 - get_template_type - Template 'asset_default.html' doesn't follow naming convention (static_/image_/video_). Defaulting to 'image' type.
+2026-05-15 21:41:45.713 | DEBUG    | pixelle_video.services.frame_html:_load_template:120 - Template loaded: 14828 chars
+2026-05-15 21:41:45.713 | DEBUG    | pixelle_video.services.frame_html:__init__:73 - Loaded HTML template: D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html (size: 1080x1920)
+2026-05-15 21:41:45.714 | DEBUG    | pixelle_video.services.frame_html:parse_template_parameters:225 - Parsed 3 custom parameter(s) from template: ['author', 'describe', 'brand']
+2026-05-15 21:41:45.716 | DEBUG    | pixelle_video.services.frame_html:_parse_media_size_from_meta:147 - Found media size in meta tags: 1024x1024
+2026-05-15 21:41:45.724 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_Z-image.json
+2026-05-15 21:41:45.725 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux.json
+2026-05-15 21:41:45.725 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux2.json
+2026-05-15 21:41:45.727 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen.json
+2026-05-15 21:41:45.727 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen_chinese_cartoon.json
+2026-05-15 21:41:45.728 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sd3.5.json
+2026-05-15 21:41:45.728 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sdxl.json
+2026-05-15 21:41:45.730 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_qwen_wan2.2.json
+2026-05-15 21:41:45.730 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_understanding.json
+2026-05-15 21:41:45.731 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan2.2.json
+2026-05-15 21:41:45.733 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan22_14b.json
+2026-05-15 21:41:45.734 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_flux.json
+2026-05-15 21:41:45.734 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_nano_banana.json
+2026-05-15 21:41:45.736 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_qwen.json
+2026-05-15 21:41:45.736 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/video_animatediff_sd15.json
+2026-05-15 21:42:09.142 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:42:09.144 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:42:09.154 | DEBUG    | web.state.session:get_pixelle_video:69 - [session] pipeline_src_hash computed: 60fd49cf...
+2026-05-15 21:42:09.154 | INFO     | web.state.session:get_pixelle_video:78 - [session] combined_hash = 8f3f4c678deccfa2...
+2026-05-15 21:42:09.154 | INFO     | web.state.session:get_pixelle_video:85 - [session] Creating new PixelleVideoCore instance (first time)
+2026-05-15 21:42:09.154 | INFO     | pixelle_video.service:initialize:197 - \U0001f680 Initializing Pixelle-Video...
+2026-05-15 21:42:09.156 | INFO     | pixelle_video.service:initialize:219 - \U0001f4f9 Registered pipelines: standard, custom, asset_based, image_text_post
+2026-05-15 21:42:09.156 | INFO     | pixelle_video.service:initialize:225 - \u2705 Pixelle-Video initialized successfully
+
+2026-05-15 21:42:09.156 | INFO     | web.state.session:get_pixelle_video:105 - [session] \u2705 PixelleVideoCore initialized and cached with hash 8f3f4c678deccfa2...
+2026-05-15 21:42:09.159 | INFO     | pixelle_video.config.loader:load_config_dict:43 - Configuration loaded from config.yaml
+2026-05-15 21:42:09- pixelle_video.utils.template_util - INFO - template_util.py:371 - resolve_template_path - Backward compatibility: migrated '1080x1920/default.html' to '1080x1920/image_default.html'
+2026-05-15 21:42:09.161 | DEBUG    | pixelle_video.config.manager:_validate_template:64 - Template validation passed: 1080x1920/default.html -> D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html
+2026-05-15 21:42:09.161 | INFO     | pixelle_video.config.manager:reload:74 - Configuration reloaded
+2026-05-15 21:42:09- pixelle_video.utils.template_util - WARNING - template_util.py:422 - get_template_type - Template 'asset_default.html' doesn't follow naming convention (static_/image_/video_). Defaulting to 'image' type.
+2026-05-15 21:42:09.313 | DEBUG    | pixelle_video.services.frame_html:_load_template:120 - Template loaded: 14828 chars
+2026-05-15 21:42:09.314 | DEBUG    | pixelle_video.services.frame_html:__init__:73 - Loaded HTML template: D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html (size: 1080x1920)
+2026-05-15 21:42:09.315 | DEBUG    | pixelle_video.services.frame_html:parse_template_parameters:225 - Parsed 3 custom parameter(s) from template: ['author', 'describe', 'brand']
+2026-05-15 21:42:09.316 | DEBUG    | pixelle_video.services.frame_html:_parse_media_size_from_meta:147 - Found media size in meta tags: 1024x1024
+2026-05-15 21:42:09.325 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_Z-image.json
+2026-05-15 21:42:09.325 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux.json
+2026-05-15 21:42:09.325 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux2.json
+2026-05-15 21:42:09.327 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen.json
+2026-05-15 21:42:09.327 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen_chinese_cartoon.json
+2026-05-15 21:42:09.328 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sd3.5.json
+2026-05-15 21:42:09.328 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sdxl.json
+2026-05-15 21:42:09.330 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_qwen_wan2.2.json
+2026-05-15 21:42:09.331 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_understanding.json
+2026-05-15 21:42:09.331 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan2.2.json
+2026-05-15 21:42:09.333 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan22_14b.json
+2026-05-15 21:42:09.334 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_flux.json
+2026-05-15 21:42:09.334 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_nano_banana.json
+2026-05-15 21:42:09.336 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_qwen.json
+2026-05-15 21:42:09.336 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/video_animatediff_sd15.json
+2026-05-15 21:43:26.034 Uncaught app execution
+Traceback (most recent call last):
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 672, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py", line 114, in <module>
+    main()
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py", line 110, in main
+    pg.run()
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\navigation\page.py", line 310, in run
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\web\pages\9_\u2699\ufe0f_Settings.py", line 87, in <module>
+    required_pwd = cfg.admin_password.strip()
+                   ^^^^^^^^^^^^^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'PixelleVideoConfig' object has no attribute 'admin_password'
+2026-05-15 21:43:59.447 | DEBUG    | web.i18n:load_locales:43 - Loaded locale: en_US
+2026-05-15 21:43:59.448 | DEBUG    | web.i18n:load_locales:43 - Loaded locale: zh_CN
+2026-05-15 21:43:59.449 | INFO     | web.i18n:load_locales:47 - Loaded 2 locales: ['en_US', 'zh_CN']
+2026-05-15 21:43:59.449 | DEBUG    | web.i18n:detect_system_language:194 - System locale from getdefaultlocale(): zh_CN
+2026-05-15 21:43:59.449 | INFO     | web.i18n:detect_system_language:224 - System language matched: zh_CN
+2026-05-15 21:43:59.450 | INFO     | web.i18n:<module>:248 - Default language initialized to: zh_CN
+2026-05-15 21:43:59.451 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:43:59.456 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:43:59.462 | DEBUG    | web.state.session:get_pixelle_video:69 - [session] pipeline_src_hash computed: 60fd49cf...
+2026-05-15 21:43:59.462 | INFO     | web.state.session:get_pixelle_video:78 - [session] combined_hash = 8f3f4c678deccfa2...
+2026-05-15 21:43:59.462 | INFO     | web.state.session:get_pixelle_video:85 - [session] Creating new PixelleVideoCore instance (first time)
+2026-05-15 21:43:59.463 | INFO     | pixelle_video.service:initialize:197 - \U0001f680 Initializing Pixelle-Video...
+2026-05-15 21:43:59.463 | INFO     | pixelle_video.service:initialize:219 - \U0001f4f9 Registered pipelines: standard, custom, asset_based, image_text_post
+2026-05-15 21:43:59.463 | INFO     | pixelle_video.service:initialize:225 - \u2705 Pixelle-Video initialized successfully
+
+2026-05-15 21:43:59.465 | INFO     | web.state.session:get_pixelle_video:105 - [session] \u2705 PixelleVideoCore initialized and cached with hash 8f3f4c678deccfa2...
+2026-05-15 21:43:59.466 | INFO     | pixelle_video.config.loader:load_config_dict:43 - Configuration loaded from config.yaml
+2026-05-15 21:43:59- pixelle_video.utils.template_util - INFO - template_util.py:371 - resolve_template_path - Backward compatibility: migrated '1080x1920/default.html' to '1080x1920/image_default.html'
+2026-05-15 21:43:59.468 | DEBUG    | pixelle_video.config.manager:_validate_template:64 - Template validation passed: 1080x1920/default.html -> D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html
+2026-05-15 21:43:59.468 | INFO     | pixelle_video.config.manager:reload:74 - Configuration reloaded
+2026-05-15 21:43:59- pixelle_video.utils.template_util - WARNING - template_util.py:422 - get_template_type - Template 'asset_default.html' doesn't follow naming convention (static_/image_/video_). Defaulting to 'image' type.
+2026-05-15 21:43:59.630 | DEBUG    | pixelle_video.services.frame_html:_load_template:120 - Template loaded: 14828 chars
+2026-05-15 21:43:59.630 | DEBUG    | pixelle_video.services.frame_html:__init__:73 - Loaded HTML template: D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html (size: 1080x1920)
+2026-05-15 21:43:59.630 | DEBUG    | pixelle_video.services.frame_html:parse_template_parameters:225 - Parsed 3 custom parameter(s) from template: ['author', 'describe', 'brand']
+2026-05-15 21:43:59.631 | DEBUG    | pixelle_video.services.frame_html:_parse_media_size_from_meta:147 - Found media size in meta tags: 1024x1024
+2026-05-15 21:43:59.642 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_Z-image.json
+2026-05-15 21:43:59.644 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux.json
+2026-05-15 21:43:59.644 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux2.json
+2026-05-15 21:43:59.644 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen.json
+2026-05-15 21:43:59.644 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen_chinese_cartoon.json
+2026-05-15 21:43:59.646 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sd3.5.json
+2026-05-15 21:43:59.646 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sdxl.json
+2026-05-15 21:43:59.647 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_qwen_wan2.2.json
+2026-05-15 21:43:59.647 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_understanding.json
+2026-05-15 21:43:59.647 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan2.2.json
+2026-05-15 21:43:59.649 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan22_14b.json
+2026-05-15 21:43:59.650 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_flux.json
+2026-05-15 21:43:59.650 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_nano_banana.json
+2026-05-15 21:43:59.650 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_qwen.json
+2026-05-15 21:43:59.652 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/video_animatediff_sd15.json
+2026-05-15 21:44:06.921 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:44:06.924 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:44:06.930 | DEBUG    | web.state.session:get_pixelle_video:69 - [session] pipeline_src_hash computed: 60fd49cf...
+2026-05-15 21:44:06.932 | INFO     | web.state.session:get_pixelle_video:78 - [session] combined_hash = 8f3f4c678deccfa2...
+2026-05-15 21:44:06.932 | INFO     | web.state.session:get_pixelle_video:85 - [session] Creating new PixelleVideoCore instance (first time)
+2026-05-15 21:44:06.933 | INFO     | pixelle_video.service:initialize:197 - \U0001f680 Initializing Pixelle-Video...
+2026-05-15 21:44:06.933 | INFO     | pixelle_video.service:initialize:219 - \U0001f4f9 Registered pipelines: standard, custom, asset_based, image_text_post
+2026-05-15 21:44:06.933 | INFO     | pixelle_video.service:initialize:225 - \u2705 Pixelle-Video initialized successfully
+
+2026-05-15 21:44:06.935 | INFO     | web.state.session:get_pixelle_video:105 - [session] \u2705 PixelleVideoCore initialized and cached with hash 8f3f4c678deccfa2...
+2026-05-15 21:44:06.940 | INFO     | pixelle_video.config.loader:load_config_dict:43 - Configuration loaded from config.yaml
+2026-05-15 21:44:06- pixelle_video.utils.template_util - INFO - template_util.py:371 - resolve_template_path - Backward compatibility: migrated '1080x1920/default.html' to '1080x1920/image_default.html'
+2026-05-15 21:44:06.941 | DEBUG    | pixelle_video.config.manager:_validate_template:64 - Template validation passed: 1080x1920/default.html -> D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html
+2026-05-15 21:44:06.941 | INFO     | pixelle_video.config.manager:reload:74 - Configuration reloaded
+2026-05-15 21:44:06- pixelle_video.utils.template_util - WARNING - template_util.py:422 - get_template_type - Template 'asset_default.html' doesn't follow naming convention (static_/image_/video_). Defaulting to 'image' type.
+2026-05-15 21:44:07.101 | DEBUG    | pixelle_video.services.frame_html:_load_template:120 - Template loaded: 14828 chars
+2026-05-15 21:44:07.102 | DEBUG    | pixelle_video.services.frame_html:__init__:73 - Loaded HTML template: D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html (size: 1080x1920)
+2026-05-15 21:44:07.102 | DEBUG    | pixelle_video.services.frame_html:parse_template_parameters:225 - Parsed 3 custom parameter(s) from template: ['author', 'describe', 'brand']
+2026-05-15 21:44:07.105 | DEBUG    | pixelle_video.services.frame_html:_parse_media_size_from_meta:147 - Found media size in meta tags: 1024x1024
+2026-05-15 21:44:07.115 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_Z-image.json
+2026-05-15 21:44:07.115 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux.json
+2026-05-15 21:44:07.116 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux2.json
+2026-05-15 21:44:07.116 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen.json
+2026-05-15 21:44:07.118 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen_chinese_cartoon.json
+2026-05-15 21:44:07.118 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sd3.5.json
+2026-05-15 21:44:07.120 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sdxl.json
+2026-05-15 21:44:07.120 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_qwen_wan2.2.json
+2026-05-15 21:44:07.121 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_understanding.json
+2026-05-15 21:44:07.121 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan2.2.json
+2026-05-15 21:44:07.123 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan22_14b.json
+2026-05-15 21:44:07.124 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_flux.json
+2026-05-15 21:44:07.124 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_nano_banana.json
+2026-05-15 21:44:07.126 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_qwen.json
+2026-05-15 21:44:07.126 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/video_animatediff_sd15.json
+2026-05-15 21:44:57.307 Uncaught app execution
+Traceback (most recent call last):
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 672, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py", line 114, in <module>
+    main()
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py", line 110, in main
+    pg.run()
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\navigation\page.py", line 310, in run
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\web\pages\9_\u2699\ufe0f_Settings.py", line 87, in <module>
+    required_pwd = cfg.admin_password.strip()
+                   ^^^^^^^^^^^^^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'PixelleVideoConfig' object has no attribute 'admin_password'
+2026-05-15 21:45:39.959 | DEBUG    | web.i18n:load_locales:43 - Loaded locale: en_US
+2026-05-15 21:45:39.961 | DEBUG    | web.i18n:load_locales:43 - Loaded locale: zh_CN
+2026-05-15 21:45:39.961 | INFO     | web.i18n:load_locales:47 - Loaded 2 locales: ['en_US', 'zh_CN']
+2026-05-15 21:45:39.961 | DEBUG    | web.i18n:detect_system_language:194 - System locale from getdefaultlocale(): zh_CN
+2026-05-15 21:45:39.961 | INFO     | web.i18n:detect_system_language:224 - System language matched: zh_CN
+2026-05-15 21:45:39.961 | INFO     | web.i18n:<module>:248 - Default language initialized to: zh_CN
+2026-05-15 21:45:39.964 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:45:39.968 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:45:39.975 | DEBUG    | web.state.session:get_pixelle_video:69 - [session] pipeline_src_hash computed: 60fd49cf...
+2026-05-15 21:45:39.975 | INFO     | web.state.session:get_pixelle_video:78 - [session] combined_hash = 8f3f4c678deccfa2...
+2026-05-15 21:45:39.975 | INFO     | web.state.session:get_pixelle_video:85 - [session] Creating new PixelleVideoCore instance (first time)
+2026-05-15 21:45:39.975 | INFO     | pixelle_video.service:initialize:197 - \U0001f680 Initializing Pixelle-Video...
+2026-05-15 21:45:39.977 | INFO     | pixelle_video.service:initialize:219 - \U0001f4f9 Registered pipelines: standard, custom, asset_based, image_text_post
+2026-05-15 21:45:39.977 | INFO     | pixelle_video.service:initialize:225 - \u2705 Pixelle-Video initialized successfully
+
+2026-05-15 21:45:39.977 | INFO     | web.state.session:get_pixelle_video:105 - [session] \u2705 PixelleVideoCore initialized and cached with hash 8f3f4c678deccfa2...
+2026-05-15 21:45:39.980 | INFO     | pixelle_video.config.loader:load_config_dict:43 - Configuration loaded from config.yaml
+2026-05-15 21:45:39- pixelle_video.utils.template_util - INFO - template_util.py:371 - resolve_template_path - Backward compatibility: migrated '1080x1920/default.html' to '1080x1920/image_default.html'
+2026-05-15 21:45:39.982 | DEBUG    | pixelle_video.config.manager:_validate_template:64 - Template validation passed: 1080x1920/default.html -> D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html
+2026-05-15 21:45:39.982 | INFO     | pixelle_video.config.manager:reload:74 - Configuration reloaded
+2026-05-15 21:45:40- pixelle_video.utils.template_util - WARNING - template_util.py:422 - get_template_type - Template 'asset_default.html' doesn't follow naming convention (static_/image_/video_). Defaulting to 'image' type.
+2026-05-15 21:45:40.142 | DEBUG    | pixelle_video.services.frame_html:_load_template:120 - Template loaded: 14828 chars
+2026-05-15 21:45:40.142 | DEBUG    | pixelle_video.services.frame_html:__init__:73 - Loaded HTML template: D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html (size: 1080x1920)
+2026-05-15 21:45:40.142 | DEBUG    | pixelle_video.services.frame_html:parse_template_parameters:225 - Parsed 3 custom parameter(s) from template: ['author', 'describe', 'brand']
+2026-05-15 21:45:40.143 | DEBUG    | pixelle_video.services.frame_html:_parse_media_size_from_meta:147 - Found media size in meta tags: 1024x1024
+2026-05-15 21:45:40.153 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_Z-image.json
+2026-05-15 21:45:40.153 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux.json
+2026-05-15 21:45:40.153 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux2.json
+2026-05-15 21:45:40.155 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen.json
+2026-05-15 21:45:40.155 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen_chinese_cartoon.json
+2026-05-15 21:45:40.157 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sd3.5.json
+2026-05-15 21:45:40.157 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sdxl.json
+2026-05-15 21:45:40.158 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_qwen_wan2.2.json
+2026-05-15 21:45:40.158 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_understanding.json
+2026-05-15 21:45:40.160 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan2.2.json
+2026-05-15 21:45:40.160 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan22_14b.json
+2026-05-15 21:45:40.161 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_flux.json
+2026-05-15 21:45:40.161 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_nano_banana.json
+2026-05-15 21:45:40.163 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_qwen.json
+2026-05-15 21:45:40.164 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/video_animatediff_sd15.json
+2026-05-15 21:46:04.691 Uncaught app execution
+Traceback (most recent call last):
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 672, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py", line 114, in <module>
+    main()
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py", line 110, in main
+    pg.run()
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\navigation\page.py", line 310, in run
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\web\pages\9_\u2699\ufe0f_Settings.py", line 87, in <module>
+    required_pwd = cfg.admin_password.strip()
+                   ^^^^^^^^^^^^^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'PixelleVideoConfig' object has no attribute 'admin_password'
+2026-05-15 21:46:51.963 Uncaught app execution
+Traceback (most recent call last):
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\exec_code.py", line 129, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\runtime\scriptrunner\script_runner.py", line 672, in code_to_exec
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py", line 115, in <module>
+    main()
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\web\app.py", line 111, in main
+    pg.run()
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\streamlit\navigation\page.py", line 310, in run
+    exec(code, module.__dict__)  # noqa: S102
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\web\pages\9_\u2699\ufe0f_Settings.py", line 87, in <module>
+    required_pwd = cfg.admin_password.strip()
+                   ^^^^^^^^^^^^^^^^^^
+  File "D:\vscocde file\github-video-项目\Pixelle-Video\.venv\Lib\site-packages\pydantic\main.py", line 1026, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'PixelleVideoConfig' object has no attribute 'admin_password'
+2026-05-15 21:46:58.656 | DEBUG    | web.i18n:load_locales:43 - Loaded locale: en_US
+2026-05-15 21:46:58.656 | DEBUG    | web.i18n:load_locales:43 - Loaded locale: zh_CN
+2026-05-15 21:46:58.656 | INFO     | web.i18n:load_locales:47 - Loaded 2 locales: ['en_US', 'zh_CN']
+2026-05-15 21:46:58.658 | DEBUG    | web.i18n:detect_system_language:194 - System locale from getdefaultlocale(): zh_CN
+2026-05-15 21:46:58.658 | INFO     | web.i18n:detect_system_language:224 - System language matched: zh_CN
+2026-05-15 21:46:58.658 | INFO     | web.i18n:<module>:248 - Default language initialized to: zh_CN
+2026-05-15 21:46:58.659 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:46:58.664 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:46:58.672 | DEBUG    | web.state.session:get_pixelle_video:69 - [session] pipeline_src_hash computed: 60fd49cf...
+2026-05-15 21:46:58.673 | INFO     | web.state.session:get_pixelle_video:78 - [session] combined_hash = 8f3f4c678deccfa2...
+2026-05-15 21:46:58.673 | INFO     | web.state.session:get_pixelle_video:85 - [session] Creating new PixelleVideoCore instance (first time)
+2026-05-15 21:46:58.673 | INFO     | pixelle_video.service:initialize:197 - \U0001f680 Initializing Pixelle-Video...
+2026-05-15 21:46:58.675 | INFO     | pixelle_video.service:initialize:219 - \U0001f4f9 Registered pipelines: standard, custom, asset_based, image_text_post
+2026-05-15 21:46:58.675 | INFO     | pixelle_video.service:initialize:225 - \u2705 Pixelle-Video initialized successfully
+
+2026-05-15 21:46:58.675 | INFO     | web.state.session:get_pixelle_video:105 - [session] \u2705 PixelleVideoCore initialized and cached with hash 8f3f4c678deccfa2...
+2026-05-15 21:46:58.678 | INFO     | pixelle_video.config.loader:load_config_dict:43 - Configuration loaded from config.yaml
+2026-05-15 21:46:58- pixelle_video.utils.template_util - INFO - template_util.py:371 - resolve_template_path - Backward compatibility: migrated '1080x1920/default.html' to '1080x1920/image_default.html'
+2026-05-15 21:46:58.679 | DEBUG    | pixelle_video.config.manager:_validate_template:64 - Template validation passed: 1080x1920/default.html -> D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html
+2026-05-15 21:46:58.679 | INFO     | pixelle_video.config.manager:reload:74 - Configuration reloaded
+2026-05-15 21:46:58- pixelle_video.utils.template_util - WARNING - template_util.py:422 - get_template_type - Template 'asset_default.html' doesn't follow naming convention (static_/image_/video_). Defaulting to 'image' type.
+2026-05-15 21:46:58.841 | DEBUG    | pixelle_video.services.frame_html:_load_template:120 - Template loaded: 14828 chars
+2026-05-15 21:46:58.843 | DEBUG    | pixelle_video.services.frame_html:__init__:73 - Loaded HTML template: D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html (size: 1080x1920)
+2026-05-15 21:46:58.843 | DEBUG    | pixelle_video.services.frame_html:parse_template_parameters:225 - Parsed 3 custom parameter(s) from template: ['author', 'describe', 'brand']
+2026-05-15 21:46:58.844 | DEBUG    | pixelle_video.services.frame_html:_parse_media_size_from_meta:147 - Found media size in meta tags: 1024x1024
+2026-05-15 21:46:58.855 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_Z-image.json
+2026-05-15 21:46:58.855 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux.json
+2026-05-15 21:46:58.856 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux2.json
+2026-05-15 21:46:58.856 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen.json
+2026-05-15 21:46:58.856 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen_chinese_cartoon.json
+2026-05-15 21:46:58.858 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sd3.5.json
+2026-05-15 21:46:58.858 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sdxl.json
+2026-05-15 21:46:58.859 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_qwen_wan2.2.json
+2026-05-15 21:46:58.859 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_understanding.json
+2026-05-15 21:46:58.861 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan2.2.json
+2026-05-15 21:46:58.861 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan22_14b.json
+2026-05-15 21:46:58.862 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_flux.json
+2026-05-15 21:46:58.862 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_nano_banana.json
+2026-05-15 21:46:58.864 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_qwen.json
+2026-05-15 21:46:58.865 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/video_animatediff_sd15.json
+2026-05-15 21:47:42.608 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:47:42.617 | DEBUG    | web.state.session:get_pixelle_video:69 - [session] pipeline_src_hash computed: 60fd49cf...
+2026-05-15 21:47:42.619 | INFO     | web.state.session:get_pixelle_video:78 - [session] combined_hash = 8f3f4c678deccfa2...
+2026-05-15 21:47:42.619 | INFO     | web.state.session:get_pixelle_video:85 - [session] Creating new PixelleVideoCore instance (first time)
+2026-05-15 21:47:42.620 | INFO     | pixelle_video.service:initialize:197 - \U0001f680 Initializing Pixelle-Video...
+2026-05-15 21:47:42.620 | INFO     | pixelle_video.service:initialize:219 - \U0001f4f9 Registered pipelines: standard, custom, asset_based, image_text_post
+2026-05-15 21:47:42.620 | INFO     | pixelle_video.service:initialize:225 - \u2705 Pixelle-Video initialized successfully
+
+2026-05-15 21:47:42.620 | INFO     | web.state.session:get_pixelle_video:105 - [session] \u2705 PixelleVideoCore initialized and cached with hash 8f3f4c678deccfa2...
+2026-05-15 21:47:50.680 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:47:50.683 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:47:50.689 | DEBUG    | web.state.session:get_pixelle_video:69 - [session] pipeline_src_hash computed: 60fd49cf...
+2026-05-15 21:47:50.691 | INFO     | web.state.session:get_pixelle_video:78 - [session] combined_hash = 8f3f4c678deccfa2...
+2026-05-15 21:47:50.691 | INFO     | web.state.session:get_pixelle_video:85 - [session] Creating new PixelleVideoCore instance (first time)
+2026-05-15 21:47:50.691 | INFO     | pixelle_video.service:initialize:197 - \U0001f680 Initializing Pixelle-Video...
+2026-05-15 21:47:50.692 | INFO     | pixelle_video.service:initialize:219 - \U0001f4f9 Registered pipelines: standard, custom, asset_based, image_text_post
+2026-05-15 21:47:50.692 | INFO     | pixelle_video.service:initialize:225 - \u2705 Pixelle-Video initialized successfully
+
+2026-05-15 21:47:50.692 | INFO     | web.state.session:get_pixelle_video:105 - [session] \u2705 PixelleVideoCore initialized and cached with hash 8f3f4c678deccfa2...
+2026-05-15 21:47:50.697 | INFO     | pixelle_video.config.loader:load_config_dict:43 - Configuration loaded from config.yaml
+2026-05-15 21:47:50- pixelle_video.utils.template_util - INFO - template_util.py:371 - resolve_template_path - Backward compatibility: migrated '1080x1920/default.html' to '1080x1920/image_default.html'
+2026-05-15 21:47:50.698 | DEBUG    | pixelle_video.config.manager:_validate_template:64 - Template validation passed: 1080x1920/default.html -> D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html
+2026-05-15 21:47:50.698 | INFO     | pixelle_video.config.manager:reload:74 - Configuration reloaded
+2026-05-15 21:47:50- pixelle_video.utils.template_util - WARNING - template_util.py:422 - get_template_type - Template 'asset_default.html' doesn't follow naming convention (static_/image_/video_). Defaulting to 'image' type.
+2026-05-15 21:47:50.848 | DEBUG    | pixelle_video.services.frame_html:_load_template:120 - Template loaded: 14828 chars
+2026-05-15 21:47:50.849 | DEBUG    | pixelle_video.services.frame_html:__init__:73 - Loaded HTML template: D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html (size: 1080x1920)
+2026-05-15 21:47:50.849 | DEBUG    | pixelle_video.services.frame_html:parse_template_parameters:225 - Parsed 3 custom parameter(s) from template: ['author', 'describe', 'brand']
+2026-05-15 21:47:50.851 | DEBUG    | pixelle_video.services.frame_html:_parse_media_size_from_meta:147 - Found media size in meta tags: 1024x1024
+2026-05-15 21:47:50.859 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_Z-image.json
+2026-05-15 21:47:50.861 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux.json
+2026-05-15 21:47:50.861 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux2.json
+2026-05-15 21:47:50.862 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen.json
+2026-05-15 21:47:50.862 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen_chinese_cartoon.json
+2026-05-15 21:47:50.864 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sd3.5.json
+2026-05-15 21:47:50.864 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sdxl.json
+2026-05-15 21:47:50.864 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_qwen_wan2.2.json
+2026-05-15 21:47:50.866 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_understanding.json
+2026-05-15 21:47:50.866 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan2.2.json
+2026-05-15 21:47:50.866 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan22_14b.json
+2026-05-15 21:47:50.870 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_flux.json
+2026-05-15 21:47:50.870 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_nano_banana.json
+2026-05-15 21:47:50.871 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_qwen.json
+2026-05-15 21:47:50.871 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/video_animatediff_sd15.json
+2026-05-15 21:49:54.545 | DEBUG    | web.i18n:load_locales:43 - Loaded locale: en_US
+2026-05-15 21:49:54.546 | DEBUG    | web.i18n:load_locales:43 - Loaded locale: zh_CN
+2026-05-15 21:49:54.546 | INFO     | web.i18n:load_locales:47 - Loaded 2 locales: ['en_US', 'zh_CN']
+2026-05-15 21:49:54.546 | DEBUG    | web.i18n:detect_system_language:194 - System locale from getdefaultlocale(): zh_CN
+2026-05-15 21:49:54.546 | INFO     | web.i18n:detect_system_language:224 - System language matched: zh_CN
+2026-05-15 21:49:54.546 | INFO     | web.i18n:<module>:248 - Default language initialized to: zh_CN
+2026-05-15 21:49:54.548 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:49:54.552 | DEBUG    | web.i18n:set_language:56 - Language set to: zh_CN
+2026-05-15 21:49:54.560 | DEBUG    | web.state.session:get_pixelle_video:69 - [session] pipeline_src_hash computed: 60fd49cf...
+2026-05-15 21:49:54.560 | INFO     | web.state.session:get_pixelle_video:78 - [session] combined_hash = 8f3f4c678deccfa2...
+2026-05-15 21:49:54.560 | INFO     | web.state.session:get_pixelle_video:85 - [session] Creating new PixelleVideoCore instance (first time)
+2026-05-15 21:49:54.561 | INFO     | pixelle_video.service:initialize:197 - \U0001f680 Initializing Pixelle-Video...
+2026-05-15 21:49:54.561 | INFO     | pixelle_video.service:initialize:219 - \U0001f4f9 Registered pipelines: standard, custom, asset_based, image_text_post
+2026-05-15 21:49:54.562 | INFO     | pixelle_video.service:initialize:225 - \u2705 Pixelle-Video initialized successfully
+
+2026-05-15 21:49:54.563 | INFO     | web.state.session:get_pixelle_video:105 - [session] \u2705 PixelleVideoCore initialized and cached with hash 8f3f4c678deccfa2...
+2026-05-15 21:49:54.566 | INFO     | pixelle_video.config.loader:load_config_dict:43 - Configuration loaded from config.yaml
+2026-05-15 21:49:54- pixelle_video.utils.template_util - INFO - template_util.py:371 - resolve_template_path - Backward compatibility: migrated '1080x1920/default.html' to '1080x1920/image_default.html'
+2026-05-15 21:49:54.566 | DEBUG    | pixelle_video.config.manager:_validate_template:64 - Template validation passed: 1080x1920/default.html -> D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html
+2026-05-15 21:49:54.566 | INFO     | pixelle_video.config.manager:reload:74 - Configuration reloaded
+2026-05-15 21:49:54- pixelle_video.utils.template_util - WARNING - template_util.py:422 - get_template_type - Template 'asset_default.html' doesn't follow naming convention (static_/image_/video_). Defaulting to 'image' type.
+2026-05-15 21:49:54.751 | DEBUG    | pixelle_video.services.frame_html:_load_template:120 - Template loaded: 14828 chars
+2026-05-15 21:49:54.751 | DEBUG    | pixelle_video.services.frame_html:__init__:73 - Loaded HTML template: D:\vscocde file\github-video-项目\Pixelle-Video\templates\1080x1920\image_default.html (size: 1080x1920)
+2026-05-15 21:49:54.751 | DEBUG    | pixelle_video.services.frame_html:parse_template_parameters:225 - Parsed 3 custom parameter(s) from template: ['author', 'describe', 'brand']
+2026-05-15 21:49:54.754 | DEBUG    | pixelle_video.services.frame_html:_parse_media_size_from_meta:147 - Found media size in meta tags: 1024x1024
+2026-05-15 21:49:54.765 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_Z-image.json
+2026-05-15 21:49:54.765 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux.json
+2026-05-15 21:49:54.766 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_flux2.json
+2026-05-15 21:49:54.766 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen.json
+2026-05-15 21:49:54.768 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_qwen_chinese_cartoon.json
+2026-05-15 21:49:54.769 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sd3.5.json
+2026-05-15 21:49:54.769 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/image_sdxl.json
+2026-05-15 21:49:54.770 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_qwen_wan2.2.json
+2026-05-15 21:49:54.770 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_understanding.json
+2026-05-15 21:49:54.772 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan2.2.json
+2026-05-15 21:49:54.772 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: runninghub/video_wan22_14b.json
+2026-05-15 21:49:54.773 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_flux.json
+2026-05-15 21:49:54.775 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_nano_banana.json
+2026-05-15 21:49:54.776 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/image_qwen.json
+2026-05-15 21:49:54.779 | DEBUG    | pixelle_video.services.media:_scan_workflows:142 - Found workflow: selfhost/video_animatediff_sd15.json
