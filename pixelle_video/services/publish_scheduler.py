@@ -33,6 +33,8 @@ DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 QUEUE_FILE = DATA_DIR / "publish_queue.json"
 PUBLISH_TIMEOUT_SECONDS = 30 * 60
 ORPHAN_RUNNING_GRACE_MINUTES = 35
+MAX_JOB_RETRIES = 2  # total attempts = MAX_JOB_RETRIES + 1
+RETRY_DELAY_SECONDS = 15  # wait between retries
 
 
 # ---- Job Status ---------------------------------------------------------------
@@ -85,6 +87,8 @@ class PublishJob:
         self.started_at: Optional[str] = None
         self.finished_at: Optional[str] = None
         self.error: Optional[str] = None
+        self.retry_count: int = 0
+        self.screenshots: List[str] = []
 
     def to_dict(self) -> dict:
         return {
@@ -106,6 +110,8 @@ class PublishJob:
             "started_at": self.started_at,
             "finished_at": self.finished_at,
             "error": self.error,
+            "retry_count": self.retry_count,
+            "screenshots": self.screenshots,
         }
 
     @classmethod
@@ -130,6 +136,8 @@ class PublishJob:
         job.started_at = data.get("started_at")
         job.finished_at = data.get("finished_at")
         job.error = data.get("error")
+        job.retry_count = int(data.get("retry_count", 0))
+        job.screenshots = data.get("screenshots") or []
         return job
 
 
@@ -415,7 +423,7 @@ class PublishScheduler:
     # -------------------------------------------------------------------------
 
     async def _execute_job(self, job_id: str):
-        """Execute a publish job (serialized per device)."""
+        """Execute a publish job (serialized per device) with automatic retry."""
         from pixelle_video.services.xhs_publisher import XHSPublisher, XHSPublishError
 
         job = self._jobs.get(job_id)
@@ -436,49 +444,91 @@ class PublishScheduler:
             job.started_at = datetime.now().isoformat()
             self._save()
 
-            try:
-                publisher = XHSPublisher(serial=job.serial)
-                if job.kind == "video":
-                    if not job.video_path:
-                        raise XHSPublishError(
-                            "Video job missing video_path"
+            publisher = XHSPublisher(serial=job.serial, job_id=job.job_id)
+            last_error: Optional[str] = None
+
+            for attempt in range(MAX_JOB_RETRIES + 1):
+                if attempt > 0:
+                    logger.warning(
+                        f"Job {job_id}: retry {attempt}/{MAX_JOB_RETRIES} "
+                        f"after failure: {last_error}"
+                    )
+                    job.retry_count = attempt
+                    self._save()
+                    # Force-stop XHS to get a clean state before retry
+                    try:
+                        import subprocess as _sp
+                        _sp.run(
+                            [
+                                XHSPublisher._resolve_adb(), "-s", job.serial,
+                                "shell", "am", "force-stop", "com.xingin.xhs",
+                            ],
+                            capture_output=True, timeout=10,
                         )
-                    success = await asyncio.wait_for(
-                        publisher.publish_video(
-                            video_path=job.video_path,
-                            title=job.title,
-                            body=job.body,
-                            hashtags=job.hashtags,
-                            dry_run=job.dry_run,
-                        ),
-                        timeout=PUBLISH_TIMEOUT_SECONDS,
+                    except Exception:
+                        pass
+                    await asyncio.sleep(RETRY_DELAY_SECONDS)
+
+                try:
+                    if job.kind == "video":
+                        if not job.video_path:
+                            raise XHSPublishError("Video job missing video_path")
+                        success = await asyncio.wait_for(
+                            publisher.publish_video(
+                                video_path=job.video_path,
+                                title=job.title,
+                                body=job.body,
+                                hashtags=job.hashtags,
+                                dry_run=job.dry_run,
+                            ),
+                            timeout=PUBLISH_TIMEOUT_SECONDS,
+                        )
+                    else:
+                        success = await asyncio.wait_for(
+                            publisher.publish(
+                                images=job.images,
+                                title=job.title,
+                                body=job.body,
+                                hashtags=job.hashtags,
+                            ),
+                            timeout=PUBLISH_TIMEOUT_SECONDS,
+                        )
+
+                    if success:
+                        job.status = JobStatus.SUCCESS
+                        break  # done, exit retry loop
+                    else:
+                        last_error = "Publish did not confirm success"
+                        if attempt < MAX_JOB_RETRIES:
+                            continue
+                        job.status = JobStatus.FAILED
+                        job.error = last_error
+
+                except asyncio.TimeoutError:
+                    job.status = JobStatus.FAILED
+                    job.error = (
+                        f"Publish timed out after {PUBLISH_TIMEOUT_SECONDS // 60} minutes"
                     )
-                else:
-                    success = await asyncio.wait_for(
-                        publisher.publish(
-                            images=job.images,
-                            title=job.title,
-                            body=job.body,
-                            hashtags=job.hashtags,
-                        ),
-                        timeout=PUBLISH_TIMEOUT_SECONDS,
-                    )
-                job.status = JobStatus.SUCCESS if success else JobStatus.FAILED
-                if not success:
-                    job.error = "Publish did not confirm success"
-            except asyncio.TimeoutError:
-                job.status = JobStatus.FAILED
-                job.error = (
-                    f"Publish timed out after {PUBLISH_TIMEOUT_SECONDS // 60} minutes"
-                )
-                logger.error(f"Job {job_id} timed out")
-            except Exception as exc:
-                job.status = JobStatus.FAILED
-                job.error = str(exc)
-                logger.error(f"Job {job_id} failed: {exc}")
-            finally:
-                job.finished_at = datetime.now().isoformat()
-                self._save()
+                    logger.error(f"Job {job_id} timed out")
+                    break  # don't retry timeouts
+
+                except XHSPublishError as exc:
+                    last_error = str(exc)
+                    if attempt < MAX_JOB_RETRIES:
+                        continue  # retry transient UI errors
+                    job.status = JobStatus.FAILED
+                    job.error = last_error
+                    logger.error(f"Job {job_id} failed after {attempt + 1} attempt(s): {exc}")
+
+                except Exception as exc:
+                    job.status = JobStatus.FAILED
+                    job.error = str(exc)
+                    logger.error(f"Job {job_id} unexpected error: {exc}")
+                    break  # don't retry unexpected errors
+
+            job.screenshots = list(publisher.screenshots)  # capture all debug screenshots
+            job.finished_at = datetime.now().isoformat()
+            self._save()
 
     async def execute_now(self, job_id: str) -> bool:
         """Manually trigger a pending job immediately."""

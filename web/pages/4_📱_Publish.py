@@ -1002,6 +1002,11 @@ def _render_publish_queue_list(filter_val: str | None):
                     except Exception:
                         pass
 
+                # Show retry count if any retries occurred
+                retry_count = getattr(job, "retry_count", 0)
+                if retry_count:
+                    st.info(f"🔄 已重试 {retry_count} 次（共 {retry_count + 1} 次尝试）")
+
                 st.json(payload)
 
                 # Inline preview for video jobs
@@ -1014,6 +1019,22 @@ def _render_publish_queue_list(filter_val: str | None):
                             st.caption(f"无法预览视频：{vp}")
                     elif vp:
                         st.caption(f"⚠️ 视频文件不存在：{vp}")
+
+                # Debug screenshots (saved by XHSPublisher during automation)
+                screenshots = getattr(job, "screenshots", []) or []
+                if screenshots:
+                    existing = [p for p in screenshots if Path(p).exists()]
+                    with st.expander(f"📸 调试截图（{len(existing)}/{len(screenshots)} 张可用）"):
+                        if existing:
+                            cols = st.columns(min(3, len(existing)))
+                            for idx, sc_path in enumerate(existing):
+                                with cols[idx % 3]:
+                                    try:
+                                        st.image(sc_path, caption=Path(sc_path).name, use_container_width=True)
+                                    except Exception:
+                                        st.caption(f"无法加载：{Path(sc_path).name}")
+                        else:
+                            st.caption("截图文件已清理或路径变更")
 
                 if elapsed is not None and elapsed > 600:
                     st.warning(f"任务已运行 {elapsed // 60} 分钟，请观察设备侧是否仍在操作")

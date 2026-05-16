@@ -57,7 +57,7 @@ class XHSPublisher:
     Each instance is tied to one device serial.
     """
 
-    def __init__(self, serial: str, push_dir: str | None = None, strict_mode: bool | None = None):
+    def __init__(self, serial: str, push_dir: str | None = None, strict_mode: bool | None = None, job_id: str | None = None):
         self.serial = serial
 
         # Load publish config from config_manager; constructor params take precedence
@@ -78,6 +78,8 @@ class XHSPublisher:
             self.strict_mode = xhs_cfg.strict_mode if xhs_cfg is not None else True
 
         self.lock_pin: str = xhs_cfg.lock_pin if xhs_cfg and hasattr(xhs_cfg, "lock_pin") else ""
+        self.job_id: Optional[str] = job_id
+        self.screenshots: List[str] = []  # paths of all screenshots taken in this session
 
         # Load UI selectors from config/xhs_ui_selectors.yaml (allows operator-level tuning)
         self._selectors: dict = self._load_selectors()
@@ -190,18 +192,8 @@ class XHSPublisher:
                 if _try_once():
                     return True
 
-        # Save debug screenshot on failure
-        try:
-            import os
-            from pathlib import Path as _P
-            _out = _P(__file__).resolve().parent.parent.parent / "output"
-            _out.mkdir(exist_ok=True)
-            _ts = int(time.time())
-            _img_path = _out / f"xhs_debug_{key}_{_ts}.png"
-            d.screenshot(str(_img_path))
-            logger.warning(f"[xhs] selector '{key}' not found; screenshot saved → {_img_path.name}")
-        except Exception as _se:
-            logger.debug(f"[xhs] screenshot on fail error: {_se}")
+        # Save debug screenshot on failure via instance method (tracks path in self.screenshots)
+        self._screenshot(d, f"selector_{key}_fail")
 
         return False
 
@@ -880,12 +872,27 @@ class XHSPublisher:
             time.sleep(0.5)
 
     def _screenshot(self, d, tag: str) -> None:
-        """Save a debug screenshot with a given tag to the system temp dir."""
+        """Save a debug screenshot.
+
+        If job_id is set, saves to output/<job_id>/screenshots/; otherwise falls back
+        to the system temp directory.  The path is appended to self.screenshots.
+        """
         try:
-            import tempfile, datetime
-            ts = datetime.datetime.now().strftime("%H%M%S")
-            path = os.path.join(tempfile.gettempdir(), f"xhs_{tag}_{ts}.png")
+            import datetime as _dt
+            ts = _dt.datetime.now().strftime("%H%M%S")
+            filename = f"xhs_{tag}_{ts}.png"
+            if self.job_id:
+                _out_dir = (
+                    Path(__file__).resolve().parent.parent.parent
+                    / "output" / self.job_id / "screenshots"
+                )
+                _out_dir.mkdir(parents=True, exist_ok=True)
+                path = str(_out_dir / filename)
+            else:
+                import tempfile
+                path = os.path.join(tempfile.gettempdir(), filename)
             d.screenshot(path)
+            self.screenshots.append(path)
             logger.debug(f"[screenshot] {tag} → {path}")
         except Exception as e:
             logger.debug(f"[screenshot] {tag} failed (non-fatal): {e}")
