@@ -1169,6 +1169,27 @@ def main():
     init_session_state()
     init_i18n()
 
+    # ---- 违禁词命中 toast -------------------------------------------------------
+    try:
+        from pixelle_video.utils.banned_keywords import read_audit as _read_audit
+        _audit_all = _read_audit(last_n=100)
+        _audit_prev = st.session_state.get("_audit_seen_count", len(_audit_all))
+        _audit_new = _audit_all[_audit_prev:]
+        if _audit_new:
+            st.session_state["_audit_seen_count"] = len(_audit_all)
+            for _ae in _audit_new:
+                _hits_str = "、".join(_ae.get("hits", []))
+                _job_short = (_ae.get("job_id") or "")[:8]
+                st.toast(
+                    f"🚫 违禁词已过滤（任务 {_ae.get('task_id', '')}）：{_hits_str}  [Job {_job_short}…]",
+                    icon="⚠️",
+                )
+        elif "_audit_seen_count" not in st.session_state:
+            st.session_state["_audit_seen_count"] = len(_audit_all)
+    except Exception:
+        pass
+    # ---------------------------------------------------------------------------
+
     st.title("📱 发布管理")
     st.caption("管理 Android 设备并将图文帖子发布到小红书")
 

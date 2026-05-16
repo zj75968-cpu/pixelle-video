@@ -341,3 +341,45 @@ def append_prompt_block(prompt: str, *, language: str = "auto") -> str:
     if not block:
         return prompt
     return f"{prompt}{block}"
+
+
+# ---- 审计日志 ---------------------------------------------------------------
+
+def _audit_log_path() -> "Path":
+    from pathlib import Path
+    p = Path(__file__).resolve().parents[2] / "data" / "banned_audit.log"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def append_audit(*, task_id: str, serial: str, job_id: str, hits: List[str]) -> None:
+    """将一条违禁词命中记录追加到 data/banned_audit.log（JSONL 格式）。"""
+    import json
+    from datetime import datetime, timezone
+
+    entry = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "task_id": task_id,
+        "serial": serial,
+        "job_id": job_id,
+        "hits": hits,
+    }
+    with open(_audit_log_path(), "a", encoding="utf-8") as _f:
+        _f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def read_audit(last_n: int = 50) -> List[dict]:
+    """读取最近 last_n 条违禁词命中记录；日志不存在时返回空列表。"""
+    import json
+
+    log_file = _audit_log_path()
+    if not log_file.exists():
+        return []
+    lines = log_file.read_text(encoding="utf-8").strip().splitlines()
+    records: List[dict] = []
+    for line in lines:
+        try:
+            records.append(json.loads(line))
+        except Exception:
+            pass
+    return records[-last_n:]

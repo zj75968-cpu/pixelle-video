@@ -283,6 +283,14 @@ class PublishScheduler:
         self._jobs[job.job_id] = job
         self._save()
 
+        # 写违禁词命中审计日志
+        if _hits:
+            try:
+                from pixelle_video.utils.banned_keywords import append_audit as _append_audit
+                _append_audit(task_id=task_id, serial=serial, job_id=job.job_id, hits=_hits)
+            except Exception as _aex:
+                logger.warning(f"[banned_keywords] audit write failed: {_aex}")
+
         # If APScheduler is running and a schedule time is specified, register it
         if self._scheduler and scheduled_at:
             self._schedule_job(job)
