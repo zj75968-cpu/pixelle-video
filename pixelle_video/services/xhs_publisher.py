@@ -1146,7 +1146,10 @@ class XHSPublisher:
           3. Click "编辑和权限设置" (bottom of detail page)
           4. In "笔记设置" bottom sheet, swipe left on icon row to reveal "删除"
           5. Tap "删除" → tap "删除笔记" → tap "确认删除"
-        Returns True if the post was deleted, False otherwise.
+          6. Verify the note no longer appears in the profile grid
+
+        Returns True only if final confirmation was tapped AND the note is
+        gone from profile (or could not be re-found within scroll budget).
         """
         import re as _re
 
@@ -1173,41 +1176,48 @@ class XHSPublisher:
             time.sleep(2)
 
             # 3. Find the note by title
-            # XHS grid view stores title in content-desc (not text attribute).
-            # The profile grid uses RecyclerView, so off-screen items are not
-            # rendered — we must scroll to find the note.
+            # XHS grid stores title in content-desc; longer probe = lower
+            # chance of matching the wrong note.
             base_title = _re.split(r"[（(]", post_title)[0].strip() or post_title
-            search_kw = post_title[:6] if len(post_title) >= 6 else post_title
+            probe_short = post_title[:6] if len(post_title) >= 6 else post_title
+            probe_long = post_title[:10] if len(post_title) >= 10 else post_title
 
-            def _find_note() -> object:
-                for selector in (
+            def _find_note():
+                # Order: most specific → least specific
+                candidates = [
                     d(text=post_title),
-                    d(textContains=search_kw),
-                    d(descriptionContains=search_kw),
-                    d(descriptionContains=base_title) if base_title != post_title else None,
-                ):
-                    if selector is not None and selector.exists(timeout=1):
+                    d(descriptionContains=probe_long),
+                    d(textContains=probe_long),
+                    d(descriptionContains=probe_short),
+                    d(textContains=probe_short),
+                ]
+                if base_title and base_title != post_title:
+                    candidates.append(d(descriptionContains=base_title))
+                for selector in candidates:
+                    if selector.exists(timeout=1):
                         return selector
                 return None
 
-            # Dismiss any in-feed banners (e.g. "随手拍&分享") by pressing back
-            # or tapping close button before scrolling
+            # Dismiss any in-feed banners (e.g. "随手拍&分享")
             if d(text="去看看").exists(timeout=1):
-                if d(textContains="✕").exists(timeout=1):
-                    d(textContains="✕").click()
-                else:
-                    try:
-                        close_btn = d(description="关闭")
-                        if close_btn.exists(timeout=1):
-                            close_btn.click()
-                    except Exception:
-                        pass
+                for closer in (
+                    d(descriptionContains="关闭"),
+                    d(description="关闭"),
+                    d(textContains="✕"),
+                    d(text="×"),
+                ):
+                    if closer.exists(timeout=0.5):
+                        try:
+                            closer.click()
+                            break
+                        except Exception:
+                            pass
 
             note_el = _find_note()
+            w, h = self._screen_size(d)
             if note_el is None:
-                w, h = self._screen_size(d)
-                # Scroll down up to 6 times to find the note in the RecyclerView
-                for _ in range(6):
+                # Scroll down up to 10 times (was 6) to find the note
+                for _ in range(10):
                     d.swipe(w // 2, int(h * 0.6), w // 2, int(h * 0.3), duration=0.4)
                     time.sleep(0.8)
                     note_el = _find_note()
@@ -1233,14 +1243,19 @@ class XHSPublisher:
             d(text="编辑和权限设置").click()
             time.sleep(2)
 
-            # 6. Swipe LEFT in icon row to reveal "删除" (it's off-screen to the right)
-            w, h = self._screen_size(d)
-            icon_y = int(h * 0.935)  # icon row is at ~93.5% of screen height
-            d.swipe(int(w * 0.83), icon_y, int(w * 0.05), icon_y, duration=0.6)
-            time.sleep(1)
+            # 6. Swipe LEFT in icon row to reveal "删除" (it's off-screen to the right).
+            # Icon row Y varies across screen sizes / nav-bar styles; try several Ys.
+            delete_visible = False
+            for y_frac in (0.935, 0.91, 0.96, 0.89):
+                if d(text="删除").exists(timeout=0.5):
+                    delete_visible = True
+                    break
+                icon_y = int(h * y_frac)
+                d.swipe(int(w * 0.83), icon_y, int(w * 0.05), icon_y, duration=0.6)
+                time.sleep(0.8)
 
             # 7. Tap "删除"
-            if not d(text="删除").exists(timeout=3):
+            if not (delete_visible or d(text="删除").exists(timeout=3)):
                 self._screenshot(d, "delete_icon_not_found")
                 logger.warning(f"[{self.serial}] delete_post: '删除' icon not found after swipe")
                 d.press("back")
@@ -1248,20 +1263,58 @@ class XHSPublisher:
             d(text="删除").click()
             time.sleep(1.5)
 
-            # 8. Tap "删除笔记" (first confirmation)
+            # 8. Tap "删除笔记" (first confirmation, if a 2-step dialog appears)
             if d(text="删除笔记").exists(timeout=3):
                 d(text="删除笔记").click()
                 time.sleep(1.5)
 
-            # 9. Tap "确认删除" (second/final confirmation)
+            # 9. Tap "确认删除" / "确认" / "确定" (final confirmation)
+            final_tapped = False
             for confirm_text in ("确认删除", "确认", "确定"):
                 if d(text=confirm_text).exists(timeout=2):
                     d(text=confirm_text).click()
+                    final_tapped = True
                     break
+
+            if not final_tapped:
+                self._screenshot(d, "delete_confirm_not_found")
+                logger.warning(
+                    f"[{self.serial}] delete_post: final confirm button not found "
+                    "— deletion likely incomplete"
+                )
+                return False
 
             time.sleep(2)
             self._screenshot(d, "delete_post_done")
-            logger.info(f"[{self.serial}] ✅ Post '{post_title}' deleted")
+
+            # 10. VERIFY: return to profile and confirm note is gone.
+            # If still on detail page, press back to profile.
+            try:
+                if d(text="编辑和权限设置").exists(timeout=0.5):
+                    d.press("back")
+                    time.sleep(1.5)
+            except Exception:
+                pass
+
+            # Re-find note with full scroll budget; success = NOT found.
+            still_exists = _find_note() is not None
+            if not still_exists:
+                for _ in range(8):
+                    d.swipe(w // 2, int(h * 0.6), w // 2, int(h * 0.3), duration=0.4)
+                    time.sleep(0.5)
+                    if _find_note() is not None:
+                        still_exists = True
+                        break
+
+            if still_exists:
+                self._screenshot(d, "delete_post_verify_fail")
+                logger.warning(
+                    f"[{self.serial}] delete_post: note '{post_title}' still visible "
+                    "after confirm-tap — deletion failed or in-flight"
+                )
+                return False
+
+            logger.info(f"[{self.serial}] ✅ Post '{post_title}' deleted (verified)")
             return True
 
         except Exception as exc:
