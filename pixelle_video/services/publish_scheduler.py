@@ -157,6 +157,10 @@ class PublishScheduler:
         self._scheduler = None
         # Per-device locks to prevent concurrent execution on the same device
         self._device_locks: Dict[str, asyncio.Lock] = {}
+        # Background TTL watcher (used when APScheduler is not running, e.g. Streamlit)
+        self._ttl_thread = None
+        self._ttl_stop_event = None
+        self._ttl_interval_minutes: float = 15.0
         self._load()
         self._recover_orphaned_running_jobs()
 
@@ -637,6 +641,72 @@ class PublishScheduler:
                     await self._do_delete_job(job)
             except Exception as exc:
                 logger.warning(f"check_and_delete_expired error for {job.job_id}: {exc}")
+
+    # -------------------------------------------------------------------------
+    # Background TTL watcher (thread-based; works without APScheduler/event loop)
+    # -------------------------------------------------------------------------
+
+    def start_ttl_watcher(self, interval_minutes: float = 15.0) -> bool:
+        """
+        Start a background daemon thread that periodically scans success jobs
+        for expired TTL and auto-deletes them. Safe to call from environments
+        without a persistent asyncio event loop (e.g. Streamlit).
+
+        Idempotent: subsequent calls are no-ops while the watcher is alive.
+        Returns True if a new watcher was started, False if one is already running.
+        """
+        import threading
+
+        if self._ttl_thread is not None and self._ttl_thread.is_alive():
+            return False
+
+        try:
+            interval_minutes = max(0.5, float(interval_minutes))
+        except (TypeError, ValueError):
+            interval_minutes = 15.0
+        self._ttl_interval_minutes = interval_minutes
+        self._ttl_stop_event = threading.Event()
+
+        def _runner(stop_event: threading.Event, interval_min: float) -> None:
+            logger.info(
+                f"TTL watcher started (interval={interval_min}min, "
+                f"thread={threading.current_thread().name})"
+            )
+            # Tiny initial delay so we don't double-fire with APScheduler at startup
+            if stop_event.wait(timeout=5.0):
+                return
+            while not stop_event.is_set():
+                try:
+                    asyncio.run(self.check_and_delete_expired())
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning(f"TTL watcher iteration failed: {exc}")
+                # Sleep in small steps so stop_event can wake us promptly.
+                stop_event.wait(timeout=interval_min * 60.0)
+            logger.info("TTL watcher stopped")
+
+        self._ttl_thread = threading.Thread(
+            target=_runner,
+            args=(self._ttl_stop_event, interval_minutes),
+            name="publish-ttl-watcher",
+            daemon=True,
+        )
+        self._ttl_thread.start()
+        return True
+
+    def stop_ttl_watcher(self) -> None:
+        """Signal the TTL watcher thread to stop (if running)."""
+        if self._ttl_stop_event is not None:
+            self._ttl_stop_event.set()
+        self._ttl_thread = None
+
+    def ttl_watcher_status(self) -> Dict[str, object]:
+        """Inspect the background TTL watcher."""
+        alive = bool(self._ttl_thread is not None and self._ttl_thread.is_alive())
+        return {
+            "running": alive,
+            "interval_minutes": self._ttl_interval_minutes if alive else None,
+            "thread_name": (self._ttl_thread.name if alive else None),
+        }
 
 
 # Module-level singleton

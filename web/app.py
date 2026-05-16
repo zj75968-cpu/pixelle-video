@@ -36,6 +36,25 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+
+# ---------------------------------------------------------------------------
+# Background TTL watcher: scans successful traffic posts for expired
+# delete_after_hours and auto-deletes them via uiautomator2. Started once
+# per Streamlit process (FastAPI starts its own APScheduler-based one).
+# ---------------------------------------------------------------------------
+@st.cache_resource(show_spinner=False)
+def _start_ttl_watcher_once():
+    try:
+        from pixelle_video.services.publish_scheduler import publish_scheduler
+        started = publish_scheduler.start_ttl_watcher(interval_minutes=15.0)
+        return {"started": bool(started)}
+    except Exception:  # noqa: BLE001
+        # Never block the UI on watcher startup failure.
+        return {"started": False}
+
+
+_start_ttl_watcher_once()
+
 # Streamlit may still cap main content width (e.g. 736px) after reruns.
 # Force the main block container to use full available width.
 st.markdown(

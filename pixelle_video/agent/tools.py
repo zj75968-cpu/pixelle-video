@@ -808,6 +808,23 @@ async def _read_post_params(task_id: str) -> Dict[str, Any]:
     }
 
 
+async def _force_check_expired_ttl() -> Dict[str, Any]:
+    """Manually trigger a TTL sweep right now (instead of waiting 15 min)."""
+    from pixelle_video.services.publish_scheduler import publish_scheduler
+
+    before = sum(1 for j in publish_scheduler.list_jobs() if j.status == "deleted")
+    await publish_scheduler.check_and_delete_expired()
+    after = sum(1 for j in publish_scheduler.list_jobs() if j.status == "deleted")
+    return {"newly_deleted": max(0, after - before), "deleted_total": after}
+
+
+async def _ttl_watcher_status() -> Dict[str, Any]:
+    """Check whether the background TTL watcher thread is running and its interval."""
+    from pixelle_video.services.publish_scheduler import publish_scheduler
+
+    return publish_scheduler.ttl_watcher_status()
+
+
 # --------------------------------------------------------------------------
 # Registry
 # --------------------------------------------------------------------------
@@ -1268,6 +1285,26 @@ TOOLS: List[ToolSpec] = [
             "required": ["task_id"],
         },
         handler=_read_post_params,
+    ),
+    ToolSpec(
+        name="force_check_expired_ttl",
+        description=(
+            "立即触发一次 TTL 到期清理（无需等待后台 15 分钟轮询）。"
+            "扫描所有 status=success 且 delete_after_hours 已过期的引流帖，"
+            "通过 uiautomator2 自动删除并把状态置为 'deleted'。"
+            "返回 newly_deleted（本次新删除数）与 deleted_total（队列里 deleted 总数）。"
+        ),
+        args_schema={"type": "object", "properties": {}, "required": []},
+        handler=_force_check_expired_ttl,
+    ),
+    ToolSpec(
+        name="ttl_watcher_status",
+        description=(
+            "查看后台 TTL 自动清理线程是否在运行，以及它的轮询间隔（分钟）。"
+            "如果 running=false，可能 web/app.py 还没启动，或在 FastAPI 进程里 TTL 是由 APScheduler 负责。"
+        ),
+        args_schema={"type": "object", "properties": {}, "required": []},
+        handler=_ttl_watcher_status,
     ),
 ]
 
