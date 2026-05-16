@@ -394,28 +394,73 @@ def _render_device_cards(dm, devices):
                     st.markdown("<div style='margin-top:4px'></div>", unsafe_allow_html=True)
                     if st.button("🚀 初始化 Agent", key=f"init_agent_{dev.serial}",
                                  help="一键推送 phone_agent.py 到手机，无需 USB 长期连接"):
-                        from pixelle_video.services.phone_agent_setup import setup_phone_agent
-                        with st.spinner("正在初始化手机 Agent…"):
-                            r = setup_phone_agent(dev.serial)
-                        if r["ok"]:
-                            if r["auto_run"]:
-                                st.success("✅ 文件已推送，安装脚本已自动运行！请在手机 Termux 中查看进度。")
-                            else:
-                                st.success(
-                                    f"✅ 文件已推送到手机 /sdcard/，Termux 已打开。\n\n"
-                                    f"**请在手机 Termux 中输入：**\n\n"
-                                    f"```\n{r['manual_command']}\n```"
+                        from pixelle_video.services.phone_agent_setup import (
+                            is_termux_installed, push_agent_files, open_termux,
+                            try_run_setup_in_termux, _adb,
+                        )
+
+                        # ── 可视化进度 ──────────────────────────────
+                        def _step(icon: str, label: str, ok: bool, detail: str = ""):
+                            color = "#1a7a1a" if ok else "#a00000"
+                            bg = "#e8f5e9" if ok else "#ffebee"
+                            bd = "#4caf50" if ok else "#ef9a9a"
+                            st.markdown(
+                                f'<div style="border:1px solid {bd};border-radius:6px;'
+                                f'padding:7px 12px;background:{bg};margin:3px 0">'
+                                f'<b style="color:{color}">{icon} {label}</b>'
+                                + (f'<br><span style="font-size:.83em;color:#555">{detail}</span>' if detail else "")
+                                + "</div>",
+                                unsafe_allow_html=True,
+                            )
+
+                        steps = st.container()
+                        with steps:
+                            st.markdown("**初始化进度**")
+
+                            # Step 1: 设备连接
+                            rc, out, _ = _adb(dev.serial, "get-state")
+                            s1_ok = rc == 0 and "device" in out
+                            _step("1️⃣", "ADB 连接验证", s1_ok,
+                                  "设备在线" if s1_ok else f"设备未连接或未授权（serial: {dev.serial}）")
+                            if not s1_ok:
+                                st.stop()
+
+                            # Step 2: Termux 检查
+                            termux_ok = is_termux_installed(dev.serial)
+                            _step("2️⃣", "Termux 安装检查", termux_ok,
+                                  "已安装" if termux_ok else "未安装 → 请在手机上从 F-Droid 安装 Termux 后重试")
+                            if not termux_ok:
+                                st.markdown(
+                                    "👉 [点此打开 F-Droid 下载页](https://f-droid.org/packages/com.termux/)",
+                                    unsafe_allow_html=False,
                                 )
-                        else:
-                            err_msg = "\n".join(r["errors"])
-                            if not r["termux_installed"]:
-                                st.error(
-                                    "❌ 手机未安装 Termux。\n\n"
-                                    "请先在 **F-Droid** 或 **Google Play** 安装 Termux，"
-                                    "然后重新点击初始化。"
-                                )
+                                st.stop()
+
+                            # Step 3: 推送文件
+                            push_result = push_agent_files(dev.serial)
+                            _step("3️⃣", "脚本文件推送", push_result["ok"],
+                                  "已推送: " + ", ".join(push_result["pushed"])
+                                  if push_result["ok"] else "失败: " + "; ".join(push_result["errors"]))
+
+                            # Step 4: 打开 Termux
+                            termux_opened = open_termux(dev.serial)
+                            _step("4️⃣", "打开 Termux", termux_opened,
+                                  "Termux 已置于前台" if termux_opened else "打开失败，请手动打开 Termux")
+
+                            # Step 5: 尝试自动执行安装
+                            auto_ok = try_run_setup_in_termux(dev.serial)
+                            if auto_ok:
+                                _step("5️⃣", "自动执行安装脚本", True, "安装进行中，请在手机 Termux 窗口查看进度")
                             else:
-                                st.error(f"❌ 初始化失败：{err_msg}")
+                                _step("5️⃣", "手动执行安装脚本", True,
+                                      "请在手机 Termux 中输入以下命令（点击可复制）：")
+                                st.code("bash /sdcard/pixelle_setup.sh", language="bash")
+
+                            # Step 6: 提示开机自启（可选）
+                            _step("6️⃣", "开机自启（可选）", True,
+                                  "安装完成后，运行 bash /sdcard/install_termux_boot.sh 启用开机自启")
+
+                            st.success("✅ 初始化完成！完成手机端 Termux 安装后即可在设置页填写 Agent URL。")
 
                 if st.button("🗑️ 移除", key=f"del_{dev.serial}"):
                     dm.remove_device(dev.serial)
