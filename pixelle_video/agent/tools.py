@@ -892,6 +892,55 @@ async def _ttl_watcher_status() -> Dict[str, Any]:
     return publish_scheduler.ttl_watcher_status()
 
 
+# ---- banned-keywords tools ----
+
+async def _list_banned_keywords() -> Dict[str, Any]:
+    """List current XHS banned keywords + filter mode."""
+    from pixelle_video.utils import banned_keywords as bk
+
+    state = bk.get_state()
+    return {
+        "count": len(state["keywords"]),
+        "mode": state["mode"],
+        "mask": state["mask"],
+        "updated_at": state.get("updated_at"),
+        "keywords": state["keywords"],
+    }
+
+
+async def _add_banned_keywords(
+    keywords: List[str],
+    mode: str = "append",
+) -> Dict[str, Any]:
+    """Add (or replace) banned keywords. mode='append' (default) or 'replace'."""
+    from pixelle_video.utils import banned_keywords as bk
+
+    if not isinstance(keywords, list) or not keywords:
+        raise ValueError("keywords 必须是非空字符串数组")
+    if mode not in ("append", "replace"):
+        raise ValueError("mode 必须是 'append' 或 'replace'")
+    if mode == "replace":
+        new_list = bk.replace_all(keywords)
+    else:
+        new_list = bk.add_keywords(keywords)
+    return {"count": len(new_list), "mode": mode, "keywords": new_list}
+
+
+async def _preview_banned_filter(text: str) -> Dict[str, Any]:
+    """Run the banned-keywords filter on a sample text without persisting anything."""
+    from pixelle_video.utils import banned_keywords as bk
+
+    if not isinstance(text, str):
+        raise ValueError("text 必须是字符串")
+    cleaned, hits = bk.filter_text(text)
+    return {
+        "original": text,
+        "cleaned": cleaned,
+        "hits": hits,
+        "hit_count": len(hits),
+    }
+
+
 # --------------------------------------------------------------------------
 # Registry
 # --------------------------------------------------------------------------
@@ -1372,6 +1421,58 @@ TOOLS: List[ToolSpec] = [
         ),
         args_schema={"type": "object", "properties": {}, "required": []},
         handler=_ttl_watcher_status,
+    ),
+    ToolSpec(
+        name="list_banned_keywords",
+        description=(
+            "读取当前小红书违禁词列表与过滤模式（mask/remove）。"
+            "返回 count / mode / mask / updated_at / keywords。"
+            "用户提到「敏感词」「违禁词」「不要出现 XX」时优先调用此工具确认现状。"
+        ),
+        args_schema={"type": "object", "properties": {}, "required": []},
+        handler=_list_banned_keywords,
+    ),
+    ToolSpec(
+        name="add_banned_keywords",
+        description=(
+            "向小红书违禁词列表里追加或整体替换关键词。"
+            "mode='append'（默认）将与现有列表合并去重；mode='replace' 用本次提交的列表整体覆盖。"
+            "对所有后续 LLM 生成（标题/正文/旁白）和发布入队（add_job）都立即生效。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "keywords": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "要加入的关键词列表，建议直接给中文词，大小写不敏感",
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["append", "replace"],
+                    "default": "append",
+                    "description": "append=合并去重；replace=整体替换",
+                },
+            },
+            "required": ["keywords"],
+        },
+        handler=_add_banned_keywords,
+    ),
+    ToolSpec(
+        name="preview_banned_filter",
+        description=(
+            "用当前违禁词列表预演一段文本会被怎么清洗。"
+            "返回 original / cleaned / hits / hit_count。"
+            "不修改任何数据。常用于回答「我这段会被屏蔽吗」「会命中哪些词」。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "待预演的文本（标题+正文均可）"},
+            },
+            "required": ["text"],
+        },
+        handler=_preview_banned_filter,
     ),
 ]
 
