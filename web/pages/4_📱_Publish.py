@@ -929,9 +929,77 @@ def render_publish_tab():
     )
     filter_val = None if status_filter == "全部" else status_filter
 
-    if st.button("🔄 刷新队列"):
-        get_publish_scheduler()._load()
-        st.rerun()
+    col_refresh, col_bulk = st.columns([1, 4])
+    with col_refresh:
+        if st.button("🔄 刷新队列"):
+            get_publish_scheduler()._load()
+            st.rerun()
+
+    # ---- Bulk actions ----------------------------------------------------
+    scheduler = get_publish_scheduler()
+    all_jobs = scheduler.list_jobs()
+    counts = {
+        "pending_active": sum(1 for j in all_jobs if j.status in ("pending", "scheduled")),
+        "completed":      sum(1 for j in all_jobs if j.status in ("success", "done", "deleted")),
+        "failed":         sum(1 for j in all_jobs if j.status in ("failed", "cancelled")),
+    }
+    with st.expander(
+        f"🛠️ 批量操作  "
+        f"(待发布 {counts['pending_active']}  |  已完成 {counts['completed']}  |  失败/取消 {counts['failed']})"
+    ):
+        bcol1, bcol2, bcol3, bcol4 = st.columns(4)
+
+        with bcol1:
+            if st.button(
+                "🚀 立即执行待发布",
+                key="bulk_exec_pending",
+                disabled=counts["pending_active"] == 0,
+                help="对所有 pending/scheduled 任务立刻触发执行",
+                use_container_width=True,
+            ):
+                pending_ids = [
+                    j.job_id for j in all_jobs if j.status in ("pending", "scheduled")
+                ]
+                ok = 0
+                for jid in pending_ids:
+                    if run_async(scheduler.execute_now(jid)):
+                        ok += 1
+                st.success(f"已触发 {ok}/{len(pending_ids)} 个任务")
+                st.rerun()
+
+        with bcol2:
+            if st.button(
+                "⛔ 取消所有待发布",
+                key="bulk_cancel_pending",
+                disabled=counts["pending_active"] == 0,
+                use_container_width=True,
+            ):
+                n = scheduler.bulk_cancel_pending()
+                st.success(f"已取消 {n} 个任务")
+                st.rerun()
+
+        with bcol3:
+            if st.button(
+                "🧹 清理已完成",
+                key="bulk_remove_done",
+                disabled=counts["completed"] == 0,
+                help="从队列中移除 success/done/deleted 状态的任务记录",
+                use_container_width=True,
+            ):
+                n = scheduler.bulk_remove(["success", "done", "deleted"])
+                st.success(f"已清理 {n} 个已完成任务")
+                st.rerun()
+
+        with bcol4:
+            if st.button(
+                "🗑️ 清理失败/取消",
+                key="bulk_remove_failed",
+                disabled=counts["failed"] == 0,
+                use_container_width=True,
+            ):
+                n = scheduler.bulk_remove(["failed", "cancelled"])
+                st.success(f"已清理 {n} 个失败/取消任务")
+                st.rerun()
 
     _render_publish_queue_list(filter_val)
 

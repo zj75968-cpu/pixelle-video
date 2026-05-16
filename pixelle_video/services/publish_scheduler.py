@@ -348,6 +348,56 @@ class PublishScheduler:
             return True
         return False
 
+    def remove_job(self, job_id: str) -> bool:
+        """
+        Remove a finished/failed/cancelled job from the queue entirely.
+        Active jobs (pending/scheduled/running) cannot be removed — cancel first.
+        Returns True if the job was removed.
+        """
+        job = self._jobs.get(job_id)
+        if not job:
+            return False
+        if job.status in (JobStatus.PENDING, JobStatus.SCHEDULED, JobStatus.RUNNING):
+            return False
+        del self._jobs[job_id]
+        if self._scheduler:
+            try:
+                self._scheduler.remove_job(job_id)
+            except Exception:
+                pass
+        self._save()
+        logger.info(f"Removed job {job_id} from queue")
+        return True
+
+    def bulk_remove(self, statuses: List[str]) -> int:
+        """Remove all jobs whose status is in `statuses`. Returns count removed."""
+        active = {JobStatus.PENDING, JobStatus.SCHEDULED, JobStatus.RUNNING}
+        targets = [
+            jid for jid, j in self._jobs.items()
+            if j.status in statuses and j.status not in active
+        ]
+        for jid in targets:
+            del self._jobs[jid]
+            if self._scheduler:
+                try:
+                    self._scheduler.remove_job(jid)
+                except Exception:
+                    pass
+        if targets:
+            self._save()
+            logger.info(f"Bulk-removed {len(targets)} job(s) with status in {statuses}")
+        return len(targets)
+
+    def bulk_cancel_pending(self) -> int:
+        """Cancel all pending/scheduled jobs. Returns count cancelled."""
+        targets = [
+            jid for jid, j in self._jobs.items()
+            if j.status in (JobStatus.PENDING, JobStatus.SCHEDULED)
+        ]
+        for jid in targets:
+            self.cancel_job(jid)
+        return len(targets)
+
     def get_job(self, job_id: str) -> Optional[PublishJob]:
         return self._jobs.get(job_id)
 
