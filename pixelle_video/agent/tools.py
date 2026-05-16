@@ -109,6 +109,63 @@ async def _list_workflows() -> Dict[str, Any]:
     return {"count": len(keys), "workflow_keys": keys}
 
 
+# --------------------------------------------------------------------------
+# Friendly error helper for media-generation pipelines
+# --------------------------------------------------------------------------
+
+def _friendly_pipeline_error(exc: BaseException, *, stage: str) -> RuntimeError:
+    """Translate a raw pipeline exception into a user/agent-friendly RuntimeError.
+
+    The returned message keeps the original error class/text for debugging,
+    and prepends a `[生成失败-<stage>]` tag plus a 修复方向 hint based on
+    keyword detection. _classify_error in brain.py will then surface this
+    cleanly to the LLM repair loop.
+    """
+    raw = f"{type(exc).__name__}: {exc}"
+    lower = raw.lower()
+    hint: str
+
+    if "value_not_in_list" in lower or "value not in list" in lower or "not in (list of" in lower:
+        # ComfyUI returns this when a referenced .safetensors/.ckpt is missing
+        hint = (
+            "ComfyUI workflow 引用了一个 ComfyUI/models/ 下不存在的模型文件，"
+            "请检查 node_errors 里报的具体文件名是否已下载"
+        )
+    elif (
+        "connectionrefus" in lower
+        or "connect call failed" in lower
+        or "connection refused" in lower
+        or "connecterror" in lower
+        or "no route to host" in lower
+    ):
+        hint = "依赖服务未启动或端口不通，请确认 ComfyUI / LLM / RunningHub 服务在线"
+    elif "timeout" in lower or "timed out" in lower:
+        hint = "上游服务响应超时，可重试，或检查 ComfyUI / 网络是否繁忙"
+    elif (
+        "401" in raw
+        or "unauthorized" in lower
+        or "invalid api key" in lower
+        or "api key" in lower and ("missing" in lower or "not set" in lower)
+    ):
+        hint = "API key 缺失或无效，检查 config.yaml 里 llm.* / runninghub.* 的 key"
+    elif (
+        "rate limit" in lower
+        or "429" in raw
+        or "too many requests" in lower
+    ):
+        hint = "上游限流，稍后重试或切换 workflow / 模型"
+    elif "no such file" in lower or "filenotfounderror" in lower:
+        hint = "依赖文件缺失，检查 workflow / 模板路径"
+    elif "not initialised" in lower or "not initialized" in lower:
+        hint = "依赖服务未初始化，可能 core.initialize() 未完成或 pipeline 没注册"
+    elif "llm 未配置" in lower or "llm 未配置" in raw or "llm not configured" in lower:
+        hint = "LLM 未配置，请在 config.yaml 填入 llm.api_key / base_url / model"
+    else:
+        hint = "可重试一次，或换用 workflow / 模型 / 主题再试"
+
+    return RuntimeError(f"[生成失败-{stage}] {raw}（修复方向：{hint}）")
+
+
 async def _generate_video(
     topic: str,
     n_scenes: int = 3,
@@ -126,7 +183,12 @@ async def _generate_video(
         kwargs["media_workflow"] = media_workflow
 
     logger.info(f"[agent] generate_video topic={topic!r} kwargs={kwargs}")
-    result = await core.generate_video(text=topic, pipeline=pipeline, **kwargs)
+    try:
+        result = await core.generate_video(text=topic, pipeline=pipeline, **kwargs)
+    except RuntimeError:
+        raise  # already wrapped (e.g. from a nested tool)
+    except Exception as exc:  # noqa: BLE001
+        raise _friendly_pipeline_error(exc, stage="generate_video") from exc
 
     video_path = (
         getattr(result, "video_path", None)
@@ -644,17 +706,22 @@ async def _generate_image_text_post(
         raise RuntimeError("image_text_post pipeline not initialised")
 
     pt = post_type if post_type in ("content", "traffic") else "content"
-    result = await pipeline(
-        topic=topic,
-        image_count=int(image_count),
-        post_tone=post_tone,
-        hashtag_count=int(hashtag_count),
-        template_size=template_size,
-        style=style,
-        aspect_ratio=aspect_ratio,
-        image_size=image_size,
-        post_type=pt,
-    )
+    try:
+        result = await pipeline(
+            topic=topic,
+            image_count=int(image_count),
+            post_tone=post_tone,
+            hashtag_count=int(hashtag_count),
+            template_size=template_size,
+            style=style,
+            aspect_ratio=aspect_ratio,
+            image_size=image_size,
+            post_type=pt,
+        )
+    except RuntimeError:
+        raise
+    except Exception as exc:  # noqa: BLE001
+        raise _friendly_pipeline_error(exc, stage="generate_image_text_post") from exc
 
     # Persist post_params.json mirroring the web layer so publish UI prefills.
     try:
