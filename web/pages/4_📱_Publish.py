@@ -391,6 +391,32 @@ def _render_device_cards(dm, devices):
                         else:
                             st.error("截图失败")
 
+                    st.markdown("<div style='margin-top:4px'></div>", unsafe_allow_html=True)
+                    if st.button("🚀 初始化 Agent", key=f"init_agent_{dev.serial}",
+                                 help="一键推送 phone_agent.py 到手机，无需 USB 长期连接"):
+                        from pixelle_video.services.phone_agent_setup import setup_phone_agent
+                        with st.spinner("正在初始化手机 Agent…"):
+                            r = setup_phone_agent(dev.serial)
+                        if r["ok"]:
+                            if r["auto_run"]:
+                                st.success("✅ 文件已推送，安装脚本已自动运行！请在手机 Termux 中查看进度。")
+                            else:
+                                st.success(
+                                    f"✅ 文件已推送到手机 /sdcard/，Termux 已打开。\n\n"
+                                    f"**请在手机 Termux 中输入：**\n\n"
+                                    f"```\n{r['manual_command']}\n```"
+                                )
+                        else:
+                            err_msg = "\n".join(r["errors"])
+                            if not r["termux_installed"]:
+                                st.error(
+                                    "❌ 手机未安装 Termux。\n\n"
+                                    "请先在 **F-Droid** 或 **Google Play** 安装 Termux，"
+                                    "然后重新点击初始化。"
+                                )
+                            else:
+                                st.error(f"❌ 初始化失败：{err_msg}")
+
                 if st.button("🗑️ 移除", key=f"del_{dev.serial}"):
                     dm.remove_device(dev.serial)
                     st.rerun()
