@@ -30,6 +30,11 @@ class PostGenerateRequest(BaseModel):
     template_size: str = Field("1080x1080", description="Image size, e.g. 1080x1080")
     post_tone: str = Field("种草", description="Post writing tone")
     hashtag_count: int = Field(5, ge=1, le=15, description="Hashtag count")
+    post_type: str = Field(
+        "content",
+        pattern="^(content|traffic)$",
+        description="Post strategy: 'content' (干货帖) or 'traffic' (引流帖)",
+    )
 
 
 class PostGenerateAsyncResponse(BaseModel):

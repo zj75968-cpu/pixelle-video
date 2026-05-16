@@ -48,6 +48,7 @@ class ImageTextPostPipeline:
         image_size: Optional[str] = None,
         content_llm: Optional[Dict] = None,
         image_llm: Optional[Dict] = None,
+        post_type: str = "content",
     ) -> PostGenerationResult:
         task_dir, task_id = create_task_output_dir()
         output_dir = Path(task_dir)
@@ -63,6 +64,7 @@ class ImageTextPostPipeline:
             hashtag_count=hashtag_count,
             style=style,
             content_llm=content_llm,
+            post_type=post_type,
         )
 
         await self.generate_images(
@@ -96,6 +98,7 @@ class ImageTextPostPipeline:
         hashtag_count: int,
         style: str,
         content_llm: Optional[Dict] = None,
+        post_type: str = "content",
     ) -> PostContent:
         prompt = build_post_prompt(
             topic=topic,
@@ -103,6 +106,7 @@ class ImageTextPostPipeline:
             post_tone=post_tone,
             hashtag_count=hashtag_count,
             style=style,
+            post_type=post_type,
         )
 
         llm_override: Dict = {}

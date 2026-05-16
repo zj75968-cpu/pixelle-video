@@ -49,6 +49,7 @@ POST_FORM_DEFAULTS = {
     "style": "",
     "aspect_ratio": "（不指定）",
     "image_size": "（不指定）",
+    "post_type": "content",
 }
 
 
@@ -132,6 +133,8 @@ def _apply_history_params_to_form(params: dict):
     st.session_state["post_form_style"] = str(params.get("style", ""))
     st.session_state["post_form_aspect_ratio"] = aspect_ratio if aspect_ratio in aspect_ratio_options else "（不指定）"
     st.session_state["post_form_image_size"] = image_size if image_size in image_size_options else "（不指定）"
+    _post_type = str(params.get("post_type", "content"))
+    st.session_state["post_form_post_type"] = _post_type if _post_type in ("content", "traffic") else "content"
 
     _apply_model_config("post_content", params.get("content_llm"))
     _apply_model_config("post_image", params.get("image_llm"))
@@ -165,6 +168,17 @@ def render_generate_form() -> dict | None:
             placeholder="例：去云南旅行的三天两夜，探索古镇、品尝当地美食。",
             height=80,
             key="post_form_topic",
+        )
+
+        # Post-type strategy selector (drives prompt strategy in the agent brain)
+        post_type = st.radio(
+            "帖子定位",
+            options=["content", "traffic"],
+            format_func=lambda x: "📚 干货帖（输出真实价值，长期保留）" if x == "content"
+                                  else "📢 引流帖（钩子+CTA，引导互动）",
+            key="post_form_post_type",
+            horizontal=True,
+            help="干货帖侧重知识价值；引流帖侧重制造钩子和引导互动",
         )
 
         col1, col2, col3 = st.columns(3)
@@ -223,6 +237,7 @@ def render_generate_form() -> dict | None:
             "hashtag_count": hashtag_count,
             "aspect_ratio": None if aspect_ratio_opt == "（不指定）" else aspect_ratio_opt,
             "image_size": None if image_size_opt == "（不指定）" else image_size_opt,
+            "post_type": post_type,
         }
     return None
 
@@ -430,6 +445,7 @@ def main():
             "hashtag_count": params.get("hashtag_count", 5),
             "aspect_ratio": params.get("aspect_ratio"),
             "image_size": params.get("image_size"),
+            "post_type": params.get("post_type", "content"),
             "content_llm": content_llm or {},
             "image_llm": image_llm or {},
             "saved_at": datetime.now().isoformat(),

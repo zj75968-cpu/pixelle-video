@@ -65,6 +65,7 @@ async def generate_post_async(
                 template_size=request_body.template_size,
                 post_tone=request_body.post_tone,
                 hashtag_count=request_body.hashtag_count,
+                post_type=request_body.post_type,
             )
 
             preview_path = str(result.output_dir / "post_preview.html")
