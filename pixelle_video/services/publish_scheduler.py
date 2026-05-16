@@ -491,8 +491,8 @@ class PublishScheduler:
     async def delete_post_now(self, job_id: str) -> bool:
         """Manually trigger deletion of a completed job's post."""
         job = self._jobs.get(job_id)
-        if not job or job.status != JobStatus.DONE:
-            logger.warning(f"delete_post_now: job {job_id} not in DONE state")
+        if not job or job.status not in (JobStatus.SUCCESS, "done", "deleted"):
+            logger.warning(f"delete_post_now: job {job_id} not in a completed state (status={getattr(job, 'status', None)})")
             return False
         return await self._do_delete_job(job)
 
@@ -518,7 +518,7 @@ class PublishScheduler:
         """
         now = datetime.now()
         for job in list(self._jobs.values()):
-            if job.status != JobStatus.DONE:
+            if job.status != JobStatus.SUCCESS:
                 continue
             if not job.delete_after_hours or not job.finished_at:
                 continue

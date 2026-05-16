@@ -1030,9 +1030,16 @@ def _render_publish_queue_list(filter_val: str | None):
                 # Delete button for completed posts
                 if job.status in ("done", "success") and job.status != "deleted":
                     if st.button("🗑️ 删除帖子", key=f"delete_{job.job_id}"):
-                        import asyncio
+                        import concurrent.futures
+                        import asyncio as _asyncio
                         with st.spinner("正在删除帖子…"):
-                            ok = asyncio.run(scheduler.delete_post_now(job.job_id))
+                            try:
+                                with concurrent.futures.ThreadPoolExecutor() as _pool:
+                                    _future = _pool.submit(_asyncio.run, scheduler.delete_post_now(job.job_id))
+                                    ok = _future.result(timeout=120)
+                            except Exception as _e:
+                                ok = False
+                                st.error(f"删除异常: {_e}")
                         if ok:
                             st.success("帖子已删除")
                             st.rerun()

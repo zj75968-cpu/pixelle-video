@@ -1076,21 +1076,15 @@ class XHSPublisher:
         """
         Navigate to My Profile → Notes, find the post by title, and delete it.
 
-        Strategy:
+        Confirmed XHS delete flow (2025):
           1. Open XHS → profile tab
-          2. Tap "发布" notes list (first tab under profile)
-          3. Long-press the note matching post_title
-          4. Tap "删除" in the context menu
-          5. Confirm deletion dialog
+          2. Click the note thumbnail to open detail page
+          3. Click "编辑和权限设置" (bottom of detail page)
+          4. In "笔记设置" bottom sheet, swipe left on icon row to reveal "删除"
+          5. Tap "删除" → tap "删除笔记" → tap "确认删除"
         Returns True if the post was deleted, False otherwise.
         """
-        import subprocess
-
-        adb = shutil.which("adb") or "adb"
-
-        def _run(*args: str):
-            subprocess.run([adb, "-s", self.serial, "shell"] + list(args),
-                           timeout=10, capture_output=True)
+        import re as _re
 
         d = self._get_device()
         orig_timeout = self._get_screen_timeout()
@@ -1114,40 +1108,62 @@ class XHSPublisher:
                 d.click(int(w * 0.9), int(h * 0.972))  # far-right nav tab
             time.sleep(2)
 
-            # 3. Find and long-press the note by title
-            # Try text match first
+            # 3. Find the note by title
+            # XHS grid view stores title in content-desc (not text attribute)
             note_el = d(text=post_title)
-            if not note_el.exists(timeout=3):
-                note_el = d(textContains=post_title[:6])  # partial match
-            if not note_el.exists(timeout=3):
+            if not note_el.exists(timeout=2):
+                note_el = d(textContains=post_title[:6])
+            if not note_el.exists(timeout=2):
+                note_el = d(descriptionContains=post_title[:6])
+            if not note_el.exists(timeout=2):
+                # Try base title without episode suffix like （3/3）
+                base_title = _re.split(r"[（(]", post_title)[0].strip()
+                if base_title and base_title != post_title:
+                    note_el = d(descriptionContains=base_title)
+            if not note_el.exists(timeout=2):
                 self._screenshot(d, "delete_note_not_found")
                 logger.warning(f"[{self.serial}] delete_post: note '{post_title}' not found")
                 return False
 
-            note_el.long_click()
-            time.sleep(1.5)
+            # 4. Click note to open detail page (NOT long-press — XHS grid is not long-clickable)
+            note_el.click()
+            time.sleep(3)
+            self._dismiss_blocking_dialogs(d)
 
-            # 4. Tap 删除 in context menu
-            deleted = (
-                self._click_text(d, "删除", timeout=4)
-                or self._click_text_contains(d, "删除", timeout=4)
-            )
-            if not deleted:
-                self._screenshot(d, "delete_menu_not_found")
-                logger.warning(f"[{self.serial}] delete_post: '删除' menu item not found")
-                _run("input", "keyevent", "4")  # BACK to dismiss
+            # 5. Click "编辑和权限设置" to open 笔记设置 bottom sheet
+            if not d(text="编辑和权限设置").exists(timeout=4):
+                self._screenshot(d, "delete_edit_button_not_found")
+                logger.warning(f"[{self.serial}] delete_post: '编辑和权限设置' not found")
+                d.press("back")
                 return False
+            d(text="编辑和权限设置").click()
+            time.sleep(2)
 
+            # 6. Swipe LEFT in icon row to reveal "删除" (it's off-screen to the right)
+            w, h = self._screen_size(d)
+            icon_y = int(h * 0.935)  # icon row is at ~93.5% of screen height
+            d.swipe(int(w * 0.83), icon_y, int(w * 0.05), icon_y, duration=0.6)
             time.sleep(1)
 
-            # 5. Confirm deletion (dialog may appear with 确认/确定)
-            confirmed = (
-                self._click_text(d, "确认", "确定", "删除", timeout=4)
-                or self._click_text_contains(d, "确认", timeout=4)
-            )
-            if not confirmed:
-                # Some versions don't have a confirm dialog — deletion may have happened
-                logger.warning(f"[{self.serial}] delete_post: confirm dialog not found, may be OK")
+            # 7. Tap "删除"
+            if not d(text="删除").exists(timeout=3):
+                self._screenshot(d, "delete_icon_not_found")
+                logger.warning(f"[{self.serial}] delete_post: '删除' icon not found after swipe")
+                d.press("back")
+                return False
+            d(text="删除").click()
+            time.sleep(1.5)
+
+            # 8. Tap "删除笔记" (first confirmation)
+            if d(text="删除笔记").exists(timeout=3):
+                d(text="删除笔记").click()
+                time.sleep(1.5)
+
+            # 9. Tap "确认删除" (second/final confirmation)
+            for confirm_text in ("确认删除", "确认", "确定"):
+                if d(text=confirm_text).exists(timeout=2):
+                    d(text=confirm_text).click()
+                    break
 
             time.sleep(2)
             self._screenshot(d, "delete_post_done")
