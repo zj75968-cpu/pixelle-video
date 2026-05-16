@@ -20,6 +20,13 @@ from web.utils.async_helpers import run_async
 from pixelle_video.agent import AgentBrain, TOOLS, enhance_instruction
 from pixelle_video.agent.brain import _resolve_placeholders
 from pixelle_video.agent.tools import get_tool as _get_tool
+from pixelle_video.services.publish_scheduler import PublishScheduler as _PublishScheduler
+
+
+def get_publish_scheduler() -> _PublishScheduler:
+    if "publish_scheduler" not in st.session_state:
+        st.session_state["publish_scheduler"] = _PublishScheduler()
+    return st.session_state["publish_scheduler"]
 
 st.set_page_config(page_title="Agent 大脑", page_icon="🤖", layout="wide")
 init_session_state()
@@ -382,6 +389,23 @@ else:
                             language="json",
                         )
                         st.caption(f"耗时 {ex.get('elapsed_ms', 0)} ms")
+                        # ── 若是 enqueue_publish，提供快速取消按钮 ────────────
+                        if step.get("tool") == "enqueue_publish":
+                            _jid = (ex.get("result") or {}).get("job_id")
+                            if _jid:
+                                _btn_key = f"cancel_job_{idx}_{i}_{_jid[:8]}"
+                                if st.button(
+                                    "🚫 取消此发布任务",
+                                    key=_btn_key,
+                                    help=f"job_id: {_jid}",
+                                ):
+                                    _sched = get_publish_scheduler()
+                                    _ok = _sched.cancel_job(_jid)
+                                    if _ok:
+                                        st.success(f"已取消 {_jid[:8]}…")
+                                    else:
+                                        st.warning(f"任务 {_jid[:8]}… 已是终态，无需取消")
+                                    st.rerun()
                     elif ex:
                         st.error(ex.get("error") or "失败")
                     else:
