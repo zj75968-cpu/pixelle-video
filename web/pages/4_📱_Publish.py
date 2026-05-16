@@ -524,7 +524,7 @@ def render_devices_tab():
     st.markdown("---")
     st.subheader("➕ 添加设备")
 
-    tab_usb, tab_wifi = st.tabs(["USB 连接", "WiFi 连接"])
+    tab_usb, tab_wifi, tab_pair = st.tabs(["USB 连接", "WiFi 连接", "Android 11+ 无线配对"])
 
     with tab_usb:
         st.info(
@@ -557,6 +557,50 @@ def render_devices_tab():
                         st.rerun()
                     else:
                         st.error("连接失败，请确认手机已开启 ADB over WiFi")
+
+    with tab_pair:
+        st.info(
+            "**Android 11+ 无线调试（无需 USB）**\n\n"
+            "1. 手机：**设置 → 开发者选项 → 无线调试 → 开启**\n"
+            "2. 点击「**使用配对码配对设备**」，屏幕会出现 IP、**配对端口**、**6 位配对码**\n"
+            "3. 将上述信息填入「**第一步：配对**」并提交\n"
+            "4. 配对成功后，回到无线调试主页查看「**IP 地址和端口**」（连接端口），填入「**第二步：连接**」\n\n"
+            "> 配对端口和连接端口是**不同**的，注意区分"
+        )
+
+        st.markdown("##### 第一步：配对")
+        with st.form("pair_wifi_step1"):
+            p_host = st.text_input("手机 IP", placeholder="如：192.168.1.100", key="p_host")
+            p_pair_port = st.number_input("配对端口（Pair Port）", min_value=1, max_value=65535, value=40123, key="p_pair_port")
+            p_code = st.text_input("配对码（6 位数字）", placeholder="如：123456", key="p_code", max_chars=8)
+            if st.form_submit_button("🔗 执行 adb pair"):
+                if p_host.strip() and p_code.strip():
+                    ok, msg = dm.pair_wireless(p_host.strip(), int(p_pair_port), p_code.strip())
+                    if ok:
+                        st.success(f"✅ 配对成功！{msg}")
+                        st.session_state["_pair_host"] = p_host.strip()
+                    else:
+                        st.error(f"❌ 配对失败：{msg}")
+                else:
+                    st.warning("请填写 IP 和配对码")
+
+        st.markdown("##### 第二步：连接并注册")
+        pair_host_default = st.session_state.get("_pair_host", "")
+        with st.form("pair_wifi_step2"):
+            c_host = st.text_input("手机 IP", value=pair_host_default, placeholder="同上", key="c_host")
+            c_port = st.number_input("连接端口（无线调试主页的端口）", min_value=1, max_value=65535, value=5555, key="c_port")
+            c_name = st.text_input("设备名称", placeholder="如：测试手机", key="c_name")
+            c_theme = st.text_input("内容主题", placeholder="如：健身打卡", key="c_theme")
+            if st.form_submit_button("📲 连接并注册设备"):
+                if c_host.strip():
+                    serial = f"{c_host.strip()}:{int(c_port)}"
+                    ok = dm.connect_wifi(c_host.strip(), int(c_port))
+                    if ok:
+                        dm.add_device(serial=serial, name=c_name.strip(), theme=c_theme.strip())
+                        st.success(f"✅ 已连接并注册设备：{serial}")
+                        st.rerun()
+                    else:
+                        st.error(f"连接失败：{serial}，请确认端口正确，或先完成第一步配对")
 
     # Publish automation settings
     st.markdown("---")

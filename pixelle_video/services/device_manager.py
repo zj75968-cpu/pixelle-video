@@ -377,6 +377,42 @@ class DeviceManager:
                 logger.error(f"WiFi connect error: {e}")
             return False
 
+    def pair_wireless(self, host: str, pair_port: int, code: str) -> Tuple[bool, str]:
+        """Pair a device using Android 11+ wireless pairing (adb pair).
+
+        Must be called before connect_wifi when using QR/pairing-code method.
+        Args:
+            host:      Device IP address shown in Wireless Debugging screen.
+            pair_port: Temporary pairing port (different from the main connect port).
+            code:      6-digit pairing code shown in the pairing dialog.
+        Returns:
+            (success, adb_output_message)
+        """
+        try:
+            result = subprocess.run(
+                [self._adb_cmd, "pair", f"{host}:{pair_port}", code],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            stdout = result.stdout.strip()
+            stderr = result.stderr.strip()
+            output = (stdout + ("\n" + stderr if stderr else "")).strip()
+            # adb pair prints "Successfully paired to …" on success
+            success = (
+                "successfully" in output.lower()
+                or "paired to" in output.lower()
+                or result.returncode == 0 and not output.lower().startswith("error")
+            )
+            logger.info(f"adb pair {host}:{pair_port}: {output}")
+            return success, output
+        except FileNotFoundError:
+            return False, "ADB 未找到，请先安装 Platform-Tools"
+        except subprocess.TimeoutExpired:
+            return False, "配对超时（30s），请检查网络连通性"
+        except Exception as exc:
+            return False, str(exc)
+
     def disconnect_wifi(self, host: str, port: int = 5555) -> bool:
         """Disconnect a WiFi-connected device."""
         try:
