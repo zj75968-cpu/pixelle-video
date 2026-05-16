@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import re
 import threading
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, List, Sequence, Tuple
@@ -32,6 +33,57 @@ _DEFAULT_MASK = "***"
 _lock = threading.RLock()
 _cache: dict | None = None
 _compiled: re.Pattern | None = None
+
+# ---- 反规避预处理 -----------------------------------------------------------
+
+# 零宽 / 不可见字符（直接删除）
+_ZW_TABLE = str.maketrans(
+    "",
+    "",
+    "".join([
+        "\u200b",  # ZERO WIDTH SPACE
+        "\u200c",  # ZERO WIDTH NON-JOINER
+        "\u200d",  # ZERO WIDTH JOINER
+        "\u2060",  # WORD JOINER
+        "\ufeff",  # ZERO WIDTH NO-BREAK SPACE / BOM
+        "\u180e",  # MONGOLIAN VOWEL SEPARATOR
+        "\u00ad",  # SOFT HYPHEN
+    ]),
+)
+
+# 异形空格 → 普通 ASCII 空格
+_FANCY_WS = (
+    "\u3000\u00a0\u2001\u2002\u2003\u2004\u2005"
+    "\u2006\u2007\u2008\u2009\u200a\u202f\u205f"
+)
+_WS_TABLE = str.maketrans(_FANCY_WS, " " * len(_FANCY_WS))
+
+# 同形字（西里尔 / 希腊字母 → ASCII）
+_HOMOGLYPH_TABLE = str.maketrans({
+    # Cyrillic lowercase
+    "а": "a", "е": "e", "о": "o", "р": "p", "с": "c", "х": "x", "у": "y",
+    # Cyrillic uppercase
+    "А": "A", "В": "B", "Е": "E", "К": "K", "М": "M", "Н": "H",
+    "О": "O", "Р": "P", "С": "C", "Т": "T", "Х": "X", "У": "Y",
+    # Greek lowercase
+    "α": "a", "β": "b", "γ": "g", "ε": "e", "ζ": "z", "ι": "i",
+    "κ": "k", "ν": "v", "ο": "o", "ρ": "p", "τ": "t", "υ": "u", "χ": "x",
+    # Greek uppercase
+    "Α": "A", "Β": "B", "Ε": "E", "Ζ": "Z", "Η": "H", "Ι": "I",
+    "Κ": "K", "Μ": "M", "Ν": "N", "Ο": "O", "Ρ": "P", "Τ": "T",
+    "Υ": "Y", "Χ": "X",
+})
+
+
+def _sanitize(text: str) -> str:
+    """反规避预处理：NFKC 归一化 + 零宽字符剥离 + 异形空格替换 + 同形字替换。"""
+    text = unicodedata.normalize("NFKC", text)  # 全角→半角、连字拆开等
+    text = text.translate(_ZW_TABLE)            # 去除零宽 / 不可见字符
+    text = text.translate(_WS_TABLE)            # 异形空格 → 普通空格
+    text = text.translate(_HOMOGLYPH_TABLE)     # 西里尔/希腊同形字 → ASCII
+    return text
+
+# ----------------------------------------------------------------------------
 
 
 def _normalize(keywords: Iterable[str]) -> List[str]:
@@ -56,7 +108,8 @@ def _normalize(keywords: Iterable[str]) -> List[str]:
 def _compile(keywords: Sequence[str]) -> re.Pattern | None:
     if not keywords:
         return None
-    parts = [re.escape(w) for w in keywords]
+    # 编译时也对关键词做反规避处理，确保关键词与预处理后的输入文本对齐
+    parts = [re.escape(_sanitize(w)) for w in keywords]
     return re.compile("|".join(parts), re.IGNORECASE)
 
 
@@ -237,17 +290,20 @@ def parse_upload(content: str | bytes, filename: str = "") -> List[str]:
 def filter_text(text: str | None) -> Tuple[str, List[str]]:
     """对单段文本过滤违禁词。
 
+    匹配前先做反规避预处理（NFKC / 零宽字符 / 异形空格 / 同形字），
     返回 (清洗后的文本, 命中的关键词列表)。命中列表用于上层展示告警。
     """
     if not text:
         return text or "", []
+    # 反规避预处理：在归一化后的文本上做匹配并返回
+    sanitized = _sanitize(text)
     with _lock:
         state = _load_locked()
         pattern = _compiled
         mode = state["mode"]
         mask = state["mask"] or _DEFAULT_MASK
     if pattern is None:
-        return text, []
+        return sanitized, []
 
     hits: List[str] = []
 
@@ -255,7 +311,7 @@ def filter_text(text: str | None) -> Tuple[str, List[str]]:
         hits.append(match.group(0))
         return "" if mode == "remove" else mask
 
-    cleaned = pattern.sub(_sub, text)
+    cleaned = pattern.sub(_sub, sanitized)
     if mode == "remove":
         # 去除遗留的连续空白
         cleaned = re.sub(r"[ \t]{2,}", " ", cleaned)
