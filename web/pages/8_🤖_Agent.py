@@ -242,6 +242,27 @@ def _run_brain(final_text: str, raw_text: str, enhanced_meta: Optional[dict]) ->
                 prog.progress(i / step_count, text=f"步骤 {i + 1}/{step_count}：{label}…")
                 st.write(f"⏳ **步骤 {i + 1}**：{label} — {step.reason or ''}")
 
+                # ── 拦截：enqueue_publish 且 device_serial 因 picks 为空而为 None ──
+                if step.tool == "enqueue_publish":
+                    try:
+                        _peek = _resolve_placeholders(dict(step.args), prior_results)
+                    except Exception:
+                        _peek = dict(step.args)
+                    _no_serial = _peek.get("device_serial") is None
+                    _empty_picks = any(
+                        isinstance(r, dict) and r.get("picks") == []
+                        for r in prior_results
+                    )
+                    if _no_serial and _empty_picks:
+                        st.session_state["_pending_enqueue"] = _peek
+                        st.warning("⚠️ 没有已连接设备，请在下方手动选择设备后入队")
+                        prog.progress(i / step_count, text="⚠️ 等待人工选择设备…")
+                        _status.update(
+                            label=f"⚠️ {plan.summary}（等待选择设备）",
+                            state="error", expanded=True,
+                        )
+                        break
+
                 # Delegate to brain so retry+LLM-repair is exercised here too.
                 exec_record = run_async(
                     brain._run_step_with_repair(
@@ -333,7 +354,65 @@ if enhanced_text_pending:
     hint = _compose_hint()
     final_with_hint = f"{hint}\n{enhanced_text_pending}" if hint else enhanced_text_pending
     _run_brain(final_text=final_with_hint, raw_text=raw, enhanced_meta=meta)
+# ---- 人工选择发布设备（当 recommend_device 返回空 picks 时） -----------------
+_pending_eq = st.session_state.get("_pending_enqueue")
+if _pending_eq:
+    st.warning("⚠️ 没有已连接设备，视频/帖子已生成——请手动选择设备后入队。")
+    with st.container(border=True):
+        st.subheader("📱 手动选择发布设备")
+        try:
+            from pixelle_video.services.device_manager import device_manager as _dm
+            _all_devs = _dm.get_all()
+        except Exception:
+            _all_devs = []
+        if not _all_devs:
+            st.error("没有已注册的设备，请先在「发布管理」→「设备管理」页面注册设备。")
+        else:
+            _dev_options = {
+                f"{'🟢' if getattr(d, 'connected', False) else '🔴'} {getattr(d, 'name', '') or d.serial} ({d.serial})": d.serial
+                for d in _all_devs
+            }
+            _chosen_label = st.selectbox(
+                "选择发布设备（🔴=当前未连接，发布前请先连接）",
+                options=list(_dev_options.keys()),
+                key="pending_eq_device",
+            )
+            _chosen_serial = _dev_options[_chosen_label]
 
+            _c1, _c2 = st.columns(2)
+            with _c1:
+                _p_title = st.text_input("标题", value=_pending_eq.get("title", ""), key="pending_eq_title")
+                _p_body = st.text_area("正文", value=_pending_eq.get("body", ""), height=120, key="pending_eq_body")
+            with _c2:
+                _p_tags_raw = st.text_input(
+                    "话题标签（逗号分隔）",
+                    value=",".join(_pending_eq.get("hashtags") or []),
+                    key="pending_eq_tags",
+                )
+            _cb1, _cb2 = st.columns([1, 3])
+            with _cb1:
+                if st.button("📥 确认入队", type="primary", key="pending_eq_submit"):
+                    from pixelle_video.services.publish_scheduler import publish_scheduler as _ps
+                    _tags_list = [t.strip() for t in _p_tags_raw.split(",") if t.strip()]
+                    _job = _ps.add_job(
+                        serial=_chosen_serial,
+                        task_id=_pending_eq.get("task_id") or "agent-manual",
+                        title=_p_title,
+                        body=_p_body,
+                        hashtags=_tags_list,
+                        images=_pending_eq.get("images") or [],
+                        video_path=_pending_eq.get("video_path"),
+                        kind=_pending_eq.get("kind", "video"),
+                        post_type=_pending_eq.get("post_type", "content"),
+                        delete_after_hours=_pending_eq.get("delete_after_hours"),
+                    )
+                    del st.session_state["_pending_enqueue"]
+                    st.success(f"✅ 已入队：{_job.job_id[:8]}…  →  设备 {_chosen_serial}")
+                    st.rerun()
+            with _cb2:
+                if st.button("🚫 放弃入队", key="pending_eq_discard"):
+                    del st.session_state["_pending_enqueue"]
+                    st.rerun()
 # ---- 历史 -----------------------------------------------------------------
 st.divider()
 st.subheader("📜 执行历史")

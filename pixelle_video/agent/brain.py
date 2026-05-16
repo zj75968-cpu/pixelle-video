@@ -106,7 +106,7 @@ SYSTEM_PROMPT_TEMPLATE = """你是 Pixelle-Video 项目的总控 Agent。\
    - 然后用占位符把推荐结果传给 enqueue_publish：
        `"device_serial": "${{steps[i].result.picks[0].serial}}"`
      （i 是 recommend_device 的步骤下标）。
-   - **如果 recommend_device 返回 picks 为空**，说明当前没有已连接设备，**必须终止后续步骤，不得调用 enqueue_publish**；在 summary 里写明「没有已连接设备，无法发布，视频已生成保存，请先用 USB 或 adb connect 连接手机后再手动入队」。
+   - **如果 recommend_device 返回 picks 为空**，说明当前没有已连接设备。此时**仍须将 enqueue_publish 步骤保留在计划中**（正常填写 title/body/hashtags 等参数，device_serial 留空），以便 UI 展示人工选设备界面；在 plan.notes 中写明「没有已连接设备，将由用户手动选择设备后入队」。**不可省略 enqueue_publish 步骤**。
 7. **小红书发布类型**（enqueue_publish 的 `kind` 参数）：
    - 用户说「视频」「纯视频」「视频笔记」或指令含 kind=video → kind="video"（上传 .mp4，默认）
    - 用户说「图文」「图文点评」「图文笔记」「图文视频」或指令含 kind=image_text → kind="image_text"（自动取 frames/*_composed.png 场景合成图，无需手动传 images）
