@@ -28,6 +28,33 @@ def get_publish_scheduler() -> _PublishScheduler:
         st.session_state["publish_scheduler"] = _PublishScheduler()
     return st.session_state["publish_scheduler"]
 
+_HISTORY_FILE = _project_root / "data" / "agent_history.json"
+_HISTORY_MAX = 50  # 最多保留条数
+
+
+def _load_history() -> list:
+    """从磁盘加载执行历史。"""
+    try:
+        if _HISTORY_FILE.exists():
+            with open(_HISTORY_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return data
+    except Exception:
+        pass
+    return []
+
+
+def _save_history(history: list) -> None:
+    """把执行历史持久化到磁盘（最多保留 _HISTORY_MAX 条）。"""
+    try:
+        _HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+        with open(_HISTORY_FILE, "w", encoding="utf-8") as f:
+            json.dump(history[:_HISTORY_MAX], f, ensure_ascii=False, indent=2, default=str)
+    except Exception:
+        pass
+
+
 st.set_page_config(page_title="Agent 大脑", page_icon="🤖", layout="wide")
 init_session_state()
 init_i18n()
@@ -38,7 +65,7 @@ st.caption("用一句话下命令，它自动调用「视频生成 / 设备查�
 # ---- 初始化 ---------------------------------------------------------------
 pixelle_video = get_pixelle_video()
 if "agent_history" not in st.session_state:
-    st.session_state.agent_history = []  # list[AgentRunResult dict]
+    st.session_state.agent_history = _load_history()
 
 # ---- 输入区 ---------------------------------------------------------------
 default_examples = [
@@ -109,6 +136,7 @@ run_direct_clicked = col_run.button(
 )
 if col_clear.button("🧹 清空历史", use_container_width=True):
     st.session_state.agent_history = []
+    _save_history([])
     st.session_state.pop("agent_enhanced_text", None)
     st.session_state.pop("agent_enhanced_meta", None)
     st.session_state.pop("agent_enhanced_source", None)
@@ -333,6 +361,7 @@ def _run_brain(final_text: str, raw_text: str, enhanced_meta: Optional[dict]) ->
             "clarifications": list(enhanced_meta.get("clarifications", [])),
         }
     st.session_state.agent_history.insert(0, run_dict)
+    _save_history(st.session_state.agent_history)
     # 执行完毕清空增强缓存，方便下一轮
     st.session_state.pop("agent_enhanced_text", None)
     st.session_state.pop("agent_enhanced_meta", None)
