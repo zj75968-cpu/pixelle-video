@@ -222,11 +222,27 @@ class XHSPublisher:
     # ADB Helpers
     # -------------------------------------------------------------------------
 
+    @staticmethod
+    def _resolve_adb() -> str:
+        """Return the path to adb, preferring project-local copy over PATH."""
+        import shutil as _shutil
+        adb_in_path = _shutil.which("adb")
+        if adb_in_path:
+            return adb_in_path
+        # Try project-local platform-tools (same search as DeviceManager)
+        _project_local = (
+            Path(__file__).resolve().parent.parent.parent
+            / "packaging" / "windows" / "platform-tools" / "adb.exe"
+        )
+        if _project_local.exists():
+            return str(_project_local)
+        return "adb"  # fallback – will raise [WinError 2] if missing
+
     def _adb(self, *args: str) -> str:
         """Run an adb command against this device."""
         import subprocess
         result = subprocess.run(
-            ["adb", "-s", self.serial] + list(args),
+            [self._resolve_adb(), "-s", self.serial] + list(args),
             capture_output=True,
             text=True,
             timeout=60,
@@ -478,7 +494,7 @@ class XHSPublisher:
         """Wake up the device screen via ADB keyevent WAKEUP (224)."""
         import subprocess
         try:
-            adb = shutil.which("adb") or "adb"
+            adb = self._resolve_adb()
             subprocess.run(
                 [adb, "-s", self.serial, "shell", "input keyevent 224"],
                 timeout=5,
@@ -492,7 +508,7 @@ class XHSPublisher:
         """Return current screen_off_timeout in ms (default 30000 on error)."""
         import subprocess
         try:
-            adb = shutil.which("adb") or "adb"
+            adb = self._resolve_adb()
             r = subprocess.run(
                 [adb, "-s", self.serial, "shell", "settings get system screen_off_timeout"],
                 timeout=5, capture_output=True, text=True,
@@ -505,7 +521,7 @@ class XHSPublisher:
         """Set screen_off_timeout in ms via ADB settings."""
         import subprocess
         try:
-            adb = shutil.which("adb") or "adb"
+            adb = self._resolve_adb()
             subprocess.run(
                 [adb, "-s", self.serial, "shell", f"settings put system screen_off_timeout {ms}"],
                 timeout=5, capture_output=True,
@@ -525,7 +541,7 @@ class XHSPublisher:
         5. Enter PIN digits if ``lock_pin`` is configured.
         """
         import subprocess
-        adb = shutil.which("adb") or "adb"
+        adb = self._resolve_adb()
 
         def _run(*args: str) -> None:
             subprocess.run(
@@ -1109,18 +1125,48 @@ class XHSPublisher:
             time.sleep(2)
 
             # 3. Find the note by title
-            # XHS grid view stores title in content-desc (not text attribute)
-            note_el = d(text=post_title)
-            if not note_el.exists(timeout=2):
-                note_el = d(textContains=post_title[:6])
-            if not note_el.exists(timeout=2):
-                note_el = d(descriptionContains=post_title[:6])
-            if not note_el.exists(timeout=2):
-                # Try base title without episode suffix like （3/3）
-                base_title = _re.split(r"[（(]", post_title)[0].strip()
-                if base_title and base_title != post_title:
-                    note_el = d(descriptionContains=base_title)
-            if not note_el.exists(timeout=2):
+            # XHS grid view stores title in content-desc (not text attribute).
+            # The profile grid uses RecyclerView, so off-screen items are not
+            # rendered — we must scroll to find the note.
+            base_title = _re.split(r"[（(]", post_title)[0].strip() or post_title
+            search_kw = post_title[:6] if len(post_title) >= 6 else post_title
+
+            def _find_note() -> object:
+                for selector in (
+                    d(text=post_title),
+                    d(textContains=search_kw),
+                    d(descriptionContains=search_kw),
+                    d(descriptionContains=base_title) if base_title != post_title else None,
+                ):
+                    if selector is not None and selector.exists(timeout=1):
+                        return selector
+                return None
+
+            # Dismiss any in-feed banners (e.g. "随手拍&分享") by pressing back
+            # or tapping close button before scrolling
+            if d(text="去看看").exists(timeout=1):
+                if d(textContains="✕").exists(timeout=1):
+                    d(textContains="✕").click()
+                else:
+                    try:
+                        close_btn = d(description="关闭")
+                        if close_btn.exists(timeout=1):
+                            close_btn.click()
+                    except Exception:
+                        pass
+
+            note_el = _find_note()
+            if note_el is None:
+                w, h = self._screen_size(d)
+                # Scroll down up to 6 times to find the note in the RecyclerView
+                for _ in range(6):
+                    d.swipe(w // 2, int(h * 0.6), w // 2, int(h * 0.3), duration=0.4)
+                    time.sleep(0.8)
+                    note_el = _find_note()
+                    if note_el is not None:
+                        break
+
+            if note_el is None:
                 self._screenshot(d, "delete_note_not_found")
                 logger.warning(f"[{self.serial}] delete_post: note '{post_title}' not found")
                 return False

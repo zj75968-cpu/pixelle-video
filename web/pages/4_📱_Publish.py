@@ -930,6 +930,7 @@ def render_publish_tab():
     filter_val = None if status_filter == "全部" else status_filter
 
     if st.button("🔄 刷新队列"):
+        get_publish_scheduler()._load()
         st.rerun()
 
     _render_publish_queue_list(filter_val)
@@ -1020,8 +1021,15 @@ def _render_publish_queue_list(filter_val: str | None):
             with col2:
                 if job.status in ("pending", "scheduled"):
                     if st.button("▶️ 立即执行", key=f"run_{job.job_id}"):
-                        import asyncio
-                        asyncio.run(scheduler.execute_now(job.job_id))
+                        import concurrent.futures
+                        import asyncio as _asyncio
+                        with st.spinner("正在发布帖子…"):
+                            try:
+                                with concurrent.futures.ThreadPoolExecutor() as _pool:
+                                    _future = _pool.submit(_asyncio.run, scheduler.execute_now(job.job_id))
+                                    _future.result(timeout=300)
+                            except Exception as _e:
+                                st.error(f"发布异常: {_e}")
                         st.rerun()
                 if job.status in ("pending", "scheduled", "running"):
                     if st.button("❌ 取消", key=f"cancel_{job.job_id}"):

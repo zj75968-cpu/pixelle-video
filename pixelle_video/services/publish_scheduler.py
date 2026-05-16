@@ -166,6 +166,10 @@ class PublishScheduler:
             except Exception as e:
                 logger.warning(f"Failed to load publish queue: {e}")
 
+    def reload_from_disk(self):
+        """Re-read the queue file to pick up jobs added by external processes."""
+        self._load()
+
     def _save(self):
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         try:
