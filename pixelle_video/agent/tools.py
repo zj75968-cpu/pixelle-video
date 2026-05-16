@@ -1238,6 +1238,11 @@ TOOLS: List[ToolSpec] = [
         name="generate_image_text_post",
         description=(
             "运行图文帖子生成流水线（生成标题/正文/话题/分镜图）。topic 必填。"
+            "**必须根据用户语义选择 post_type**："
+            "用户说「干货 / 教程 / 方法 / 技巧 / 清单 / 攻略 / 避坑 / 科普 / 新手必看」"
+            "→ post_type='content'（📚 干货帖，结构化分点、不带强引导话术）；"
+            "用户说「引流 / 钩子 / 转化 / 私信 / 评论扣 1 / 主页有完整版 / 营销 / 拉新 / 悬念」"
+            "→ post_type='traffic'（📢 引流帖，制造钩子 + 必带 CTA）。"
             "post_type='traffic' + traffic_ttl_hours=24 表示：生成一个引流帖，"
             "在发布到小红书后 24 小时内自动删除（TTL 会写入 post_params.json，"
             "之后调用 enqueue_publish 时配合 delete_after_hours 使用）。"

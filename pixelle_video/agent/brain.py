@@ -111,6 +111,12 @@ SYSTEM_PROMPT_TEMPLATE = """你是 Pixelle-Video 项目的总控 Agent。\
    - 用户说「视频」「纯视频」「视频笔记」或指令含 kind=video → kind="video"（上传 .mp4，默认）
    - 用户说「图文」「图文点评」「图文笔记」「图文视频」或指令含 kind=image_text → kind="image_text"（自动取 frames/*_composed.png 场景合成图，无需手动传 images）
    - 未提及发布类型时默认 kind="video"。
+8. **图文帖定位**（generate_image_text_post 的 `post_type` 参数）：
+   - 用户说「干货」「教程」「方法」「技巧」「清单」「攻略」「避坑」「知识」「科普」「新手必看」→ post_type="content"（📚 干货帖，结构化分点、不带强引导话术）
+   - 用户说「引流」「钩子」「转化」「私信」「评论扣 1」「主页有完整版」「营销」「拉新」「冲粉丝」「悬念」「反差」→ post_type="traffic"（📢 引流帖，制造钩子 + 必带 CTA）
+   - 未提到时默认 "content"。
+   - 当 post_type="traffic" 且用户提到时效（如「24 小时后删」「发完明天就删」「短效」）→ 同时设置 traffic_ttl_hours=对应小时数；后续 enqueue_publish 时把同样的值传给 delete_after_hours（不要遗漏，否则 TTL 不会生效）。
+9. **违禁词**：用户给出「不要出现 X」「禁止 X」「屏蔽 X」类指令时，先调用 add_banned_keywords（mode='append'）写入，再继续后续生成步骤；这样新生成的内容会在 LLM 层就避开这些词。
 
 用户指令："{instruction}"
 """

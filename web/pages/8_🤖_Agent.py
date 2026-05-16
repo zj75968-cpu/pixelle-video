@@ -56,6 +56,32 @@ _KIND_HINT = {
     "🖼️ 图文笔记（图文点评/图文视频）": "【发布方式：图文笔记，kind=image_text】",
 }
 
+# ── 图文帖定位单选（仅对 generate_image_text_post 生效）─────────────────────
+post_type_choice = st.radio(
+    "🎯 图文帖定位（仅图文笔记/图文帖生效）",
+    options=["🤖 自动决定", "📚 干货帖（content）", "📢 引流帖（traffic）"],
+    horizontal=True,
+    index=0,
+    key="agent_post_type",
+    help=(
+        "干货帖：结构化分点、提供真实价值、不带强引导话术；"
+        "引流帖：制造钩子 + 必带 CTA（评论/私信/关注）。"
+        "选「自动」由 Agent 根据指令措辞自行判断。"
+    ),
+)
+_POST_TYPE_HINT = {
+    "📚 干货帖（content）": "【图文帖定位：干货帖，post_type=content】",
+    "📢 引流帖（traffic）": "【图文帖定位：引流帖，post_type=traffic】",
+}
+
+
+def _compose_hint() -> str:
+    parts = [
+        _KIND_HINT.get(publish_kind, ""),
+        _POST_TYPE_HINT.get(post_type_choice, ""),
+    ]
+    return "\n".join(p for p in parts if p)
+
 instruction = st.text_area(
     "你想做什么？",
     value=default_text,
@@ -290,14 +316,14 @@ if run_direct_clicked:
     if not raw:
         st.warning("请先输入指令")
     else:
-        hint = _KIND_HINT.get(publish_kind, "")
+        hint = _compose_hint()
         final = f"{hint}\n{raw}" if hint else raw
         _run_brain(final_text=final, raw_text=raw, enhanced_meta=None)
 
 if enhanced_text_pending:
     raw = st.session_state.get("agent_enhanced_source") or enhanced_text_pending
     meta = st.session_state.get("agent_enhanced_meta") or {}
-    hint = _KIND_HINT.get(publish_kind, "")
+    hint = _compose_hint()
     final_with_hint = f"{hint}\n{enhanced_text_pending}" if hint else enhanced_text_pending
     _run_brain(final_text=final_with_hint, raw_text=raw, enhanced_meta=meta)
 
