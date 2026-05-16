@@ -154,6 +154,45 @@ with st.expander("🔗 RunningHub 工作流 ID"):
             except Exception:
                 pass
 
+# ── 6. Phone Agent 配置 ─────────────────────────────────────────
+with st.expander("📱 手机 HTTP Agent（替代 USB ADB）"):
+    st.caption(
+        "配置后，将优先通过 HTTP Agent 推送文件到手机，无需 USB 连接或 ADB。\n"
+        "手机端运行：`python scripts/phone_agent.py --token 你的token --port 7777`\n"
+        "穿透地址：`cloudflared tunnel --url http://localhost:7777`，复制输出 URL 填入下方"
+    )
+    _pa = cfg.phone_agent
+    new_pa_url = st.text_input(
+        "Agent URL",
+        value=_pa.url or "",
+        key="input_pa_url",
+        placeholder="https://xxx-yyy-zzz.trycloudflare.com",
+    )
+    new_pa_token = _key_field("Agent Token", "pa_token", _pa.token or "")
+    col_pa1, col_pa2 = st.columns(2)
+    with col_pa1:
+        new_pa_chunk = st.number_input(
+            "分块大小（MB）",
+            value=int(_pa.chunk_size_mb),
+            min_value=1, max_value=50,
+            key="input_pa_chunk",
+        )
+    with col_pa2:
+        new_pa_timeout = st.number_input(
+            "推送超时（秒）",
+            value=int(_pa.timeout_push),
+            min_value=30, max_value=600,
+            key="input_pa_timeout",
+        )
+    if new_pa_url.strip():
+        if st.button("📶 测试连接", key="btn_pa_ping"):
+            from pixelle_video.services.phone_agent_client import ping
+            ok = ping(new_pa_url.strip(), token=new_pa_token or "")
+            if ok:
+                st.success("✅ Agent 在线")
+            else:
+                st.error("❌ 无法连接，请检查 URL 和 Token")
+
 st.divider()
 
 # ── 保存 ──────────────────────────────────────────────────────────
@@ -171,6 +210,12 @@ if st.button("💾 保存配置", type="primary", use_container_width=True):
             "runninghub_concurrent_limit": int(new_rh_concurrent),
             "comfyui_url":     new_comfy_url.strip() or "http://127.0.0.1:8188",
             "comfyui_api_key": new_comfy_key or None,
+        },
+        "phone_agent": {
+            "url":           new_pa_url.strip(),
+            "token":         new_pa_token or "",
+            "chunk_size_mb": int(new_pa_chunk),
+            "timeout_push":  int(new_pa_timeout),
         },
     }
 
