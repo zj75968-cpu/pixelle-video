@@ -79,6 +79,9 @@ class XHSPublisher:
 
         self.lock_pin: str = xhs_cfg.lock_pin if xhs_cfg and hasattr(xhs_cfg, "lock_pin") else ""
 
+        # Load UI selectors from config/xhs_ui_selectors.yaml (allows operator-level tuning)
+        self._selectors: dict = self._load_selectors()
+
         logger.info(
             f"XHSPublisher initialized: serial={serial}, "
             f"strict_mode={self.strict_mode}, push_dir={self.push_dir}"
@@ -88,6 +91,69 @@ class XHSPublisher:
     # -------------------------------------------------------------------------
     # Device Initialization
     # -------------------------------------------------------------------------
+
+    @staticmethod
+    def _load_selectors() -> dict:
+        """Load UI selectors from config/xhs_ui_selectors.yaml.
+
+        Returns an empty dict if the file is missing or unreadable.
+        Each value is a dict with optional keys: resource_id, text, description, fallback_texts.
+        """
+        yaml_path = Path(__file__).resolve().parent.parent.parent / "config" / "xhs_ui_selectors.yaml"
+        try:
+            import yaml  # pyyaml is in requirements
+            with open(yaml_path, "r", encoding="utf-8") as fh:
+                return yaml.safe_load(fh) or {}
+        except FileNotFoundError:
+            logger.debug("xhs_ui_selectors.yaml not found, using hardcoded fallbacks")
+        except Exception as exc:
+            logger.warning(f"Could not load xhs_ui_selectors.yaml: {exc}")
+        return {}
+
+    def _click_by_selector_key(self, d, key: str, timeout: float = 10.0) -> bool:
+        """Try clicking an element by a named selector key from xhs_ui_selectors.yaml.
+
+        Strategy order: resource_id → text → description → fallback_texts.
+        Polls until ``timeout`` seconds have elapsed.
+        Returns True on first successful click, False otherwise.
+        """
+        sel = self._selectors.get(key, {})
+        if not sel:
+            return False
+
+        rid = sel.get("resource_id")
+        text = sel.get("text")
+        desc = sel.get("description")
+        fallback_texts: list = sel.get("fallback_texts") or []
+
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            if rid:
+                el = d(resourceId=rid)
+                if el.exists(timeout=0.5):
+                    el.click()
+                    return True
+            if text:
+                el = d(text=text)
+                if el.exists(timeout=0.5):
+                    el.click()
+                    return True
+            if desc:
+                el = d(description=desc)
+                if el.exists(timeout=0.5):
+                    el.click()
+                    return True
+            for ft in fallback_texts:
+                el = d(text=ft)
+                if el.exists(timeout=0.3):
+                    el.click()
+                    return True
+                el = d(textContains=ft)
+                if el.exists(timeout=0.3):
+                    el.click()
+                    return True
+            time.sleep(0.5)
+        return False
 
     def _get_device(self):
         """Lazily initialize uiautomator2 device connection."""
@@ -477,7 +543,8 @@ class XHSPublisher:
         # Strict mode: do not use coordinate fallback.
         # If key selectors are missing, fail fast to avoid mis-clicking arbitrary UI.
         published = (
-            self._click_resource(d, f"{XHS_PACKAGE}:id/tab_add", timeout=6)
+            self._click_by_selector_key(d, "nav_publish", timeout=6)
+            or self._click_resource(d, f"{XHS_PACKAGE}:id/tab_add", timeout=6)
             or self._click_resource(d, f"{XHS_PACKAGE}:id/create", timeout=3)
             or self._click_desc(d, "发布", "加号", "创作", timeout=6)
             or self._click_text(d, "+", "发笔记", "创作", timeout=6)
@@ -516,7 +583,8 @@ class XHSPublisher:
         # "从相册选择" / "相机" / "写文字".
         # Prefer entering via album option when present.
         clicked = (
-            self._click_text(d, "从相册选择", timeout=4)
+            self._click_by_selector_key(d, "post_type_image_text", timeout=4)
+            or self._click_text(d, "从相册选择", timeout=4)
             or self._click_text_contains(d, "相册选择", timeout=4)
             or self._click_resource(d, f"{XHS_PACKAGE}:id/image_text_tab", timeout=4)
             or self._click_text(d, "图文", timeout=6)
@@ -544,7 +612,8 @@ class XHSPublisher:
         if not already_in_album:
             # Strict mode: no coordinate fallback for album entry.
             opened = (
-                self._click_text(d, "相册", timeout=6)
+                self._click_by_selector_key(d, "album_button", timeout=4)
+                or self._click_text(d, "相册", timeout=6)
                 or self._click_text_contains(d, "相册", timeout=6)
                 or self._click_resource(d, f"{XHS_PACKAGE}:id/album_btn", timeout=4)
             )
@@ -708,7 +777,8 @@ class XHSPublisher:
         """Click the final publish button and wait for the page to leave edit state."""
         self._screenshot(d, "before_publish")
         published = (
-            self._click_resource(d, f"{XHS_PACKAGE}:id/publish_btn", timeout=8)
+            self._click_by_selector_key(d, "publish_confirm_button", timeout=8)
+            or self._click_resource(d, f"{XHS_PACKAGE}:id/publish_btn", timeout=8)
             or self._click_text(d, "发布", "发布笔记", timeout=8)
             or self._click_text_contains(d, "发布", "发布笔记", timeout=8)
             or self._click_desc(d, "发布", "发布笔记", timeout=5)

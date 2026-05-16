@@ -15,7 +15,7 @@ Configuration schema with Pydantic models
 
 Single source of truth for all configuration defaults and validation.
 """
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -140,6 +140,13 @@ class XHSPublishConfig(BaseModel):
     lock_pin: str = Field(
         default="",
         description="Device unlock PIN (digits only). If set, auto-unlocks the screen before publishing.",
+    )
+    daily_schedule_times: List[str] = Field(
+        default_factory=lambda: ["09:00", "12:00", "18:00"],
+        description=(
+            "每日固定发布时间段（HH:MM，24小时制）。提交发布任务时若未指定时间，"
+            "自动分配到下一个未占用的时间段。留空则禁用自动排期。"
+        ),
     )
 
 

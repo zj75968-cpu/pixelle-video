@@ -312,6 +312,45 @@ with st.expander("📱 手机 HTTP Agent（替代 USB ADB）"):
 
 st.divider()
 
+# ── 7. 小红书发布配置 ──────────────────────────────────────────────
+with st.expander("📲 小红书发布配置"):
+    st.caption("控制小红书自动发布行为，包括 UI 兼容模式和每日定时计划。")
+    _xhs = cfg.xhs_publish
+
+    new_xhs_strict = st.toggle(
+        "严格模式（找不到 UI 元素时抛错而非坐标降级）",
+        value=_xhs.strict_mode,
+        key="input_xhs_strict",
+    )
+    new_xhs_push_dir = st.text_input(
+        "设备图片目录",
+        value=_xhs.push_dir,
+        key="input_xhs_push_dir",
+        placeholder="/sdcard/DCIM/PixelleVideo",
+    )
+    new_xhs_lock_pin = st.text_input(
+        "解锁 PIN（纯数字，留空则不自动解锁）",
+        value=_xhs.lock_pin,
+        type="password",
+        key="input_xhs_lock_pin",
+    )
+
+    st.markdown("**📅 每日自动发布时间段**")
+    st.caption(
+        "每行填一个时间（24 小时制 HH:MM）。\n"
+        "在发布表单中选择「按计划自动安排」时，将自动分配到下一个未被占用的时间段。"
+    )
+    _times_default = "\n".join(_xhs.daily_schedule_times)
+    new_xhs_schedule_raw = st.text_area(
+        "发布时间段（每行一个 HH:MM）",
+        value=_times_default,
+        height=120,
+        key="input_xhs_schedule_times",
+        placeholder="09:00\n12:00\n18:00",
+    )
+
+st.divider()
+
 # ── 保存 ──────────────────────────────────────────────────────────
 if st.button("💾 保存配置", type="primary", use_container_width=True):
     updates: dict = {
@@ -333,6 +372,15 @@ if st.button("💾 保存配置", type="primary", use_container_width=True):
             "token":         new_pa_token or "",
             "chunk_size_mb": int(new_pa_chunk),
             "timeout_push":  int(new_pa_timeout),
+        },
+        "xhs_publish": {
+            "strict_mode": new_xhs_strict,
+            "push_dir":    new_xhs_push_dir.strip() or "/sdcard/DCIM/PixelleVideo",
+            "lock_pin":    new_xhs_lock_pin or "",
+            "daily_schedule_times": [
+                t.strip() for t in new_xhs_schedule_raw.splitlines()
+                if t.strip() and ":" in t.strip()
+            ],
         },
     }
 

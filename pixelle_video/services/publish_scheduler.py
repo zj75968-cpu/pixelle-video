@@ -251,6 +251,61 @@ class PublishScheduler:
         logger.info(f"Added publish job {job.job_id} for device {serial}")
         return job
 
+    def next_available_slot(self, serial: str) -> Optional[datetime]:
+        """返回该设备下一个未被占用的每日计划时间槽。
+
+        从 config.xhs_publish.daily_schedule_times 读取时间段列表，
+        在未来 7 天内搜索第一个没有已有任务的时间槽。
+        """
+        try:
+            from pixelle_video.config import config_manager  # local import to avoid circular
+            times_str: List[str] = config_manager.config.xhs_publish.daily_schedule_times
+        except Exception:
+            times_str = []
+
+        if not times_str:
+            return None
+
+        # Parse "HH:MM" → (hour, minute) tuples
+        slots: List[tuple] = []
+        for t in times_str:
+            try:
+                h, m = map(int, t.strip().split(":"))
+                slots.append((h, m))
+            except Exception:
+                continue
+
+        if not slots:
+            return None
+
+        # Collect all occupied (year, month, day, hour, minute) keys for this device
+        occupied: set = set()
+        for job in self._jobs.values():
+            if job.serial != serial:
+                continue
+            if job.status not in (JobStatus.PENDING, JobStatus.SCHEDULED, JobStatus.RUNNING):
+                continue
+            if not job.scheduled_at:
+                continue
+            try:
+                dt = datetime.fromisoformat(job.scheduled_at)
+                occupied.add((dt.year, dt.month, dt.day, dt.hour, dt.minute))
+            except Exception:
+                continue
+
+        now = datetime.now()
+        for day_offset in range(8):  # search up to 7 days ahead
+            base = now.replace(second=0, microsecond=0) + timedelta(days=day_offset)
+            for h, m in sorted(slots):
+                candidate = base.replace(hour=h, minute=m)
+                if candidate <= now:
+                    continue
+                key = (candidate.year, candidate.month, candidate.day, candidate.hour, candidate.minute)
+                if key not in occupied:
+                    return candidate
+
+        return None
+
     def cancel_job(self, job_id: str) -> bool:
         """Cancel a pending, scheduled, or running job."""
         job = self._jobs.get(job_id)

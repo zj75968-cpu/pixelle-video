@@ -691,6 +691,9 @@ def render_publish_tab():
     """Render publish queue management UI."""
     st.subheader("📤 发布队列")
 
+    from pixelle_video.config import config_manager as _cm
+    _xhs_cfg = _cm.config.xhs_publish
+
     scheduler = get_publish_scheduler()
     dm = get_device_manager()
     _init_publish_form_defaults()
@@ -742,16 +745,38 @@ def render_publish_tab():
 
             schedule_col1, schedule_col2 = st.columns([1, 2])
             with schedule_col1:
-                use_schedule = st.checkbox("定时发布")
+                schedule_mode = st.radio(
+                    "发布方式",
+                    options=["立即发布", "定时发布", "📅 按计划自动安排"],
+                    horizontal=False,
+                    key="schedule_mode_radio",
+                )
             with schedule_col2:
                 scheduled_dt = None
-                if use_schedule:
+                if schedule_mode == "定时发布":
                     default_dt = datetime.now() + timedelta(hours=1)
                     scheduled_dt = st.datetime_input(
                         "发布时间",
                         value=default_dt,
                         min_value=datetime.now(),
                     )
+                elif schedule_mode == "📅 按计划自动安排":
+                    _preview_serial = selected_serials[0] if selected_serials else None
+                    if _preview_serial:
+                        _next_slot = scheduler.next_available_slot(_preview_serial)
+                        if _next_slot:
+                            st.info(
+                                f"**{_preview_serial}** 下一个可用时间：\n\n"
+                                f"🕐 {_next_slot.strftime('%m-%d %H:%M')}"
+                            )
+                        else:
+                            st.warning("未找到可用时间段，请在「⚙️ 设置」中配置每日发布计划。")
+                    else:
+                        _cfg_times = _xhs_cfg.daily_schedule_times
+                        if _cfg_times:
+                            st.caption(f"已配置时间段：{', '.join(_cfg_times)}")
+                        else:
+                            st.warning("请先在「⚙️ 设置」中配置每日发布时间段。")
 
             action_col1, action_col2, action_col3, action_col4 = st.columns([1, 1, 1, 2])
             with action_col1:
@@ -802,11 +827,22 @@ def render_publish_tab():
                     st.error("请填写帖子标题")
                 elif not images:
                     st.error("请填写至少一张图片路径")
+                elif schedule_mode == "📅 按计划自动安排" and not _xhs_cfg.daily_schedule_times:
+                    st.error("请先在「⚙️ 设置」→「小红书发布配置」中添加每日发布时间段。")
                 else:
                     created_jobs = []
                     failed_devices = []
                     for serial in selected_serials:
                         try:
+                            # Determine scheduled_at per device
+                            if schedule_mode == "📅 按计划自动安排":
+                                _slot = scheduler.next_available_slot(serial)
+                                _scheduled_at = _slot.isoformat() if _slot else None
+                            elif schedule_mode == "定时发布":
+                                _scheduled_at = scheduled_dt.isoformat() if scheduled_dt else None
+                            else:
+                                _scheduled_at = None  # 立即发布
+
                             job = scheduler.add_job(
                                 serial=serial,
                                 task_id=task_id or "manual",
@@ -814,7 +850,7 @@ def render_publish_tab():
                                 body=body.strip(),
                                 hashtags=hashtags,
                                 images=images,
-                                scheduled_at=scheduled_dt.isoformat() if scheduled_dt else None,
+                                scheduled_at=_scheduled_at,
                             )
                             created_jobs.append(job.job_id)
                         except Exception as e:
