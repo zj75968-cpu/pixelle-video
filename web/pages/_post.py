@@ -289,7 +289,7 @@ def render_result(result):
     if images_dir.exists():
         img_files_to_push = sorted(images_dir.glob("*.png")) + sorted(images_dir.glob("*.jpg"))
 
-    from pixelle_video.services.device_manager import push_images_to_gallery
+    from pixelle_video.services.phone_agent_client import push_images_auto
     from pixelle_video.services.device_manager import device_manager as dm
 
     if not source_topic or not img_files_to_push:
@@ -344,7 +344,7 @@ def render_result(result):
                         selected_serial = device_options[selected_label]
                         with st.spinner(f"正在推送 {len(img_files_to_push)} 张图片..."):
                             try:
-                                result = push_images_to_gallery(
+                                result = push_images_auto(
                                     serial=selected_serial,
                                     local_paths=[str(p) for p in img_files_to_push],
                                 )

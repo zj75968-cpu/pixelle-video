@@ -564,7 +564,7 @@ def render_gallery_upload_tab():
     ):
         import tempfile
         import os
-        from pixelle_video.services.device_manager import push_images_to_gallery
+        from pixelle_video.services.phone_agent_client import push_images_auto
         from pixelle_video.config import config_manager
 
         push_cfg = getattr(config_manager.config, "xhs_publish", None)
@@ -584,7 +584,7 @@ def render_gallery_upload_tab():
                     tmp_paths.append(tmp_path)
 
                 with st.spinner(f"正在推送 {len(tmp_paths)} 张图片到 {selected_serial}..."):
-                    result = push_images_to_gallery(
+                    result = push_images_auto(
                         serial=selected_serial,
                         local_paths=tmp_paths,
                         push_dir=push_dir,

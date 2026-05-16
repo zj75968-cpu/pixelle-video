@@ -1,0 +1,54 @@
+project_name: Pixelle-Video
+admin_password: "5793"       # ← 在这里添加
+llm:
+  api_key: sk-57e4d54bfa5d49c1948501a211fb20a1
+  base_url: https://api.deepseek.com
+  model: deepseek-chat
+post_model_presets:
+  post_content:
+    api_key: sk-57e4d54bfa5d49c1948501a211fb20a1
+    base_url: https://api.deepseek.com
+    model: deepseek-v4-flash
+  post_image:
+    api_key: sk-56IvmW0fsb5XuvuqC5mUk01Tntf0BbjV4z9o624CrJUfrMih
+    base_url: https://cdn.12ai.org
+    model: gemini-2.5-flash-image
+comfyui:
+  comfyui_url: http://127.0.0.1:8188
+  comfyui_api_key: ''
+  runninghub_api_key: 2bf633b86b5d4b3c8835ec85e8e87632
+  runninghub_consumer_api_key: 38026dc0af544256a980e462c793e6c6
+  runninghub_base_url: https://www.runninghub.cn
+  runninghub_concurrent_limit: 1
+  runninghub_instance_type: plus
+  show_unavailable_workflows: false
+  public_base_url: ''
+  tts:
+    inference_mode: local
+    local:
+      voice: zh-CN-YunjianNeural
+      speed: 1.2
+    comfyui:
+      default_workflow: null
+  image:
+    default_workflow: runninghub/image_qwen.json
+    prompt_prefix: Minimalist black-and-white matchstick figure style illustration,
+      clean lines, simple sketch style
+  video:
+    default_workflow: runninghub/video_wan2.2.json
+    prompt_prefix: Minimalist black-and-white matchstick figure style illustration,
+      clean lines, simple sketch style
+template:
+  default_template: 1080x1920/default.html
+xhs_publish:
+  strict_mode: true
+  push_dir: /sdcard/DCIM/PixelleVideo
+  lock_pin: ""   # 填写手机解锁 PIN，如 "1234"；留空则不自动解锁
+
+# 手机 HTTP Agent 配置（替代 USB ADB，支持云端部署）
+# 使用方式：在手机 Termux 运行 scripts/phone_agent.py，配合 cloudflared 穿透
+phone_agent:
+  url: ""        # cloudflared 输出的 URL，如 https://xxx-yyy.trycloudflare.com
+  token: ""      # 与 phone_agent.py --token 保持一致
+  chunk_size_mb: 5
+  timeout_push: 120

@@ -104,6 +104,26 @@ class TemplateConfig(BaseModel):
     )
 
 
+class PhoneAgentConfig(BaseModel):
+    """HTTP Agent configuration for phone control without USB ADB."""
+    url: str = Field(
+        default="",
+        description="手机 Agent 的访问地址（cloudflared 隧道 URL），如 https://xxx.trycloudflare.com",
+    )
+    token: str = Field(
+        default="",
+        description="认证 Token，与手机端 phone_agent.py --token 保持一致",
+    )
+    chunk_size_mb: int = Field(
+        default=5,
+        description="文件分块大小（MB），默认 5MB",
+    )
+    timeout_push: int = Field(
+        default=120,
+        description="单文件推送超时秒数",
+    )
+
+
 class XHSPublishConfig(BaseModel):
     """Xiaohongshu publish automation configuration"""
     strict_mode: bool = Field(
@@ -141,7 +161,8 @@ class PixelleVideoConfig(BaseModel):
     comfyui: ComfyUIConfig = Field(default_factory=ComfyUIConfig)
     template: TemplateConfig = Field(default_factory=TemplateConfig)
     xhs_publish: XHSPublishConfig = Field(default_factory=XHSPublishConfig)
-    
+    phone_agent: PhoneAgentConfig = Field(default_factory=PhoneAgentConfig)
+
     def is_llm_configured(self) -> bool:
         """Check if LLM is properly configured"""
         return bool(
