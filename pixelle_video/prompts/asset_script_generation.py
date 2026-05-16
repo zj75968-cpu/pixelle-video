@@ -72,10 +72,16 @@ def build_asset_script_prompt(
     title_section = f"- Video Title: {title}\n" if title else ""
     title_instruction = f"6. Narration content should be consistent with the video title: {title}\n" if title else ""
     
-    return ASSET_SCRIPT_GENERATION_PROMPT.format(
+    prompt = ASSET_SCRIPT_GENERATION_PROMPT.format(
         duration=duration,
         title_section=title_section,
         intent=intent,
         assets_text=assets_text,
         title_instruction=title_instruction
     )
+    try:
+        from pixelle_video.utils.banned_keywords import append_prompt_block
+        prompt = append_prompt_block(prompt, language="en")
+    except Exception:
+        pass
+    return prompt

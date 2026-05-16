@@ -95,7 +95,7 @@ def build_post_prompt(
     else:
         post_type_strategy = POST_TYPE_STRATEGY_CONTENT
 
-    return POST_GENERATION_PROMPT_TEMPLATE.format(
+    prompt = POST_GENERATION_PROMPT_TEMPLATE.format(
         system_prompt=POST_GENERATION_SYSTEM_PROMPT,
         post_type_strategy=post_type_strategy,
         topic=topic.strip(),
@@ -104,3 +104,10 @@ def build_post_prompt(
         hashtag_count=hashtag_count,
         style_hint=style_hint,
     )
+    # 注入小红书违禁词清单，让模型生成阶段就避开
+    try:
+        from pixelle_video.utils.banned_keywords import append_prompt_block
+        prompt = append_prompt_block(prompt, language="zh")
+    except Exception:
+        pass
+    return prompt

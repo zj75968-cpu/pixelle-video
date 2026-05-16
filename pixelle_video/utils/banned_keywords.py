@@ -298,3 +298,46 @@ def filter_post(
         seen.add(key)
         merged.append(h)
     return new_title, new_body, new_tags, merged
+
+
+# ---- LLM prompt injection ----
+
+def build_prompt_block(*, max_words: int = 200, language: str = "auto") -> str:
+    """生成可拼接到 LLM prompt 末尾的「禁止词」指令段落。
+
+    - 列表为空时返回空字符串（不污染 prompt）。
+    - 默认双语提示，兼容中英文模型/中英文输出场景。
+    - 超过 `max_words` 个关键词只展示前 N 个（避免 prompt 过长）。
+    """
+    words = list_keywords()
+    if not words:
+        return ""
+    shown = words[:max_words]
+    overflow = max(0, len(words) - len(shown))
+    words_line = "、".join(shown)
+    if overflow:
+        words_line += f"（另有 {overflow} 个未列出）"
+
+    if language == "en":
+        block = (
+            "\n\nBANNED TERMS — MUST NOT APPEAR in title, body, hashtags, "
+            "captions or any text output (Chinese OR English, case-insensitive). "
+            "If the topic forces them, rephrase with a neutral synonym. "
+            f"List: {words_line}\n"
+        )
+    else:
+        block = (
+            "\n\n【小红书禁止出现的关键词 / Banned terms】\n"
+            "下列词语在标题、正文、话题标签、字幕里都不允许出现（中英文均判定，"
+            "大小写不敏感）。若主题不得不涉及，请改用中性同义表达，或绕开该词。"
+            f"\n禁止词列表：{words_line}\n"
+        )
+    return block
+
+
+def append_prompt_block(prompt: str, *, language: str = "auto") -> str:
+    """便捷函数：把禁止词段落追加到现有 prompt 末尾。"""
+    block = build_prompt_block(language=language)
+    if not block:
+        return prompt
+    return f"{prompt}{block}"

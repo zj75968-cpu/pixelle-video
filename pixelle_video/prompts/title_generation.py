@@ -78,8 +78,14 @@ def build_title_generation_prompt(content: str, max_length: int = 15) -> str:
     # Take first 500 chars to avoid overly long prompts
     content_preview = content[:500]
     
-    return TITLE_GENERATION_PROMPT.format(
+    prompt = TITLE_GENERATION_PROMPT.format(
         content=content_preview,
         max_length=max_length
     )
+    try:
+        from pixelle_video.utils.banned_keywords import append_prompt_block
+        prompt = append_prompt_block(prompt, language="en")
+    except Exception:
+        pass
+    return prompt
 

@@ -149,10 +149,16 @@ def build_topic_narration_prompt(
     Returns:
         Formatted prompt
     """
-    return TOPIC_NARRATION_PROMPT.format(
+    prompt = TOPIC_NARRATION_PROMPT.format(
         topic=topic,
         n_storyboard=n_storyboard,
         min_words=min_words,
         max_words=max_words
     )
+    try:
+        from pixelle_video.utils.banned_keywords import append_prompt_block
+        prompt = append_prompt_block(prompt, language="en")
+    except Exception:
+        pass
+    return prompt
 
