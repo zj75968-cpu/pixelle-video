@@ -251,6 +251,20 @@ class PublishScheduler:
         delete_after_hours: Optional[float] = None,
     ) -> PublishJob:
         """Add a new publish job to the queue."""
+        # 过滤小红书违禁词（标题 / 正文 / 标签）
+        try:
+            from pixelle_video.utils.banned_keywords import filter_post
+            title, body, hashtags, _hits = filter_post(
+                title=title, body=body, hashtags=hashtags
+            )
+            if _hits:
+                logger.info(
+                    f"[banned_keywords] scrubbed {len(_hits)} term(s) from job "
+                    f"task_id={task_id}: {_hits}"
+                )
+        except Exception as _exc:  # noqa: BLE001
+            logger.warning(f"[banned_keywords] filter skipped: {_exc}")
+
         job = PublishJob(
             job_id=str(uuid.uuid4()),
             serial=serial,
