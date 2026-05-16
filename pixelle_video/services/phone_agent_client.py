@@ -24,9 +24,11 @@ Phone Agent Client
 from __future__ import annotations
 
 import os
+import threading
 import time
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import requests
 from loguru import logger
@@ -266,3 +268,146 @@ def push_images_auto(
             local_paths=local_paths,
             push_dir=push_dir,
         )
+
+
+# ── 心跳监控 ──────────────────────────────────────────────────────
+
+class PhoneAgentMonitor:
+    """
+    后台心跳监控，定期 ping 手机 HTTP Agent。
+
+    用法：
+        from pixelle_video.services.phone_agent_client import get_monitor, ensure_monitor_running
+
+        ensure_monitor_running()          # 按 config.yaml 自动启动
+        m = get_monitor()
+        print(m.is_online, m.last_seen)
+    """
+
+    def __init__(self) -> None:
+        self._thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._lock = threading.Lock()
+        self._online: bool = False
+        self._last_seen: Optional[datetime] = None
+        self._consecutive_failures: int = 0
+        self._agent_url: str = ""
+        self._token: str = ""
+        self._interval: int = 30
+        self._on_status_change: Optional[Callable[[bool], None]] = None
+
+    @property
+    def is_online(self) -> bool:
+        with self._lock:
+            return self._online
+
+    @property
+    def last_seen(self) -> Optional[datetime]:
+        with self._lock:
+            return self._last_seen
+
+    @property
+    def consecutive_failures(self) -> int:
+        with self._lock:
+            return self._consecutive_failures
+
+    @property
+    def is_running(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    def start(
+        self,
+        agent_url: str,
+        token: str = "",
+        check_interval: int = 30,
+        on_status_change: Optional[Callable[[bool], None]] = None,
+    ) -> None:
+        """启动心跳监控线程。若已在运行且参数未变则跳过。"""
+        if (
+            self.is_running
+            and self._agent_url == agent_url
+            and self._token == token
+            and self._interval == check_interval
+        ):
+            return
+        self.stop()
+        self._agent_url = agent_url
+        self._token = token
+        self._interval = check_interval
+        self._on_status_change = on_status_change
+        self._stop_event.clear()
+        self._thread = threading.Thread(
+            target=self._run, daemon=True, name="PhoneAgentHeartbeat"
+        )
+        self._thread.start()
+        logger.info(f"PhoneAgentMonitor: started (interval={check_interval}s)")
+
+    def stop(self) -> None:
+        """停止心跳监控线程。"""
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=5)
+        self._thread = None
+        logger.debug("PhoneAgentMonitor: stopped")
+
+    def _run(self) -> None:
+        """心跳主循环：启动后立即检测一次，然后按间隔轮询。"""
+        self._check()
+        while not self._stop_event.wait(timeout=self._interval):
+            self._check()
+
+    def _check(self) -> None:
+        """执行单次心跳检测并更新状态。"""
+        if not self._agent_url:
+            return
+        online = ping(self._agent_url, self._token, timeout=8)
+        with self._lock:
+            prev_online = self._online
+            if online:
+                self._online = True
+                self._last_seen = datetime.now()
+                self._consecutive_failures = 0
+                if not prev_online:
+                    logger.info("PhoneAgentMonitor: ✅ Agent came ONLINE")
+                    if self._on_status_change:
+                        self._on_status_change(True)
+            else:
+                self._consecutive_failures += 1
+                if prev_online:
+                    self._online = False
+                    logger.warning(
+                        f"PhoneAgentMonitor: ⚠ Agent went OFFLINE "
+                        f"(failures={self._consecutive_failures})"
+                    )
+                    if self._on_status_change:
+                        self._on_status_change(False)
+                else:
+                    logger.debug(
+                        f"PhoneAgentMonitor: Agent still offline "
+                        f"(failures={self._consecutive_failures})"
+                    )
+
+
+# 模块级单例
+_monitor = PhoneAgentMonitor()
+
+
+def get_monitor() -> PhoneAgentMonitor:
+    """获取全局心跳监控单例。"""
+    return _monitor
+
+
+def ensure_monitor_running() -> None:
+    """
+    根据当前 config.yaml 自动启动/停止心跳监控。
+    在 Streamlit 启动时或配置变更后调用。
+    """
+    from pixelle_video.config import config_manager
+
+    cfg = config_manager.config
+    agent_url = cfg.phone_agent.url.strip()
+    agent_token = cfg.phone_agent.token.strip()
+    if agent_url:
+        _monitor.start(agent_url, token=agent_token)
+    else:
+        _monitor.stop()

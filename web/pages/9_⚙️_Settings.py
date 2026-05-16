@@ -248,6 +248,36 @@ with st.expander("📱 手机 HTTP Agent（替代 USB ADB）"):
         "手机端运行：`python scripts/phone_agent.py --token 你的token --port 7777`\n"
         "穿透地址：`cloudflared tunnel --url http://localhost:7777`，复制输出 URL 填入下方"
     )
+
+    # ── 实时心跳状态（自动刷新）────────────────────────────────────
+    from pixelle_video.services.phone_agent_client import (
+        get_monitor, ensure_monitor_running,
+    )
+    ensure_monitor_running()
+
+    @st.fragment(run_every="30s")
+    def _render_heartbeat_badge():
+        m = get_monitor()
+        if not cfg.phone_agent.url.strip():
+            return
+        if m.is_online:
+            last = m.last_seen.strftime("%H:%M:%S") if m.last_seen else "—"
+            st.markdown(
+                f'<span style="background:#e8f5e9;color:#1a7a1a;border:1px solid #4caf50;'
+                f'border-radius:4px;padding:3px 10px;font-size:.9em">🟢 在线 · 最近: {last}</span>',
+                unsafe_allow_html=True,
+            )
+        else:
+            fails = m.consecutive_failures
+            st.markdown(
+                f'<span style="background:#ffebee;color:#a00000;border:1px solid #ef9a9a;'
+                f'border-radius:4px;padding:3px 10px;font-size:.9em">'
+                f'🔴 离线 · 连续失败: {fails} 次</span>',
+                unsafe_allow_html=True,
+            )
+
+    _render_heartbeat_badge()
+
     _pa = cfg.phone_agent
     new_pa_url = st.text_input(
         "Agent URL",

@@ -256,55 +256,65 @@ def _trigger_media_scan(device_path: str):
 # -------------------------------------------------------------------
 def _start_cloudflared_and_report(port: int, pixelle_url: str, token: str):
     """
-    子线程：启动 cloudflared，解析 trycloudflare.com URL，
-    然后 POST 给 Pixelle-Video /api/phone-agent/register。
+    子线程：循环启动 cloudflared（守护模式）。
+    - 解析到隧道 URL 后写入 ~/pixelle_agent_url.txt 并上报给 Pixelle-Video。
+    - 进程意外退出后自动重启（watchdog）。
     """
     cf_cmd = os.path.expanduser("~/cloudflared")
     if not os.path.exists(cf_cmd):
         cf_cmd = "cloudflared"  # 尝试系统 PATH
 
-    print(f"[cloudflared] 启动中...")
-    proc = subprocess.Popen(
-        [cf_cmd, "tunnel", "--url", f"http://localhost:{port}"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
-
-    tunnel_url = None
     url_pattern = re.compile(r"https://[a-zA-Z0-9\-]+\.trycloudflare\.com")
+    restart_delay = 15  # 重启前等待秒数
 
-    # 最多等 60 秒解析出 URL
-    deadline = time.time() + 60
-    while time.time() < deadline:
-        line = proc.stdout.readline()
-        if not line:
-            break
-        print(f"[cloudflared] {line.rstrip()}")
-        m = url_pattern.search(line)
-        if m:
-            tunnel_url = m.group(0)
-            break
+    while True:  # watchdog 主循环
+        print(f"[cloudflared] 启动中（端口 {port}）...")
+        try:
+            proc = subprocess.Popen(
+                [cf_cmd, "tunnel", "--url", f"http://localhost:{port}"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+            )
+        except FileNotFoundError:
+            print(f"[cloudflared] ✗ 找不到 cloudflared，{restart_delay}s 后重试...")
+            time.sleep(restart_delay)
+            continue
+        except Exception as e:
+            print(f"[cloudflared] ✗ 启动失败: {e}，{restart_delay}s 后重试...")
+            time.sleep(restart_delay)
+            continue
 
-    if not tunnel_url:
-        print("[cloudflared] ⚠ 未能解析到隧道 URL，请手动填写到 Pixelle-Video 设置页")
-        return
+        tunnel_url = None
+        url_deadline = time.time() + 60  # 最多等 60 秒解析 URL
 
-    print(f"[cloudflared] ✅ 隧道 URL: {tunnel_url}")
+        for line in iter(proc.stdout.readline, ""):
+            print(f"[cloudflared] {line.rstrip()}")
 
-    # 写入本地文件，方便手动查看
-    url_file = os.path.expanduser("~/pixelle_agent_url.txt")
-    with open(url_file, "w") as f:
-        f.write(tunnel_url + "\n")
-    print(f"[cloudflared] URL 已写入 {url_file}")
+            if tunnel_url is None:
+                m = url_pattern.search(line)
+                if m:
+                    tunnel_url = m.group(0)
+                    print(f"[cloudflared] ✅ 隧道 URL: {tunnel_url}")
+                    # 写入本地文件
+                    url_file = os.path.expanduser("~/pixelle_agent_url.txt")
+                    try:
+                        with open(url_file, "w") as f:
+                            f.write(tunnel_url + "\n")
+                        print(f"[cloudflared] URL 已写入 {url_file}")
+                    except Exception as e:
+                        print(f"[cloudflared] 写入文件失败: {e}")
+                    # 上报给 Pixelle-Video
+                    if pixelle_url:
+                        _report_url_to_pixelle(tunnel_url, token, pixelle_url)
+                elif time.time() > url_deadline:
+                    print("[cloudflared] ⚠ 超时未获得隧道 URL，请手动填写到 Pixelle-Video 设置页")
+                    # 继续读取，但不再尝试解析 URL
 
-    # 上报给 Pixelle-Video
-    if pixelle_url:
-        _report_url_to_pixelle(tunnel_url, token, pixelle_url)
-
-    # 继续读取 cloudflared 输出，保持进程运行
-    for line in proc.stdout:
-        print(f"[cloudflared] {line.rstrip()}")
+        # stdout 关闭 = 进程已退出
+        ret = proc.wait()
+        print(f"[cloudflared] ⚠ 进程已退出（code={ret}），{restart_delay}s 后自动重启...")
+        time.sleep(restart_delay)
 
 
 def _report_url_to_pixelle(tunnel_url: str, agent_token: str, pixelle_url: str, retries: int = 5):
@@ -349,7 +359,6 @@ if __name__ == "__main__":
                         help="Pixelle-Video 服务器地址，用于自动上报隧道 URL")
     args = parser.parse_args()
 
-    global _TOKEN, _PUSH_DIR
     _TOKEN = args.token
     _PUSH_DIR = args.push_dir
 
