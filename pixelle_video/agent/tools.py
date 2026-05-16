@@ -735,6 +735,79 @@ async def _execute_job_now(job_id: str) -> Dict[str, Any]:
     return {"job_id": job_id, "triggered": bool(ok)}
 
 
+async def _get_job(job_id: str) -> Dict[str, Any]:
+    """Fetch a publish job's full record (status, scheduled_at, error, etc.)."""
+    from pixelle_video.services.publish_scheduler import publish_scheduler
+
+    job = publish_scheduler.get_job(job_id)
+    if job is None:
+        return {"found": False, "job_id": job_id}
+    return {"found": True, "job": job.to_dict()}
+
+
+async def _polish_text(raw: str, kind: str = "body") -> Dict[str, Any]:
+    """LLM polish a piece of title / body / topic text. Returns polished + rationale."""
+    from pixelle_video.service import pixelle_video as core
+
+    if kind not in {"title", "body", "topic"}:
+        raise ValueError(f"kind must be one of title/body/topic, got {kind!r}")
+
+    if not getattr(core, "_initialized", False):
+        await core.initialize()
+    if core.llm is None:
+        raise RuntimeError("LLM 未配置（请在 config.yaml 配置 llm.*）")
+
+    # Reuse the same prompt builder as the web polish component.
+    from web.components.polish import _build_prompt, _PolishResult  # type: ignore
+
+    prompt = _build_prompt(raw, kind)  # type: ignore[arg-type]
+    result = await core.llm(
+        prompt=prompt,
+        response_type=_PolishResult,
+        temperature=0.4,
+        max_tokens=600,
+    )
+    return {
+        "kind": kind,
+        "original": raw,
+        "polished": result.polished,
+        "rationale": result.rationale,
+    }
+
+
+async def _read_post_params(task_id: str) -> Dict[str, Any]:
+    """Read output/<task_id>/post_params.json so the agent can inspect generated content."""
+    import json
+    from pathlib import Path
+    from pixelle_video.service import pixelle_video as core
+
+    if not getattr(core, "_initialized", False):
+        await core.initialize()
+    persistence = core.persistence
+    if persistence is None:
+        raise RuntimeError("PersistenceService not initialized")
+
+    output_root = Path(persistence.output_dir)
+    pp = output_root / task_id / "post_params.json"
+    if not pp.exists():
+        return {"found": False, "task_id": task_id, "path": str(pp)}
+    try:
+        data = json.loads(pp.read_text(encoding="utf-8"))
+    except Exception as e:  # noqa: BLE001
+        return {"found": False, "task_id": task_id, "path": str(pp), "error": str(e)}
+
+    frames_dir = output_root / task_id / "frames"
+    composed = sorted(frames_dir.glob("*_composed.png")) if frames_dir.exists() else []
+    return {
+        "found": True,
+        "task_id": task_id,
+        "path": str(pp),
+        "post_params": data,
+        "composed_image_count": len(composed),
+        "composed_images": [str(p) for p in composed],
+    }
+
+
 # --------------------------------------------------------------------------
 # Registry
 # --------------------------------------------------------------------------
@@ -1140,6 +1213,61 @@ TOOLS: List[ToolSpec] = [
             "required": ["job_id"],
         },
         handler=_execute_job_now,
+    ),
+    ToolSpec(
+        name="get_job",
+        description=(
+            "按 job_id 读取单条发布任务的完整字段（含 status / scheduled_at / error / retry_count / "
+            "post_type / delete_after_hours / screenshots 等）。"
+            "用于在 list_jobs 看到大致信息后，进一步排查某条任务为什么失败或还没发。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "job_id": {"type": "string", "description": "publish_scheduler 中的 job_id"},
+            },
+            "required": ["job_id"],
+        },
+        handler=_get_job,
+    ),
+    ToolSpec(
+        name="polish_text",
+        description=(
+            "用 LLM 一键润色一段文本（标题 / 正文 / 选题）。"
+            "kind='title' 限 20 汉字、'topic' 限 80 汉字、'body' 控制在原长 1.4 倍以内。"
+            "返回 polished（润色后）+ rationale（一句话改动思路）。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "raw": {"type": "string", "description": "原始文本"},
+                "kind": {
+                    "type": "string",
+                    "enum": ["title", "body", "topic"],
+                    "description": "润色目标：title=标题；body=正文；topic=选题/主题",
+                    "default": "body",
+                },
+            },
+            "required": ["raw"],
+        },
+        handler=_polish_text,
+    ),
+    ToolSpec(
+        name="read_post_params",
+        description=(
+            "读取 output/<task_id>/post_params.json，查看某次图文帖生成结果的完整参数"
+            "（title / body / hashtags / images / post_type / traffic_ttl_hours）。"
+            "用于在 generate_image_text_post 之后、enqueue_publish 之前，让 agent 检查内容是否合适、"
+            "或回看历史生成结果。也会返回 frames/*_composed.png 的张数与路径。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "task_id": {"type": "string", "description": "output/ 下的 task_id 子目录名"},
+            },
+            "required": ["task_id"],
+        },
+        handler=_read_post_params,
     ),
 ]
 
