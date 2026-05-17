@@ -632,9 +632,12 @@ def render_devices_tab():
         mdns_col, _ = st.columns([1, 3])
         with mdns_col:
             if st.button("🔍 扫描 mDNS 设备", key="scan_mdns_btn"):
-                with st.spinner("正在扫描 mDNS（约 5 秒）…"):
-                    mdns_found = dm.scan_mdns(timeout=5.0)
-                st.session_state["mdns_scan_results"] = mdns_found
+                if not hasattr(dm, "scan_mdns"):
+                    st.error("功能需重启 Streamlit 才能加载，请关闭并重新运行 `start_web.bat`")
+                else:
+                    with st.spinner("正在扫描 mDNS（约 5 秒）…"):
+                        mdns_found = dm.scan_mdns(timeout=5.0)
+                    st.session_state["mdns_scan_results"] = mdns_found
 
         mdns_res = st.session_state.get("mdns_scan_results")
         if mdns_res is not None:
