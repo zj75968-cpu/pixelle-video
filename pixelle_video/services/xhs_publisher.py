@@ -1010,12 +1010,27 @@ class XHSPublisher:
                     return True
 
             # Tier 6: weak heuristic — feed-like state without title verification
+            # When expected_title is available (≥4 chars), require the title prefix
+            # to also appear in XML to block false positives caused by OTHER posts
+            # on the home feed (especially relevant for video posts whose upload
+            # may still be in progress).
+            _probe_t6 = (expected_title or "").strip()[:10]
+            _has_title_gate = len(_probe_t6) >= 4
+            _title_in_xml_t6 = _has_title_gate and (_probe_t6 in xml)
+
             if "刚刚" in xml and "赞" in xml and ("首页" in xml or "市集" in xml):
-                logger.warning(
-                    "_check_success: ⚠️ tier-6 weak heuristic (刚刚 + 赞 + feed) — "
-                    "possible false positive if title could not be verified"
-                )
-                return True
+                if _has_title_gate and not _title_in_xml_t6:
+                    logger.warning(
+                        f"_check_success: ❌ tier-6 BLOCKED — feed visible but title "
+                        f"'{_probe_t6}' not found in XML "
+                        "(video may still be uploading / post not yet in feed)"
+                    )
+                else:
+                    logger.warning(
+                        "_check_success: ⚠️ tier-6 weak heuristic (刚刚 + 赞 + feed) — "
+                        + ("title confirmed in XML" if _title_in_xml_t6 else "no title to verify — possible false positive")
+                    )
+                    return True
 
             try:
                 info = d.info
