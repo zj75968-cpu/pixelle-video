@@ -43,6 +43,32 @@ st.set_page_config(
 
 # ---- Helpers -----------------------------------------------------------------
 
+def _wifi_connect_hint(adb_msg: str) -> str:
+    """Return a user-friendly hint based on the ADB connect output."""
+    m = adb_msg.lower()
+    if "authenticate" in m or "authentication" in m:
+        return (
+            "**原因：设备拒绝认证**\n\n"
+            "首次连接需要先配对。请切换到「Android 11+ 无线配对」标签页，"
+            "完成「第一步：配对」（adb pair + 配对码）后再回来连接。"
+        )
+    if "refused" in m or "connection refused" in m:
+        return (
+            "**原因：端口被拒绝**\n\n"
+            "- 检查手机「无线调试」主页显示的端口（不是配对端口）\n"
+            "- 确认「无线调试」开关处于开启状态"
+        )
+    if "no route" in m or "timed out" in m or "timeout" in m:
+        return (
+            "**原因：网络不通**\n\n"
+            "- 确认手机与电脑在同一 WiFi\n"
+            "- 检查 IP 地址是否正确（手机「无线调试」页显示）"
+        )
+    return (
+        "请检查：无线调试开关已开启 / IP 和端口与手机屏幕一致 / 手机与电脑在同一 WiFi"
+    )
+
+
 def get_device_manager():
     from pixelle_video.services.device_manager import device_manager
     # Apply saved ADB server config on first use
@@ -578,18 +604,14 @@ def render_devices_tab():
             if st.form_submit_button("连接并注册"):
                 if host.strip():
                     serial = f"{host.strip()}:{int(port)}"
-                    ok = dm.connect_wifi(host.strip(), int(port))
+                    ok, adb_msg = dm.connect_wifi(host.strip(), int(port))
                     if ok:
                         dm.add_device(serial=serial, name=name.strip(), theme=theme.strip())
                         st.success(f"WiFi 连接成功：{serial}")
                         st.rerun()
                     else:
-                        st.error(
-                            "连接失败，请检查：\n"
-                            "- 手机无线调试开关是否已开启\n"
-                            "- IP 和端口是否与手机屏幕显示一致\n"
-                            "- 手机与电脑是否在同一 WiFi"
-                        )
+                        _hint = _wifi_connect_hint(adb_msg)
+                        st.error(f"连接失败 `{serial}`\n\nADB 返回：`{adb_msg}`\n\n{_hint}")
 
     with tab_pair:
         st.info(
@@ -633,7 +655,7 @@ def render_devices_tab():
                         st.code(_e["serial"])
                     with _ec2:
                         if st.button("一键连接", key=f"mdns_connect_{_e['serial']}"):
-                            _ok = dm.connect_wifi(_e["ip"], _e["port"])
+                            _ok, _msg = dm.connect_wifi(_e["ip"], _e["port"])
                             if _ok:
                                 dm.add_device(serial=_e["serial"], name=_e["ip"], theme="")
                                 st.success(f"✅ 已连接并注册：{_e['serial']}")
@@ -677,13 +699,14 @@ def render_devices_tab():
             if st.form_submit_button("📲 连接并注册设备"):
                 if c_host.strip():
                     serial = f"{c_host.strip()}:{int(c_port)}"
-                    ok = dm.connect_wifi(c_host.strip(), int(c_port))
+                    ok, adb_msg = dm.connect_wifi(c_host.strip(), int(c_port))
                     if ok:
                         dm.add_device(serial=serial, name=c_name.strip(), theme=c_theme.strip())
                         st.success(f"✅ 已连接并注册设备：{serial}")
                         st.rerun()
                     else:
-                        st.error(f"连接失败：{serial}，请确认端口正确，或先完成第一步配对")
+                        _hint = _wifi_connect_hint(adb_msg)
+                        st.error(f"连接失败 `{serial}`\n\nADB 返回：`{adb_msg}`\n\n{_hint}")
 
     # Publish automation settings
     st.markdown("---")

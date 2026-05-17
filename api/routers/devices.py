@@ -76,11 +76,11 @@ async def remove_device(serial: str):
 async def connect_wifi(body: DeviceConnectWiFiRequest):
     """Connect to an Android device over WiFi via ADB."""
     serial = f"{body.host}:{body.port}"
-    success = device_manager.connect_wifi(body.host, body.port)
+    success, adb_msg = device_manager.connect_wifi(body.host, body.port)
     if not success:
         raise HTTPException(
             status_code=502,
-            detail=f"Failed to connect to {serial}. Make sure ADB TCP/IP mode is enabled on the device.",
+            detail=f"Failed to connect to {serial}: {adb_msg}",
         )
     # Auto-register if not already in registry
     dev = device_manager.get(serial) or device_manager.add_device(serial=serial)

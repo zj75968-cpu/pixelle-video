@@ -318,7 +318,7 @@ class DeviceManager:
             return False
 
         self._last_wifi_attempt[serial] = now
-        ok = self.connect_wifi(host, port, quiet=True)
+        ok, _ = self.connect_wifi(host, port, quiet=True)
         if ok:
             logger.info(f"Auto reconnected WiFi device: {serial}")
         return ok
@@ -371,27 +371,33 @@ class DeviceManager:
             logger.error(f"ADB devices error: {e}", exc_info=True)
             return []
 
-    def connect_wifi(self, host: str, port: int = 5555, quiet: bool = False) -> bool:
-        """Connect to a device over WiFi (TCP/IP)."""
+    def connect_wifi(self, host: str, port: int = 5555, quiet: bool = False) -> Tuple[bool, str]:
+        """Connect to a device over WiFi (TCP/IP).
+
+        Returns:
+            (success, adb_output_message)
+        """
         try:
             result = self._adb("connect", f"{host}:{port}")
-            success = "connected" in result.stdout.lower()
             message = result.stdout.strip()
+            success = "connected" in message.lower()
             if quiet:
                 logger.debug(f"WiFi connect {host}:{port}: {message}")
             else:
                 logger.info(f"WiFi connect {host}:{port}: {message}")
-            return success
+            return success, message
         except FileNotFoundError:
+            msg = "ADB not found in PATH"
             if not quiet:
-                logger.warning("ADB not found in PATH.")
-            return False
+                logger.warning(msg)
+            return False, msg
         except Exception as e:
+            msg = str(e)
             if quiet:
-                logger.debug(f"WiFi connect error: {e}")
+                logger.debug(f"WiFi connect error: {msg}")
             else:
-                logger.error(f"WiFi connect error: {e}")
-            return False
+                logger.error(f"WiFi connect error: {msg}")
+            return False, msg
 
     def pair_wireless(self, host: str, pair_port: int, code: str) -> Tuple[bool, str]:
         """Pair a device using Android 11+ wireless pairing (adb pair).
