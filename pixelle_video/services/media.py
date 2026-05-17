@@ -193,13 +193,6 @@ class MediaService(ComfyBaseService):
                 workflows = [wf for wf in workflows if not _is_image_wf(wf)]
 
                 _CHATFIRE_MODELS = [
-                    ("nano-banana-pro",              "nano-banana-pro"),
-                    ("nano-banana-pro_2k",           "nano-banana-pro 2K"),
-                    ("nano-banana-pro_4k",           "nano-banana-pro 4K"),
-                    ("nano-banana",                  "nano-banana"),
-                    ("gemini-2.5-flash-image",       "Gemini 2.5 Flash Image"),
-                    ("gemini-2.5-flash-image-preview",    "Gemini 2.5 Flash Preview"),
-                    ("gemini-2.5-flash-image-preview-hd", "Gemini 2.5 Flash Preview HD"),
                     ("gemini-3.1-flash-image-preview_1k", "Gemini 3.1 Flash Preview 1K"),
                 ]
                 for _mid, _label in _CHATFIRE_MODELS:

@@ -12,7 +12,7 @@ post_model_presets:
   post_image:
     api_key: sk-MXBjq1odMGod9tl808ZSZkfC08kMwtCVcK3uzhqDUUmjhWYF
     base_url: https://api.chatfire.cn
-    model: nano-banana-pro
+    model: gemini-3.1-flash-image-preview_1k
 comfyui:
   comfyui_url: http://127.0.0.1:8188
   comfyui_api_key: ''
