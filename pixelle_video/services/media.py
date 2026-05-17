@@ -278,31 +278,43 @@ class MediaService(ComfyBaseService):
             user_params = dict(params)  # 复制
             user_params.setdefault("prompt", prompt)
 
-            # 通用宽高 -> aspectRatio（仅当模型有 aspectRatio 字段且用户没提供时）
+            # 通用宽高 -> aspectRatio 自动映射 / 无效值修正
             field_keys = {i["fieldKey"] for i in model.get("inputs", [])}
-            if "aspectRatio" in field_keys and "aspectRatio" not in user_params:
-                if width and height:
-                    import math
-                    _ar_spec = next(
-                        (i for i in model.get("inputs", []) if i.get("fieldKey") == "aspectRatio"),
-                        {},
-                    )
-                    _options = [o["value"] for o in (_ar_spec.get("options") or []) if o.get("value")]
-                    if _options:
-                        # 找与 width/height 比例最接近的选项值
-                        # 选项格式可能是 "1:1" 或 "960x960"
-                        def _parse_ratio(v: str) -> float:
-                            if "x" in v.lower() and ":" not in v:
-                                parts = v.lower().split("x")
-                            else:
-                                parts = v.split(":")
-                            try:
-                                return float(parts[0]) / float(parts[1])
-                            except Exception:
-                                return 1.0
-                        _target = int(width) / int(height)
-                        user_params["aspectRatio"] = min(_options, key=lambda v: abs(_parse_ratio(v) - _target))
+            if "aspectRatio" in field_keys:
+                import math
+                _ar_spec = next(
+                    (i for i in model.get("inputs", []) if i.get("fieldKey") == "aspectRatio"),
+                    {},
+                )
+                _options = [o["value"] for o in (_ar_spec.get("options") or []) if o.get("value")]
+
+                def _parse_ratio(v: str) -> float:
+                    if "x" in v.lower() and ":" not in v:
+                        parts = v.lower().split("x")
                     else:
+                        parts = v.split(":")
+                    try:
+                        return float(parts[0]) / float(parts[1])
+                    except Exception:
+                        return 1.0
+
+                current_ar = user_params.get("aspectRatio")
+                # 若用户没传，或传了但不在允许列表里，则自动选最近邻
+                needs_fix = (current_ar is None) or (
+                    _options and current_ar not in _options
+                )
+                if needs_fix and _options:
+                    # 以 width/height 为基准；若未提供则解析当前值的比例
+                    if width and height:
+                        _target = int(width) / int(height)
+                    elif current_ar:
+                        _target = _parse_ratio(str(current_ar))
+                    else:
+                        _target = 1.0
+                    user_params["aspectRatio"] = min(_options, key=lambda v: abs(_parse_ratio(v) - _target))
+                elif needs_fix and not _options:
+                    # 模型无选项列表，按宽高生成比例字符串
+                    if width and height:
                         g = math.gcd(int(width), int(height))
                         user_params["aspectRatio"] = f"{int(width)//g}:{int(height)//g}"
             # 时长：LIST 模型优先保留字符串枚举；INT 模型再做数值约束
