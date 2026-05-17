@@ -175,6 +175,33 @@ class MediaService(ComfyBaseService):
             workflows = [wf for wf in workflows if wf.get("source") != "selfhost"]
         # 过滤分析类工作流（category: video-analysis / image-analysis 等），不列入生成流水线
         workflows = [wf for wf in workflows if not (wf.get("category") or "").endswith("-analysis")]
+
+        # 动态注入 chatfire.cn 模型条目（读取 post_image preset）
+        try:
+            from pixelle_video.config import config_manager as _cf_mgr
+            _preset = _cf_mgr.get_post_model_preset("post_image")
+            if "chatfire" in (_preset.get("base_url") or "").lower() and _preset.get("api_key"):
+                _CHATFIRE_MODELS = [
+                    ("nano-banana-pro",              "nano-banana-pro"),
+                    ("nano-banana-pro_2k",           "nano-banana-pro 2K"),
+                    ("nano-banana-pro_4k",           "nano-banana-pro 4K"),
+                    ("nano-banana",                  "nano-banana"),
+                    ("gemini-2.5-flash-image",       "Gemini 2.5 Flash Image"),
+                    ("gemini-2.5-flash-image-preview",    "Gemini 2.5 Flash Preview"),
+                    ("gemini-2.5-flash-image-preview-hd", "Gemini 2.5 Flash Preview HD"),
+                ]
+                for _mid, _label in _CHATFIRE_MODELS:
+                    workflows.append({
+                        "key": f"chatfire/{_mid}",
+                        "source": "chatfire",
+                        "name": _mid,
+                        "display_name": f"[chatfire] {_label}",
+                        "category": "text-to-image",
+                        "path": None,
+                    })
+        except Exception as _e:
+            logger.warning(f"加载 chatfire 模型失败: {_e}")
+
         return sorted(workflows, key=lambda w: w["key"])
     
     async def __call__(
@@ -265,6 +292,23 @@ class MediaService(ComfyBaseService):
             )
         """
         # 1. Resolve workflow (returns structured info)
+        # --- Chatfire.cn 直接路由 (OpenAI-兼容 图片生成 API) ---
+        if workflow and workflow.startswith("chatfire/"):
+            from pixelle_video.services.llm_image_service import LLMImageService
+            from pixelle_video.config import config_manager as _cf_mgr
+            _preset = _cf_mgr.get_post_model_preset("post_image")
+            _model_id = workflow[len("chatfire/"):]
+            _llm_svc = LLMImageService()
+            _size = _llm_svc._to_chatfire_size(f"{width or 1080}x{height or 1080}")
+            _url = await _llm_svc.generate(
+                prompt=prompt,
+                api_key=_preset["api_key"],
+                base_url=_preset["base_url"],
+                model=_model_id,
+                size=_size,
+            )
+            return MediaResult(media_type="image", url=_url)
+
         # --- RunningHub Model API direct routing (low-cost REST API, registry-driven) ---
         if workflow and workflow.startswith("runninghub-api/"):
             from pixelle_video.services.runninghub_api_service import RunningHubAPIService
