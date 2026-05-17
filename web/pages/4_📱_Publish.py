@@ -554,6 +554,48 @@ def render_devices_tab():
                     st.rerun()
 
     with tab_wifi:
+        # ── LAN scan ───────────────────────────────────────────────────────
+        st.markdown("##### 🔍 自动扫描局域网（旧版 ADB TCP / Android ≤10）")
+        st.caption(
+            "适用于已通过 USB 运行过 `adb tcpip 5555` 的设备（Android 10 及以下）。"
+            "点击扫描后系统会探测当前子网的 5555 端口，找到的设备可直接一键连接。"
+        )
+        if "wifi_scan_results" not in st.session_state:
+            st.session_state["wifi_scan_results"] = []
+
+        scan_col, _ = st.columns([1, 3])
+        with scan_col:
+            if st.button("🔍 扫描局域网 (:5555)", key="scan_lan_5555"):
+                with st.spinner("正在扫描子网，约需 3–5 秒…"):
+                    from pixelle_video.services.device_manager import device_manager as _dm_scan
+                    results = _dm_scan.scan_lan_port(port=5555)
+                st.session_state["wifi_scan_results"] = results
+
+        scan_res = st.session_state.get("wifi_scan_results", [])
+        if scan_res:
+            st.success(f"发现 {len(scan_res)} 台可能的 ADB 设备：")
+            for _serial in scan_res:
+                _ip, _port = _serial.rsplit(":", 1)
+                _c1, _c2 = st.columns([3, 1])
+                with _c1:
+                    st.code(_serial)
+                with _c2:
+                    if st.button("一键连接", key=f"lan_connect_{_serial}"):
+                        _ok = dm.connect_wifi(_ip, int(_port))
+                        if _ok:
+                            dm.add_device(serial=_serial, name=_ip, theme="")
+                            st.success(f"✅ 已连接并注册：{_serial}")
+                            st.session_state["wifi_scan_results"] = []
+                            st.rerun()
+                        else:
+                            st.error(f"连接失败：{_serial}")
+        elif st.session_state.get("wifi_scan_results") == []:
+            # Only show when explicitly scanned and nothing found
+            if "wifi_scan_results" in st.session_state and st.session_state["wifi_scan_results"] is not None:
+                pass  # initial state, no message
+
+        st.markdown("---")
+        st.markdown("##### ✍️ 手动填写 IP 连接")
         with st.form("add_wifi_device"):
             host = st.text_input("手机 IP 地址", placeholder="如：192.168.1.100")
             port = st.number_input("ADB 端口", value=5555, min_value=1, max_value=65535)
@@ -568,7 +610,7 @@ def render_devices_tab():
                         st.success(f"WiFi 连接成功：{serial}")
                         st.rerun()
                     else:
-                        st.error("连接失败，请确认手机已开启 ADB over WiFi")
+                        st.error("连接失败，请确认手机已开启 ADB over WiFi（需先通过 USB 运行 adb tcpip 5555）")
 
     with tab_pair:
         st.info(
@@ -579,6 +621,57 @@ def render_devices_tab():
             "4. 配对成功后，回到无线调试主页查看「**IP 地址和端口**」（连接端口），填入「**第二步：连接**」\n\n"
             "> 配对端口和连接端口是**不同**的，注意区分"
         )
+
+        # ── mDNS auto-discovery ────────────────────────────────────────────
+        st.markdown("##### 🔍 自动发现（mDNS，Android 11+）")
+        st.caption("已开启「无线调试」的设备会通过 mDNS 广播，点击扫描可直接发现，无需手填 IP。")
+        if "mdns_scan_results" not in st.session_state:
+            st.session_state["mdns_scan_results"] = None
+
+        mdns_col, _ = st.columns([1, 3])
+        with mdns_col:
+            if st.button("🔍 扫描 mDNS 设备", key="scan_mdns_btn"):
+                with st.spinner("正在扫描 mDNS（约 5 秒）…"):
+                    from pixelle_video.services.device_manager import device_manager as _dm_mdns
+                    mdns_found = _dm_mdns.scan_mdns(timeout=5.0)
+                st.session_state["mdns_scan_results"] = mdns_found
+
+        mdns_res = st.session_state.get("mdns_scan_results")
+        if mdns_res is not None:
+            connect_entries = [r for r in mdns_res if r["type"] == "connect"]
+            pair_entries    = [r for r in mdns_res if r["type"] == "pair"]
+            if not mdns_res:
+                st.warning(
+                    "未发现 mDNS 设备。请确认：\n"
+                    "- 手机与电脑在同一 WiFi\n"
+                    "- 手机已开启「无线调试」\n"
+                    "- adb 版本 ≥ 30（`adb --version`）"
+                )
+            if connect_entries:
+                st.success(f"发现 {len(connect_entries)} 台可直接连接的设备：")
+                for _e in connect_entries:
+                    _ec1, _ec2 = st.columns([3, 1])
+                    with _ec1:
+                        st.code(_e["serial"])
+                    with _ec2:
+                        if st.button("一键连接", key=f"mdns_connect_{_e['serial']}"):
+                            _ok = dm.connect_wifi(_e["ip"], _e["port"])
+                            if _ok:
+                                dm.add_device(serial=_e["serial"], name=_e["ip"], theme="")
+                                st.success(f"✅ 已连接并注册：{_e['serial']}")
+                                st.session_state["mdns_scan_results"] = None
+                                st.rerun()
+                            else:
+                                st.error(f"连接失败：{_e['serial']}")
+            if pair_entries:
+                st.info(
+                    f"发现 {len(pair_entries)} 台待配对设备（下方填入配对码完成配对）："
+                )
+                for _p in pair_entries:
+                    st.code(f"IP: {_p['ip']}  配对端口: {_p['port']}")
+                    st.session_state["_pair_host"] = _p["ip"]
+
+        st.markdown("---")
 
         st.markdown("##### 第一步：配对")
         with st.form("pair_wifi_step1"):

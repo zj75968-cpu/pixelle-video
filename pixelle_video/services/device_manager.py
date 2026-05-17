@@ -439,6 +439,109 @@ class DeviceManager:
             logger.error(f"WiFi disconnect error: {e}")
             return False
 
+    # -------------------------------------------------------------------------
+    # LAN / mDNS Discovery
+    # -------------------------------------------------------------------------
+
+    def scan_mdns(self, timeout: float = 5.0) -> List[Dict[str, str]]:
+        """Discover ADB devices via mDNS (Android 11+ wireless-debugging broadcasts).
+
+        Returns a list of dicts with keys: ip, port, serial, type.
+          type is either 'connect' (_adb-tls-connect) or 'pair' (_adb-tls-pairing).
+
+        Requires adb >= 30 and Android 11+. Returns [] if mDNS is not supported.
+        """
+        found: List[Dict[str, str]] = []
+        try:
+            result = self._adb("mdns", "services")
+            for line in result.stdout.splitlines():
+                # Format: adb-<serial>    _adb-tls-connect._tcp.    192.168.x.x:port
+                parts = line.strip().split()
+                if len(parts) < 3:
+                    continue
+                svc_type = parts[1] if len(parts) > 1 else ""
+                addr = parts[-1]  # "ip:port"
+                if ":" not in addr:
+                    continue
+                ip, port_str = addr.rsplit(":", 1)
+                try:
+                    port = int(port_str)
+                except ValueError:
+                    continue
+                kind = (
+                    "connect" if "connect" in svc_type
+                    else "pair" if "pair" in svc_type
+                    else "unknown"
+                )
+                found.append({
+                    "ip": ip,
+                    "port": port,
+                    "serial": f"{ip}:{port}",
+                    "type": kind,
+                    "raw": line.strip(),
+                })
+            logger.info(f"mDNS scan found {len(found)} service(s)")
+        except Exception as exc:
+            logger.debug(f"mDNS scan failed (may not be supported): {exc}")
+        return found
+
+    def scan_lan_port(
+        self,
+        port: int = 5555,
+        subnet: Optional[str] = None,
+        max_threads: int = 50,
+        connect_timeout: float = 0.5,
+    ) -> List[str]:
+        """Scan the local subnet for open ADB TCP port (default 5555).
+
+        Used for older Android ≤10 devices where "adb tcpip 5555" was run via USB.
+
+        Args:
+            port: TCP port to probe (default 5555).
+            subnet: Base IP like "192.168.1" — auto-detected if None.
+            max_threads: Parallel probes (default 50 → ~2.5 s for /24).
+            connect_timeout: Per-host timeout in seconds.
+
+        Returns:
+            List of "ip:port" strings where the port was open.
+        """
+        import ipaddress
+        import socket
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        # Auto-detect local subnet from default gateway interface
+        if subnet is None:
+            try:
+                import socket as _sock
+                s = _sock.socket(_sock.AF_INET, _sock.SOCK_DGRAM)
+                s.settimeout(0)
+                s.connect(("8.8.8.8", 80))
+                local_ip = s.getsockname()[0]
+                s.close()
+                subnet = ".".join(local_ip.split(".")[:3])
+            except Exception:
+                logger.warning("scan_lan_port: could not auto-detect subnet, defaulting to 192.168.1")
+                subnet = "192.168.1"
+
+        def _probe(ip_str: str) -> Optional[str]:
+            try:
+                with socket.create_connection((ip_str, port), timeout=connect_timeout):
+                    return ip_str
+            except (ConnectionRefusedError, socket.timeout, OSError):
+                return None
+
+        hosts = [f"{subnet}.{i}" for i in range(1, 255)]
+        reachable: List[str] = []
+        with ThreadPoolExecutor(max_workers=max_threads) as pool:
+            for result in as_completed([pool.submit(_probe, h) for h in hosts]):
+                val = result.result()
+                if val:
+                    reachable.append(val)
+
+        reachable.sort(key=lambda x: int(x.rsplit(".", 1)[-1]))
+        logger.info(f"LAN port scan (subnet {subnet}, port {port}): {len(reachable)} host(s) found")
+        return [f"{ip}:{port}" for ip in reachable]
+
     def screenshot(self, serial: str) -> Optional[bytes]:
         """Capture a screenshot from the specified device. Returns PNG bytes."""
         try:
