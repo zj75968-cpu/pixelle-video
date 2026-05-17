@@ -244,6 +244,14 @@ def render_generate_form() -> dict | None:
                 help="仅 Gemini 3 系列支持，其他模型忽略此参数",
             )
 
+        st.markdown("---")
+        ref_image_file = st.file_uploader(
+            "📷 参考图片（图生图模式，可选）",
+            type=["png", "jpg", "jpeg", "webp"],
+            help="上传参考图片后，图片生成会以图生图方式运行（需 RunningHub workflow 支持）",
+            key="post_form_ref_image",
+        )
+
         submitted = st.form_submit_button("🚀 开始生成", width="stretch", type="primary")
 
     if submitted:
@@ -261,6 +269,7 @@ def render_generate_form() -> dict | None:
             "image_size": None if image_size_opt == "（不指定）" else image_size_opt,
             "post_type": post_type,
             "traffic_ttl_hours": float(traffic_ttl_hours) if post_type == "traffic" else 0.0,
+            "ref_image_file": ref_image_file,
         }
     return None
 
@@ -479,6 +488,18 @@ def main():
         }
 
     if pipeline_params:
+        # Extract and persist uploaded reference image before pipeline call
+        ref_image_file = pipeline_params.pop("ref_image_file", None)
+        ref_image_path = None
+        if ref_image_file is not None:
+            import tempfile
+            suffix = Path(ref_image_file.name).suffix or ".png"
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix, dir=Path("output"))
+            tmp.write(ref_image_file.getvalue())
+            tmp.close()
+            ref_image_path = tmp.name
+            pipeline_params["ref_image"] = ref_image_path
+
         pixelle_video = get_pixelle_video()
         pipeline = pixelle_video.pipelines.get("image_text_post")
         if pipeline is None:

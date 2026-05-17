@@ -49,6 +49,7 @@ class ImageTextPostPipeline:
         content_llm: Optional[Dict] = None,
         image_llm: Optional[Dict] = None,
         post_type: str = "content",
+        ref_image: Optional[str] = None,
     ) -> PostGenerationResult:
         task_dir, task_id = create_task_output_dir()
         output_dir = Path(task_dir)
@@ -76,6 +77,7 @@ class ImageTextPostPipeline:
             aspect_ratio=aspect_ratio,
             image_size=image_size,
             image_llm=image_llm,
+            ref_image=ref_image,
         )
 
         post_json_path = self.save_post_json(output_dir=output_dir, content=content)
@@ -176,6 +178,7 @@ class ImageTextPostPipeline:
         aspect_ratio: Optional[str] = None,
         image_size: Optional[str] = None,
         image_llm: Optional[Dict] = None,
+        ref_image: Optional[str] = None,
     ) -> None:
         semaphore = asyncio.Semaphore(3)
 
@@ -201,6 +204,8 @@ class ImageTextPostPipeline:
                 extra_params["aspectRatio"] = aspect_ratio
             if image_size:
                 extra_params["imageSize"] = image_size
+            if ref_image:
+                extra_params["imageUrl"] = ref_image
 
         async def _generate_single(frame: PostFrame):
             async with semaphore:
