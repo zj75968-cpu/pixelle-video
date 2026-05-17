@@ -283,8 +283,28 @@ class MediaService(ComfyBaseService):
             if "aspectRatio" in field_keys and "aspectRatio" not in user_params:
                 if width and height:
                     import math
-                    g = math.gcd(int(width), int(height))
-                    user_params["aspectRatio"] = f"{int(width)//g}:{int(height)//g}"
+                    _ar_spec = next(
+                        (i for i in model.get("inputs", []) if i.get("fieldKey") == "aspectRatio"),
+                        {},
+                    )
+                    _options = [o["value"] for o in (_ar_spec.get("options") or []) if o.get("value")]
+                    if _options:
+                        # 找与 width/height 比例最接近的选项值
+                        # 选项格式可能是 "1:1" 或 "960x960"
+                        def _parse_ratio(v: str) -> float:
+                            if "x" in v.lower() and ":" not in v:
+                                parts = v.lower().split("x")
+                            else:
+                                parts = v.split(":")
+                            try:
+                                return float(parts[0]) / float(parts[1])
+                            except Exception:
+                                return 1.0
+                        _target = int(width) / int(height)
+                        user_params["aspectRatio"] = min(_options, key=lambda v: abs(_parse_ratio(v) - _target))
+                    else:
+                        g = math.gcd(int(width), int(height))
+                        user_params["aspectRatio"] = f"{int(width)//g}:{int(height)//g}"
             # 时长：LIST 模型优先保留字符串枚举；INT 模型再做数值约束
             if "duration" in field_keys and "duration" not in user_params and duration is not None:
                 duration_spec = next(
