@@ -536,7 +536,7 @@ def render_devices_tab():
     st.markdown("---")
     st.subheader("➕ 添加设备")
 
-    tab_usb, tab_wifi, tab_pair = st.tabs(["USB 连接", "WiFi 连接", "Android 11+ 无线配对"])
+    tab_usb, tab_wifi, tab_pair = st.tabs(["USB 连接", "鸿蒙 / 手动 WiFi", "Android 11+ 无线配对"])
 
     with tab_usb:
         st.info(
@@ -554,69 +554,26 @@ def render_devices_tab():
                     st.rerun()
 
     with tab_wifi:
-        # ── 路径引导 ───────────────────────────────────────────────────────
         st.info(
-            "**选哪个标签页？**\n\n"
-            "| 手机系统 | 推荐方式 |\n"
-            "|---------|--------|\n"
-            "| **Android 11+** | ✅ 切到「Android 11+ 无线配对」标签页，全程无需 USB |\n"
-            "| **Android ≤10** | 需一次性 USB 准备（下方说明），之后断 USB 即可扫描连接 |"
+            "**适用设备**：华为 / 荣耀 鸿蒙系统（HarmonyOS），以及任何可在设置中看到 IP:端口 的无线调试设备。\n\n"
+            "鸿蒙无线调试由**手机显示 IP:端口**，电脑主动发起连接，无需配对码。"
         )
 
-        with st.expander("📖 Android ≤10 一次性 USB 准备步骤（做过请忽略）"):
-            st.markdown(
-                "1. 手机开启「开发者选项」→「USB 调试」\n"
-                "2. 用数据线连电脑，弹窗选「允许调试」\n"
-                "3. 在电脑终端运行：\n"
-                "   ```\n"
-                "   adb tcpip 5555\n"
-                "   ```\n"
-                "4. **拔掉 USB** 🔌\n"
-                "5. 回到本页点「🔍 扫描局域网」即可发现手机\n\n"
-                "> 完成一次后，只要手机不重启，无需再插 USB。"
-            )
-
-        # ── LAN scan ───────────────────────────────────────────────────────
-        st.markdown("##### 🔍 扫描局域网（:5555）")
-        if "wifi_scan_results" not in st.session_state:
-            st.session_state["wifi_scan_results"] = []
-
-        scan_col, _ = st.columns([1, 3])
-        with scan_col:
-            if st.button("🔍 扫描局域网 (:5555)", key="scan_lan_5555"):
-                with st.spinner("正在扫描子网，约需 3–5 秒…"):
-                    results = dm.scan_lan_port(port=5555)
-                st.session_state["wifi_scan_results"] = results
-
-        scan_res = st.session_state.get("wifi_scan_results", [])
-        if scan_res:
-            st.success(f"发现 {len(scan_res)} 台可能的 ADB 设备：")
-            for _serial in scan_res:
-                _ip, _port = _serial.rsplit(":", 1)
-                _c1, _c2 = st.columns([3, 1])
-                with _c1:
-                    st.code(_serial)
-                with _c2:
-                    if st.button("一键连接", key=f"lan_connect_{_serial}"):
-                        _ok = dm.connect_wifi(_ip, int(_port))
-                        if _ok:
-                            dm.add_device(serial=_serial, name=_ip, theme="")
-                            st.success(f"✅ 已连接并注册：{_serial}")
-                            st.session_state["wifi_scan_results"] = []
-                            st.rerun()
-                        else:
-                            st.error(f"连接失败：{_serial}")
-        elif st.session_state.get("wifi_scan_results") == []:
-            # Only show when explicitly scanned and nothing found
-            if "wifi_scan_results" in st.session_state and st.session_state["wifi_scan_results"] is not None:
-                pass  # initial state, no message
+        st.markdown("##### 📱 手机端操作步骤")
+        st.markdown(
+            "1. 打开「设置」→「关于手机」，连续点击「版本号」7 次，开启**开发者选项**\n"
+            "2. 进入「设置」→「开发者选项」→「无线调试」→ **打开开关**\n"
+            "3. 屏幕上会显示形如 `192.168.x.x:xxxxx` 的 **IP 地址和端口**\n"
+            "4. 将上方 IP 和端口填入下方表单，点击「连接并注册」\n"
+            "5. 手机弹出授权弹窗，选择「允许」即可 ✅"
+        )
 
         st.markdown("---")
-        st.markdown("##### ✍️ 手动填写 IP 连接")
+        st.markdown("##### ✍️ 填写 IP 连接")
         with st.form("add_wifi_device"):
             host = st.text_input("手机 IP 地址", placeholder="如：192.168.1.100")
             port = st.number_input("ADB 端口", value=5555, min_value=1, max_value=65535)
-            name = st.text_input("设备名称", placeholder="如：副号手机")
+            name = st.text_input("设备名称", placeholder="如：鸿蒙主机")
             theme = st.text_input("内容主题", placeholder="如：美食探店")
             if st.form_submit_button("连接并注册"):
                 if host.strip():
@@ -627,7 +584,12 @@ def render_devices_tab():
                         st.success(f"WiFi 连接成功：{serial}")
                         st.rerun()
                     else:
-                        st.error("连接失败，请确认手机已开启 ADB over WiFi（需先通过 USB 运行 adb tcpip 5555）")
+                        st.error(
+                            "连接失败，请检查：\n"
+                            "- 手机无线调试开关是否已开启\n"
+                            "- IP 和端口是否与手机屏幕显示一致\n"
+                            "- 手机与电脑是否在同一 WiFi"
+                        )
 
     with tab_pair:
         st.info(
