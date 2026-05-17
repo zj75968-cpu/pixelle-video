@@ -180,12 +180,8 @@ def render_grid_task_card(task: dict, pixelle_video):
     }
     status_icon = status_map.get(status, "❓")
     
-    # Get input text
-    detail = run_async(pixelle_video.history.get_task_detail(task_id))
+    # input_text not loaded in grid view (avoids N+1 queries per card)
     input_text = ""
-    if detail and detail.get("metadata"):
-        input_params = detail["metadata"].get("input", {})
-        input_text = input_params.get("text", "")
     
     # Card container
     with st.container():
@@ -202,16 +198,14 @@ def render_grid_task_card(task: dict, pixelle_video):
             else:
                 st.session_state.setdefault("selected_tasks", set()).discard(task_id)
 
-        # Video preview at top
-        if video_path and os.path.exists(video_path):
-            st.video(video_path, autoplay=False, loop=False, muted=False)
-        else:
-            st.markdown(
-                f"<div style='background: #f0f0f0; height: 180px; display: flex; align-items: center; "
-                f"justify-content: center; border-radius: 4px; font-size: 48px;'>📹</div>",
-                unsafe_allow_html=True
-            )
-        
+        # Video preview at top — removed from grid to avoid Streamlit hashing all video files on render.
+        # Use the 👁️ detail button to watch videos.
+        st.markdown(
+            f"<div style='background:#1a1a1a;height:120px;display:flex;align-items:center;"
+            f"justify-content:center;border-radius:6px;font-size:36px;'>📹</div>",
+            unsafe_allow_html=True
+        )
+
         # Title + Status (compact) - show actual title from task
         st.markdown(f"**{status_icon} {truncate_text(title, 50)}**")
         
@@ -232,16 +226,22 @@ def render_grid_task_card(task: dict, pixelle_video):
         
         with col2:
             if video_path and os.path.exists(video_path):
-                with open(video_path, "rb") as f:
-                    st.download_button(
-                        "⬇️ 下载",
-                        data=f,
-                        file_name=f"{title}.mp4",
-                        mime="video/mp4",
-                        key=f"download_{task_id}",
-                        help=tr("history.task_card.download"),
-                        width="stretch"
-                    )
+                # Two-step download: only read file bytes when user explicitly requests it
+                if st.session_state.get(f"dl_ready_{task_id}"):
+                    with open(video_path, "rb") as _f:
+                        st.download_button(
+                            "⬇️ 下载",
+                            data=_f,
+                            file_name=f"{title}.mp4",
+                            mime="video/mp4",
+                            key=f"download_{task_id}",
+                            help=tr("history.task_card.download"),
+                            width="stretch"
+                        )
+                else:
+                    if st.button("⬇️ 下载", key=f"prep_dl_{task_id}", width="stretch"):
+                        st.session_state[f"dl_ready_{task_id}"] = True
+                        st.rerun()
             else:
                 st.button("⬇️ 下载", key=f"download_disabled_{task_id}", disabled=True, width="stretch")
         
@@ -425,14 +425,24 @@ def main():
         return
     
     # Otherwise, show the grid list
-    # Get task list
-    result = run_async(pixelle_video.history.get_task_list(
-        page=st.session_state.history_page,
-        page_size=page_size,
-        status=filter_status,
-        sort_by=sort_by,
-        sort_order=sort_order
-    ))
+    # Get task list — cached for 10s to avoid re-reading disk on every widget interaction
+    @st.cache_data(ttl=10, show_spinner=False)
+    def _cached_task_list(page, page_size, status, sort_by, sort_order):
+        return run_async(pixelle_video.history.get_task_list(
+            page=page,
+            page_size=page_size,
+            status=status,
+            sort_by=sort_by,
+            sort_order=sort_order
+        ))
+
+    result = _cached_task_list(
+        st.session_state.history_page,
+        page_size,
+        filter_status,
+        sort_by,
+        sort_order,
+    )
     
     tasks = result["tasks"]
     total = result["total"]

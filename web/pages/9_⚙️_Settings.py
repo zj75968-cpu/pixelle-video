@@ -54,8 +54,16 @@ if not st.session_state.is_admin:
         st.query_params.clear()
         st.rerun()
     else:
-        # 无效或无参数：静默跳回首页
-        st.switch_page("pages/1_🎨_创作.py")
+        # URL 参数无效或未携带：展示密码输入框（不跳转）
+        st.title("⚙️ 管理员设置")
+        st.caption("请输入管理员访问密钥以继续")
+        input_key = st.text_input("访问密钥", type="password", key="admin_login_input")
+        if st.button("进入", type="primary"):
+            if input_key.strip() == required_key:
+                st.session_state.is_admin = True
+                st.rerun()
+            else:
+                st.error("密钥错误")
         st.stop()
 
 

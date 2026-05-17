@@ -37,6 +37,7 @@ def parse_template_size(template_path: str) -> Tuple[int, int]:
     Args:
         template_path: Template path like "templates/1080x1920/default.html"
                       or "1080x1920/default.html"
+                      or "passthrough_1080x1920" (no-template mode)
     
     Returns:
         Tuple of (width, height) in pixels
@@ -49,7 +50,18 @@ def parse_template_size(template_path: str) -> Tuple[int, int]:
         (1080, 1920)
         >>> parse_template_size("1920x1080/modern.html")
         (1920, 1080)
+        >>> parse_template_size("passthrough_1080x1920")
+        (1080, 1920)
     """
+    # Handle passthrough (no-template) mode
+    if template_path.startswith("passthrough_"):
+        size_str = template_path[len("passthrough_"):]
+        try:
+            w, h = size_str.split('x')
+            return (int(w), int(h))
+        except (ValueError, AttributeError):
+            return (1080, 1920)
+
     path = Path(template_path)
     
     # Get parent directory name (should be like "1080x1920")
@@ -342,7 +354,11 @@ def resolve_template_path(template_input: Optional[str]) -> str:
     # Default case
     if template_input is None:
         template_input = "1080x1920/image_default.html"
-    
+
+    # Handle passthrough (no-template) mode — return as-is, caller must guard HTMLFrameGenerator
+    if template_input.startswith("passthrough_"):
+        return template_input
+
     # Parse input to extract size and template name
     size = None
     template_name = None

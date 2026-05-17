@@ -680,7 +680,7 @@ class XHSPublisher:
                 )
             logger.warning("Did not enter creation screen; compatible mode: continuing anyway")
 
-
+    def _select_image_text_mode(self, d):
         """Select image-text post type (图文).
 
         After tapping the publish (+) button, XHS shows a camera/creation page
@@ -897,8 +897,16 @@ class XHSPublisher:
         except Exception as e:
             logger.debug(f"[screenshot] {tag} failed (non-fatal): {e}")
 
-    def _publish(self, d):
-        """Click the final publish button and wait for the page to leave edit state."""
+    def _publish(self, d) -> bool:
+        """Click the final publish button and wait for the page to leave edit state.
+
+        Returns:
+            True  — a definitive success toast ("发布成功" / "笔记已发布") was observed
+                    while waiting.  The caller can treat the publish as confirmed and
+                    skip the subsequent _check_success() call.
+            False — no definitive toast was detected (upload still in progress, or
+                    the toast was too brief).  The caller should run _check_success().
+        """
         self._screenshot(d, "before_publish")
         published = (
             self._click_by_selector_key(d, "publish_confirm_button", timeout=8)
@@ -918,10 +926,30 @@ class XHSPublisher:
             )
             w, h = self._screen_size(d)
             d.click(int(w * 0.92), int(h * 0.052))
-        # Wait for success indicator or page change (up to 20s)
-        self._wait_for_text(d, "发布成功", "笔记已发布", "发布中", "上传中", timeout=20)
+        # Poll up to 20 s for any publish-state indicator, tracking whether a
+        # definitive success toast was seen so callers can short-circuit _check_success.
+        _seen_definitive = False
+        _deadline = time.time() + 20
+        while time.time() < _deadline:
+            for _t in ("发布成功", "笔记已发布"):
+                if d(text=_t).exists(timeout=0.3):
+                    _seen_definitive = True
+                    logger.info(f"_publish: ✅ definitive toast '{_t}' observed")
+                    break
+            if _seen_definitive:
+                break
+            # Still uploading / processing — keep polling until toast or timeout
+            _still_busy = any(
+                d(textContains=_p).exists(timeout=0.3)
+                for _p in ("发布中", "上传中", "正在发布")
+            )
+            if not _still_busy and time.time() > _deadline - 15:
+                # Nothing happening and deadline approaching — stop early
+                break
+            time.sleep(0.3)
         time.sleep(2)
         self._screenshot(d, "after_publish")
+        return _seen_definitive
 
     def _check_success(self, d, expected_title: Optional[str] = None) -> bool:
         """Check if publish succeeded by looking for explicit success indicators.
@@ -1139,16 +1167,21 @@ class XHSPublisher:
             # 7. Publish
             _log("7/7 点击发布按钮…")
             self._adb_wakeup()  # ensure screen is on before publishing
-            self._publish(d)
+            _definitive = self._publish(d)
 
             # 8. Verify success
-            _log("正在验证发布结果…")
-            self._adb_wakeup()  # ensure screen is on for success check
-            success = self._check_success(d, expected_title=title)
-            if success:
+            if _definitive:
+                # 发布成功/笔记已发布 toast was observed in _publish(); no need to re-check
                 _log("✅ 图文笔记发布成功")
+                success = True
             else:
-                _log("⚠️ 无法确认发布成功")
+                _log("正在验证发布结果…")
+                self._adb_wakeup()  # ensure screen is on for success check
+                success = self._check_success(d, expected_title=title)
+                if success:
+                    _log("✅ 图文笔记发布成功")
+                else:
+                    _log("⚠️ 无法确认发布成功")
 
             return success
 
@@ -1466,16 +1499,21 @@ class XHSPublisher:
             # 7. Publish
             _log("等待视频上传并提交发布…")
             self._adb_wakeup()
-            self._publish(d)
+            _definitive = self._publish(d)
 
             # 8. Verify
-            _log("正在验证发布结果…")
-            self._adb_wakeup()
-            success = self._check_success(d, expected_title=title)
-            if success:
+            if _definitive:
+                # 发布成功/笔记已发布 toast was observed in _publish(); no need to re-check
                 _log("✅ 视频笔记发布成功")
+                success = True
             else:
-                _log("⚠️ 无法确认视频发布成功")
+                _log("正在验证发布结果…")
+                self._adb_wakeup()
+                success = self._check_success(d, expected_title=title)
+                if success:
+                    _log("✅ 视频笔记发布成功")
+                else:
+                    _log("⚠️ 无法确认视频发布成功")
             return success
 
         except XHSPublishError:

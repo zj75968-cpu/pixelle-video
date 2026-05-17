@@ -164,8 +164,13 @@ class PublishScheduler:
         self._ttl_thread = None
         self._ttl_stop_event = None
         self._ttl_interval_minutes: float = 15.0
+        # Background scheduled-job polling thread (fires due scheduled jobs when APScheduler
+        # is not running, e.g. in Streamlit)
+        self._sched_poll_thread = None
+        self._sched_poll_stop_event = None
         self._load()
         self._recover_orphaned_running_jobs()
+        self._start_schedule_poll()
 
     # -------------------------------------------------------------------------
     # Persistence
@@ -234,6 +239,52 @@ class PublishScheduler:
         if changed:
             self._save()
 
+    def _start_schedule_poll(self):
+        """Start a background thread that fires SCHEDULED jobs when their time arrives.
+
+        Used when APScheduler is not running (e.g. Streamlit context).
+        Checks every 60 seconds; safe to call multiple times (no-op if already running).
+        """
+        import threading as _threading
+
+        if self._sched_poll_thread and self._sched_poll_thread.is_alive():
+            return  # already running
+
+        self._sched_poll_stop_event = _threading.Event()
+
+        def _poll():
+            import time as _time
+            while not self._sched_poll_stop_event.is_set():
+                try:
+                    now = datetime.now()
+                    for job in list(self._jobs.values()):
+                        if job.status != JobStatus.SCHEDULED:
+                            continue
+                        if not job.scheduled_at:
+                            continue
+                        try:
+                            run_at = datetime.fromisoformat(job.scheduled_at)
+                        except Exception:
+                            continue
+                        if now >= run_at:
+                            logger.info(
+                                f"[SchedulePoll] Firing due job {job.job_id} "
+                                f"(scheduled_at={job.scheduled_at})"
+                            )
+                            _threading.Thread(
+                                target=lambda jid=job.job_id: asyncio.run(
+                                    self._execute_job(jid)
+                                ),
+                                daemon=True,
+                            ).start()
+                except Exception as _exc:
+                    logger.warning(f"[SchedulePoll] error: {_exc}")
+                _time.sleep(60)
+
+        self._sched_poll_thread = _threading.Thread(target=_poll, daemon=True, name="sched-poll")
+        self._sched_poll_thread.start()
+        logger.debug("[SchedulePoll] background polling thread started")
+
     # -------------------------------------------------------------------------
     # Queue Management
     # -------------------------------------------------------------------------
@@ -297,7 +348,12 @@ class PublishScheduler:
         # If APScheduler is running and a schedule time is specified, register it
         if self._scheduler and scheduled_at:
             self._schedule_job(job)
-        elif not scheduled_at:
+        elif scheduled_at:
+            # No APScheduler — mark as SCHEDULED; polling thread will fire it when due
+            job.status = JobStatus.SCHEDULED
+            self._save()
+            logger.info(f"Job {job.job_id} marked SCHEDULED at {scheduled_at} (polling mode)")
+        else:
             # Immediate jobs: schedule ASAP (next tick).
             # asyncio.get_running_loop() raises RuntimeError when there is no running
             # loop (e.g. Streamlit sync thread, plain scripts). Use that to branch:
@@ -614,11 +670,27 @@ class PublishScheduler:
 
                 except XHSPublishError as exc:
                     last_error = str(exc)
-                    if attempt < MAX_JOB_RETRIES:
+                    # 不要重试由代码 bug 引发的失败：例如 AttributeError/TypeError/NameError/ImportError
+                    # 这些错误重试多少次都一样，只会让 XHS 反复被 force-stop + 重启
+                    _cause = exc.__cause__ or exc.__context__
+                    _is_code_bug = isinstance(
+                        _cause,
+                        (AttributeError, TypeError, NameError, ImportError, SyntaxError),
+                    )
+                    if attempt < MAX_JOB_RETRIES and not _is_code_bug:
                         continue  # retry transient UI errors
                     job.status = JobStatus.FAILED
                     job.error = last_error
-                    logger.error(f"Job {job_id} failed after {attempt + 1} attempt(s): {exc}")
+                    if _is_code_bug:
+                        logger.error(
+                            f"Job {job_id} failed due to code bug ({type(_cause).__name__}); "
+                            f"skipping remaining retries: {exc}"
+                        )
+                    else:
+                        logger.error(
+                            f"Job {job_id} failed after {attempt + 1} attempt(s): {exc}"
+                        )
+                    break
 
                 except Exception as exc:
                     job.status = JobStatus.FAILED
@@ -629,6 +701,21 @@ class PublishScheduler:
             job.screenshots = list(publisher.screenshots)  # capture all debug screenshots
             job.finished_at = datetime.now().isoformat()
             self._save()
+
+            # 自动分析失败任务并写入知识库（后台异步，不阻塞主流程）
+            if job.status == JobStatus.FAILED and job.error:
+                try:
+                    from pixelle_video.agent.publish_knowledge import analyze_and_record_failure
+                    asyncio.create_task(
+                        analyze_and_record_failure(
+                            job_id=job.job_id,
+                            job_kind=job.kind or "",
+                            error=job.error,
+                            progress_log=list(job.progress_log or []),
+                        )
+                    )
+                except Exception:
+                    pass  # knowledge analysis is optional, never crash the scheduler
 
     async def execute_now(self, job_id: str) -> bool:
         """Manually trigger a pending job immediately."""

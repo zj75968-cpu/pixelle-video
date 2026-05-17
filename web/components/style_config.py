@@ -280,7 +280,34 @@ def render_style_config(pixelle_video):
             st.markdown(tr("template.what"))
             st.markdown(f"**{tr('help.how')}**")
             st.markdown(tr("template.how"))
-        
+
+        # Option to skip template entirely and concatenate raw images
+        use_passthrough = st.checkbox(
+            "不使用模板，直接用生成图片拼接视频",
+            key="use_passthrough_template",
+            help="勾选后将跳过 HTML 模板渲染，直接把生成图片拼成视频"
+        )
+        if use_passthrough:
+            _passthrough_sizes = {
+                "竖屏 1080×1920": "1080x1920",
+                "横屏 1920×1080": "1920x1080",
+                "方形 1080×1080": "1080x1080",
+            }
+            _sel = st.selectbox(
+                "视频尺寸",
+                options=list(_passthrough_sizes.keys()),
+                key="passthrough_size_selector"
+            )
+            _selected_size = _passthrough_sizes[_sel]
+            _pw, _ph = map(int, _selected_size.split('x'))
+            st.session_state['selected_template'] = f"passthrough_{_selected_size}"
+            st.session_state['template_media_width'] = _pw
+            st.session_state['template_media_height'] = _ph
+            st.session_state['template_media_type'] = 'image'
+            st.session_state['template_requires_media'] = True
+            st.session_state['template_requires_image'] = True
+            st.info(f"✅ 将直接使用生成图片拼接为 {_selected_size} 视频，不渲染 HTML 模板")
+
         # Template preview link (based on language)
         current_lang = get_language()
         
@@ -495,110 +522,35 @@ def render_style_config(pixelle_video):
         from pixelle_video.utils.template_util import parse_template_size
         video_width, video_height = parse_template_size(frame_template)
         st.caption(tr("template.video_size_info", width=video_width, height=video_height))
-        
-        # Custom template parameters (for video generation)
-        from pixelle_video.services.frame_html import HTMLFrameGenerator
-        # Resolve template path to support both data/templates/ and templates/
-        from pixelle_video.utils.template_util import resolve_template_path
-        template_path_for_params = resolve_template_path(frame_template)
-        generator_for_params = HTMLFrameGenerator(template_path_for_params)
-        custom_params_for_video = generator_for_params.parse_template_parameters()
-        
-        # Get media size from template (for image/video generation)
-        media_width, media_height = generator_for_params.get_media_size()
-        st.session_state['template_media_width'] = media_width
-        st.session_state['template_media_height'] = media_height
-        
-        # Detect template media type
-        from pixelle_video.utils.template_util import get_template_type
-        
-        template_name = Path(frame_template).name
-        template_media_type = get_template_type(template_name)
-        template_requires_media = (template_media_type in ["image", "video"])
-        
-        # Store in session state for workflow filtering
-        st.session_state['template_media_type'] = template_media_type
-        st.session_state['template_requires_media'] = template_requires_media
-        
-        # Backward compatibility
-        st.session_state['template_requires_image'] = (template_media_type == "image")
-        
+
+        custom_params_for_video = {}  # default; overwritten below when not in passthrough mode
+        if not use_passthrough:
+            # Custom template parameters (for video generation)
+            from pixelle_video.services.frame_html import HTMLFrameGenerator
+            from pixelle_video.utils.template_util import resolve_template_path
+            template_path_for_params = resolve_template_path(frame_template)
+            generator_for_params = HTMLFrameGenerator(template_path_for_params)
+            custom_params_for_video = generator_for_params.parse_template_parameters()
+
+            # Get media size from template (for image/video generation)
+            media_width, media_height = generator_for_params.get_media_size()
+            st.session_state['template_media_width'] = media_width
+            st.session_state['template_media_height'] = media_height
+
+            # Detect template media type
+            from pixelle_video.utils.template_util import get_template_type
+            template_name = Path(frame_template).name
+            template_media_type = get_template_type(template_name)
+            template_requires_media = (template_media_type in ["image", "video"])
+
+            # Store in session state for workflow filtering
+            st.session_state['template_media_type'] = template_media_type
+            st.session_state['template_requires_media'] = template_requires_media
+            st.session_state['template_requires_image'] = (template_media_type == "image")
+        # else: session state already set by passthrough block above
+
         custom_values_for_video = {}
-        if custom_params_for_video:
-            st.markdown("📝 " + tr("template.custom_parameters"))
-            
-            # Render custom parameter inputs in 2 columns
-            video_custom_col1, video_custom_col2 = st.columns(2)
-            
-            param_items = list(custom_params_for_video.items())
-            mid_point = (len(param_items) + 1) // 2
-            
-            # Left column parameters
-            with video_custom_col1:
-                for param_name, config in param_items[:mid_point]:
-                    param_type = config['type']
-                    default = config['default']
-                    label = config['label']
-                    
-                    if param_type == 'text':
-                        custom_values_for_video[param_name] = st.text_input(
-                            label,
-                            value="",
-                            placeholder=str(default),
-                            key=f"video_custom_{param_name}"
-                        )
-                    elif param_type == 'number':
-                        custom_values_for_video[param_name] = st.number_input(
-                            label,
-                            value=default,
-                            key=f"video_custom_{param_name}"
-                        )
-                    elif param_type == 'color':
-                        custom_values_for_video[param_name] = st.color_picker(
-                            label,
-                            value=default,
-                            key=f"video_custom_{param_name}"
-                        )
-                    elif param_type == 'bool':
-                        custom_values_for_video[param_name] = st.checkbox(
-                            label,
-                            value=default,
-                            key=f"video_custom_{param_name}"
-                        )
-            
-            # Right column parameters
-            with video_custom_col2:
-                for param_name, config in param_items[mid_point:]:
-                    param_type = config['type']
-                    default = config['default']
-                    label = config['label']
-                    
-                    if param_type == 'text':
-                        custom_values_for_video[param_name] = st.text_input(
-                            label,
-                            value="",
-                            placeholder=str(default),
-                            key=f"video_custom_{param_name}"
-                        )
-                    elif param_type == 'number':
-                        custom_values_for_video[param_name] = st.number_input(
-                            label,
-                            value=default,
-                            key=f"video_custom_{param_name}"
-                        )
-                    elif param_type == 'color':
-                        custom_values_for_video[param_name] = st.color_picker(
-                            label,
-                            value=default,
-                            key=f"video_custom_{param_name}"
-                        )
-                    elif param_type == 'bool':
-                        custom_values_for_video[param_name] = st.checkbox(
-                            label,
-                            value=default,
-                            key=f"video_custom_{param_name}"
-                        )
-        
+
         # Template preview expander
         with st.expander(tr("template.preview_title"), expanded=False):
             col1, col2 = st.columns(2)
@@ -630,7 +582,9 @@ def render_style_config(pixelle_video):
             st.info(f"📐 {tr('template.size_info')}: {template_width} × {template_height}")
             
             # Preview button
-            if st.button(tr("template.preview_button"), key="btn_preview_template", width="stretch"):
+            if use_passthrough:
+                st.info("不使用模板模式下无法预览")
+            elif st.button(tr("template.preview_button"), key="btn_preview_template", width="stretch"):
                 with st.spinner(tr("template.preview_generating")):
                     try:
                         from pixelle_video.services.frame_html import HTMLFrameGenerator

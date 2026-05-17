@@ -590,8 +590,10 @@ async def _recommend_device(
     devices = device_manager.get_all()
     candidates = []
     for d in devices:
-        status = getattr(d, "status", "unknown") or "unknown"
-        if only_connected and status != "connected":
+        # DeviceInfo uses `connected: bool`; derive a status string for display
+        is_connected = getattr(d, "connected", False)
+        status = "connected" if is_connected else "disconnected"
+        if only_connected and not is_connected:
             continue
         candidates.append({
             "serial": d.serial,
@@ -956,6 +958,61 @@ async def _preview_banned_filter(text: str) -> Dict[str, Any]:
         "cleaned": cleaned,
         "hits": hits,
         "hit_count": len(hits),
+    }
+
+
+# ---- publish knowledge tools ----
+
+async def _query_publish_knowledge(query: str, top_k: int = 3) -> Dict[str, Any]:
+    """Search the XHS publish failure knowledge base for known problems and solutions."""
+    from pixelle_video.agent.publish_knowledge import publish_knowledge
+
+    hits = publish_knowledge.search(query, top_k=int(top_k))
+    return {
+        "count": len(hits),
+        "entries": [
+            {
+                "id": e.id,
+                "problem": e.problem,
+                "root_cause": e.root_cause,
+                "solution": e.solution,
+                "resolution_steps": e.resolution_steps,
+                "resolved": e.resolved,
+                "times_seen": e.times_seen,
+                "job_kind": e.job_kind,
+            }
+            for e in hits
+        ],
+    }
+
+
+async def _record_publish_finding(
+    problem: str,
+    root_cause: str,
+    solution: str,
+    resolution_steps: Optional[List[str]] = None,
+    job_kind: str = "",
+    error_pattern: str = "",
+    resolved: bool = True,
+) -> Dict[str, Any]:
+    """Manually record a publish problem + solution into the knowledge base."""
+    from pixelle_video.agent.publish_knowledge import publish_knowledge, KnowledgeEntry
+
+    entry = KnowledgeEntry(
+        job_kind=job_kind,
+        problem=problem,
+        error_pattern=error_pattern or problem[:40],
+        root_cause=root_cause,
+        solution=solution,
+        resolution_steps=resolution_steps or [],
+        resolved=resolved,
+    )
+    saved = publish_knowledge.add_or_update(entry)
+    return {
+        "id": saved.id,
+        "problem": saved.problem,
+        "resolved": saved.resolved,
+        "times_seen": saved.times_seen,
     }
 
 
@@ -1510,6 +1567,63 @@ TOOLS: List[ToolSpec] = [
             "required": ["text"],
         },
         handler=_preview_banned_filter,
+    ),
+    ToolSpec(
+        name="query_publish_knowledge",
+        description=(
+            "在小红书发布问题知识库里搜索已知故障和解决方案。"
+            "当发布任务失败或遇到错误时，**优先调用此工具**，看是否有已知解法可直接参考。"
+            "query 填入错误关键词或问题描述，返回匹配的问题条目（含根因和解决步骤）。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "错误信息或问题描述关键词，如 'AttributeError _select_image_text_mode'",
+                },
+                "top_k": {"type": "integer", "description": "最多返回条数", "default": 3},
+            },
+            "required": ["query"],
+        },
+        handler=_query_publish_knowledge,
+    ),
+    ToolSpec(
+        name="record_publish_finding",
+        description=(
+            "向知识库手动新增或更新一条发布问题记录（含根因和解决方案）。"
+            "适合 Agent 在调试成功后把修复经验固化进去，方便以后自动检索。"
+        ),
+        args_schema={
+            "type": "object",
+            "properties": {
+                "problem": {"type": "string", "description": "一句话描述问题（≤30字）"},
+                "root_cause": {"type": "string", "description": "根本原因（2-3句）"},
+                "solution": {"type": "string", "description": "解决方案（1-2句）"},
+                "resolution_steps": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "具体修复步骤列表",
+                },
+                "job_kind": {
+                    "type": "string",
+                    "enum": ["video", "image_text", ""],
+                    "description": "适用的发布类型",
+                    "default": "",
+                },
+                "error_pattern": {
+                    "type": "string",
+                    "description": "逗号分隔的匹配关键词，用于未来检索",
+                },
+                "resolved": {
+                    "type": "boolean",
+                    "description": "true=解决方案已验证可用",
+                    "default": True,
+                },
+            },
+            "required": ["problem", "root_cause", "solution"],
+        },
+        handler=_record_publish_finding,
     ),
 ]
 

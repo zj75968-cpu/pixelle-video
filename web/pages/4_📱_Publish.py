@@ -936,8 +936,8 @@ def render_publish_tab():
 
     # New publish job form
     with st.expander(
-        "➕ 新建发布任务",
-        expanded=bool(st.session_state.get("last_post_result") or st.session_state.get("publish_history_post_select")),
+        "➕ 新建发布任务 / 定时发布",
+        expanded=True,
     ):
         suggested_serials = st.session_state.get("publish_suggested_serials", [])
         all_connected_serials = [d.serial for d in dm.get_all() if d.connected]
@@ -1128,6 +1128,42 @@ def render_publish_tab():
                         )
                     if failed_devices:
                         st.error("部分设备创建失败：" + " | ".join(failed_devices))
+                    st.rerun()
+
+    # ── 定时任务预览 ────────────────────────────────────────────
+    scheduled_jobs = [j for j in scheduler.list_jobs() if j.status == "scheduled"]
+    if scheduled_jobs:
+        st.markdown("---")
+        st.subheader("🕐 待执行的定时任务")
+        for sj in scheduled_jobs:
+            run_at_str = ""
+            if sj.scheduled_at:
+                try:
+                    run_at_str = datetime.fromisoformat(sj.scheduled_at).strftime("%m-%d %H:%M")
+                except Exception:
+                    run_at_str = sj.scheduled_at
+            kind_label = "视频" if sj.kind == "video" else "图文"
+            col_a, col_b, col_c = st.columns([3, 1, 1])
+            with col_a:
+                st.markdown(
+                    f"**{sj.title or '（无标题）'}**  "
+                    f"`{kind_label}` · 设备 `{sj.serial}` · 🕐 `{run_at_str}`"
+                )
+            with col_b:
+                if st.button("▶️ 立即执行", key=f"fire_now_{sj.job_id}"):
+                    import asyncio as _asyncio
+                    import threading as _th
+                    _th.Thread(
+                        target=lambda jid=sj.job_id: _asyncio.run(
+                            scheduler._execute_job(jid)
+                        ),
+                        daemon=True,
+                    ).start()
+                    st.toast(f"已触发任务 {sj.job_id[:8]}", icon="▶️")
+                    st.rerun()
+            with col_c:
+                if st.button("🗑️ 取消", key=f"cancel_sched_{sj.job_id}"):
+                    scheduler.cancel_job(sj.job_id)
                     st.rerun()
 
     # Job list

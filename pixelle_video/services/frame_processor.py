@@ -289,6 +289,12 @@ class FrameProcessor:
         """Step 3: Compose frame with subtitle using HTML template"""
         logger.debug(f"  3/4: Composing frame {frame.index}...")
 
+        # Handle passthrough (no-template) mode — use raw image directly
+        if config.frame_template and config.frame_template.startswith("passthrough_"):
+            frame.composed_image_path = frame.image_path
+            logger.debug("  → Skip HTML composition (passthrough mode: raw image)")
+            return
+
         # For video media with non-video templates, skip HTML composition to preserve
         # source motion quality and avoid synthetic card-like overlays.
         if frame.media_type == "video" and not self._is_video_template(config.frame_template):

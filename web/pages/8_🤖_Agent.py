@@ -4,6 +4,7 @@
 import asyncio
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -62,6 +63,11 @@ init_i18n()
 st.title("🤖 Agent 大脑")
 st.caption("用一句话下命令，它自动调用「视频生成 / 设备查询 / 发布入队」等工具完成。")
 
+# 显示手动入队成功通知（跨 rerun 持久化）
+_manual_success_msg = st.session_state.pop("_manual_enqueue_success", None)
+if _manual_success_msg:
+    st.success(_manual_success_msg)
+
 # ---- 初始化 ---------------------------------------------------------------
 pixelle_video = get_pixelle_video()
 if "agent_history" not in st.session_state:
@@ -108,11 +114,43 @@ _POST_TYPE_HINT = {
     "📢 引流帖（traffic）": "【图文帖定位：引流帖，post_type=traffic】",
 }
 
+# ── 发布时间选择 ─────────────────────────────────────────────────────────────
+_sched_mode_choice = st.radio(
+    "⏰ 发布时间（涉及发布时生效）",
+    options=["🚀 立即发布", "🕐 定时发布", "📅 按计划自动安排"],
+    horizontal=True,
+    index=0,
+    key="agent_sched_mode",
+    help="定时发布：在指定日期时间执行；自动安排：按每日发布计划分配下一个空闲时段。",
+)
+_agent_scheduled_at: str | None = None
+if _sched_mode_choice == "🕐 定时发布":
+    _sched_col1, _sched_col2 = st.columns([2, 3])
+    with _sched_col1:
+        _sched_dt = st.datetime_input(
+            "发布时间",
+            value=datetime.now().replace(hour=9, minute=0, second=0, microsecond=0)
+                  + __import__("datetime").timedelta(days=1),
+            min_value=datetime.now(),
+            key="agent_sched_dt",
+        )
+        _agent_scheduled_at = _sched_dt.isoformat() if _sched_dt else None
+        if _agent_scheduled_at:
+            _sched_dt_parsed = datetime.fromisoformat(_agent_scheduled_at)
+            st.caption(f"将在 {_sched_dt_parsed.strftime('%m月%d日 %H:%M')} 发布")
+elif _sched_mode_choice == "📅 按计划自动安排":
+    st.caption("将自动分配到下一个未被占用的每日计划时段（在「发布管理」→「每日发布计划」中配置）。")
+_SCHED_HINT = {
+    "🕐 定时发布":      f"【发布时间：定时发布，scheduled_at={_agent_scheduled_at or ''}】",
+    "📅 按计划自动安排": "【发布时间：按每日计划自动安排，use_schedule=true】",
+}
+
 
 def _compose_hint() -> str:
     parts = [
         _KIND_HINT.get(publish_kind, ""),
         _POST_TYPE_HINT.get(post_type_choice, ""),
+        _SCHED_HINT.get(_sched_mode_choice, ""),
     ]
     return "\n".join(p for p in parts if p)
 
@@ -306,7 +344,7 @@ def _run_brain(
                     )
                     if _no_serial and _empty_picks:
                         st.session_state["_pending_enqueue"] = _peek
-                        st.warning("⚠️ 没有已连接设备，请在下方手动选择设备后入队")
+                        st.warning("⚠️ 自动选择设备失败，请在下方手动选择设备后入队")
                         prog.progress(i / step_count, text="⚠️ 等待人工选择设备…")
                         _status.update(
                             label=f"⚠️ {_plan_summary}（等待选择设备）",
@@ -315,6 +353,20 @@ def _run_brain(
                         break
 
                 # Delegate to brain so retry+LLM-repair is exercised here too.
+                # ── 注入用户指定的发布时间偏好 ─────────────────────────────────
+                if step.tool == "enqueue_publish" and _sched_mode_choice != "🚀 立即发布":
+                    try:
+                        _resolved_args = _resolve_placeholders(dict(step.args), prior_results)
+                    except Exception:
+                        _resolved_args = dict(step.args)
+                    if _sched_mode_choice == "🕐 定时发布" and _agent_scheduled_at:
+                        if not _resolved_args.get("scheduled_at"):
+                            if hasattr(step, "args") and isinstance(step.args, dict):
+                                step.args["scheduled_at"] = _agent_scheduled_at
+                    elif _sched_mode_choice == "📅 按计划自动安排":
+                        if not _resolved_args.get("use_schedule") and not _resolved_args.get("scheduled_at"):
+                            if hasattr(step, "args") and isinstance(step.args, dict):
+                                step.args["use_schedule"] = True
                 exec_record = run_async(
                     brain._run_step_with_repair(
                         index=i,
@@ -436,7 +488,16 @@ if _retry_run:
 # ---- 人工选择发布设备（当 recommend_device 返回空 picks 时） -----------------
 _pending_eq = st.session_state.get("_pending_enqueue")
 if _pending_eq:
-    st.warning("⚠️ 没有已连接设备，视频/帖子已生成——请手动选择设备后入队。")
+    # Check if any connected devices exist to show an appropriate message
+    try:
+        from pixelle_video.services.device_manager import device_manager as _dm_check
+        _has_connected = any(getattr(d, "connected", False) for d in _dm_check.get_all())
+    except Exception:
+        _has_connected = False
+    if _has_connected:
+        st.warning("⚠️ 自动匹配设备失败，视频/帖子已生成——请手动选择设备后入队。")
+    else:
+        st.warning("⚠️ 没有已连接设备，视频/帖子已生成——请手动选择设备后入队。")
     with st.container(border=True):
         st.subheader("📱 手动选择发布设备")
         try:
@@ -470,6 +531,37 @@ if _pending_eq:
                 )
             _cb1, _cb2 = st.columns([1, 3])
             with _cb1:
+                # ── 发布时间选择 ──────────────────────────────────────
+                _eq_sched_mode = st.radio(
+                    "发布方式",
+                    options=["立即发布", "定时发布", "📅 按计划自动安排"],
+                    horizontal=True,
+                    key="pending_eq_sched_mode",
+                )
+                _eq_scheduled_at = None
+                if _eq_sched_mode == "定时发布":
+                    from datetime import timedelta as _td
+                    _eq_dt = st.datetime_input(
+                        "发布时间",
+                        value=datetime.now() + _td(hours=1),
+                        min_value=datetime.now(),
+                        key="pending_eq_dt",
+                    )
+                    _eq_scheduled_at = _eq_dt.isoformat() if _eq_dt else None
+                elif _eq_sched_mode == "📅 按计划自动安排":
+                    from pixelle_video.services.publish_scheduler import publish_scheduler as _ps_prev
+                    _next_slot = _ps_prev.next_available_slot(_chosen_serial)
+                    if _next_slot:
+                        _eq_scheduled_at = _next_slot.isoformat()
+                        st.caption(f"🕐 下一个可用时间：{_next_slot.strftime('%m-%d %H:%M')}")
+                    else:
+                        st.warning("无可用时间段，请先在设置中配置每日发布计划。")
+
+            with _cb2:
+                pass  # spacer
+
+            _cb_submit, _cb_discard = st.columns([1, 3])
+            with _cb_submit:
                 if st.button("📥 确认入队", type="primary", key="pending_eq_submit"):
                     from pixelle_video.services.publish_scheduler import publish_scheduler as _ps
                     _tags_list = [t.strip() for t in _p_tags_raw.split(",") if t.strip()]
@@ -484,11 +576,43 @@ if _pending_eq:
                         kind=_pending_eq.get("kind", "video"),
                         post_type=_pending_eq.get("post_type", "content"),
                         delete_after_hours=_pending_eq.get("delete_after_hours"),
+                        scheduled_at=_eq_scheduled_at,
                     )
                     del st.session_state["_pending_enqueue"]
-                    st.success(f"✅ 已入队：{_job.job_id[:8]}…  →  设备 {_chosen_serial}")
+                    # 更新最近一条历史记录为成功，避免用户看到「失败」状态误以为需要重跑
+                    if st.session_state.agent_history:
+                        _last = st.session_state.agent_history[0]
+                        _enq_exec_idx = len(_last.get("executions", []))
+                        _last.setdefault("executions", []).append({
+                            "index": _enq_exec_idx,
+                            "tool": "enqueue_publish",
+                            "args": {
+                                "device_serial": _chosen_serial,
+                                "title": _p_title,
+                                "body": _p_body,
+                                "hashtags": _tags_list,
+                                "kind": _pending_eq.get("kind", "video"),
+                            },
+                            "ok": True,
+                            "result": {"job_id": _job.job_id, "serial": _chosen_serial, "manual": True},
+                            "elapsed_ms": 0,
+                            "attempts": 1,
+                        })
+                        _last["ok"] = True
+                        _save_history(st.session_state.agent_history)
+                    # 用 session_state 跨 rerun 持久化成功通知
+                    _sched_label = ""
+                    if _eq_scheduled_at:
+                        try:
+                            _sched_dt = datetime.fromisoformat(_eq_scheduled_at)
+                            _sched_label = f"，定时 {_sched_dt.strftime('%m-%d %H:%M')}"
+                        except Exception:
+                            _sched_label = f"，定时 {_eq_scheduled_at}"
+                    st.session_state["_manual_enqueue_success"] = (
+                        f"✅ 已入队：{_job.job_id[:8]}…  →  设备 {_chosen_serial}（手动选择设备{_sched_label}）"
+                    )
                     st.rerun()
-            with _cb2:
+            with _cb_discard:
                 if st.button("🚫 放弃入队", key="pending_eq_discard"):
                     del st.session_state["_pending_enqueue"]
                     st.rerun()
@@ -625,3 +749,35 @@ else:
                         "prior_results": _prior,
                     }
                     st.rerun()
+
+# ---- 发布问题知识库 -------------------------------------------------------
+st.divider()
+with st.expander("🧠 发布问题知识库", expanded=False):
+    st.caption(
+        "每次发布任务失败后，Agent 会自动调用 LLM 分析根因并记录在这里。"
+        "下次遇到相同问题时，Agent 可直接检索解决方案。"
+    )
+    try:
+        from pixelle_video.agent.publish_knowledge import publish_knowledge as _pk
+        _entries = _pk.list_all()
+        if not _entries:
+            st.info("暂无记录。发布任务失败后会自动写入。")
+        else:
+            # 排序：未解决的先展示
+            _entries_sorted = sorted(_entries, key=lambda e: (e.resolved, -e.times_seen))
+            for _e in _entries_sorted:
+                _e_icon = "✅" if _e.resolved else "⚠️"
+                _e_label = f"{_e_icon} [{_e.job_kind or '通用'}] {_e.problem}（出现 {_e.times_seen} 次）"
+                with st.expander(_e_label, expanded=False):
+                    st.markdown(f"**根本原因**：{_e.root_cause}")
+                    st.markdown(f"**解决方案**：{_e.solution}")
+                    if _e.resolution_steps:
+                        st.markdown("**修复步骤**：")
+                        for _si, _s in enumerate(_e.resolution_steps, 1):
+                            st.markdown(f"{_si}. {_s}")
+                    st.caption(
+                        f"ID: `{_e.id}` | 匹配词: `{_e.error_pattern}` "
+                        f"| 更新: {_e.updated_at[:16]}"
+                    )
+    except Exception as _kb_err:
+        st.warning(f"知识库加载失败：{_kb_err}")

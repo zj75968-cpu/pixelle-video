@@ -36,8 +36,7 @@ comfyui:
       clean lines, simple sketch style
   video:
     default_workflow: runninghub/video_wan2.2.json
-    prompt_prefix: Minimalist black-and-white matchstick figure style illustration,
-      clean lines, simple sketch style
+    prompt_prefix: 
 template:
   default_template: 1080x1920/default.html
 xhs_publish:
