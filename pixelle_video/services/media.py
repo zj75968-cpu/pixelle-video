@@ -181,30 +181,21 @@ class MediaService(ComfyBaseService):
             from pixelle_video.config import config_manager as _cf_mgr
             _preset = _cf_mgr.get_post_model_preset("post_image")
             if "chatfire" in (_preset.get("base_url") or "").lower() and _preset.get("api_key"):
-                # chatfire 已接管图片生成 → 去掉所有 RunningHub/文件型 图片 workflow
-                # 只保留视频类（text-to-video / video-tools / image-to-video）和分析类已被过滤掉的
+                # chatfire 已接管图片生成 → 只去掉 RunningHub Registry 里的图片 API 模型
+                # （即 source="runninghub-api" + category text-to-image / image-to-image）
+                # 保留文件型 image_*.json workflow（有参数表单 + 尺寸选择）
                 def _is_image_wf(wf):
-                    src = wf.get("source", "")
-                    if src == "chatfire":
-                        return False   # chatfire 自己不过滤
-                    cat = (wf.get("category") or "").lower()
-                    if cat in ("text-to-image", "image-to-image"):
-                        return True
-                    # 文件型工作流按 key 判断（image_*.json）
-                    key_low = wf.get("key", "").lower()
-                    rh_model = wf.get("runninghub_model")
-                    if rh_model:
-                        rh_cat = (rh_model.get("category") or "").lower()
-                        return rh_cat in ("text-to-image", "image-to-image")
-                    # 文件 workflow：key 含 /image_ 且不含 video
-                    return "/image_" in key_low or key_low.startswith("runninghub/image_")
+                    if wf.get("source") != "runninghub-api":
+                        return False
+                    rh_model = wf.get("runninghub_model") or {}
+                    cat = (rh_model.get("category") or wf.get("category") or "").lower()
+                    return cat in ("text-to-image", "image-to-image")
                 workflows = [wf for wf in workflows if not _is_image_wf(wf)]
 
                 _CHATFIRE_MODELS = [
                     ("nano-banana-pro",              "nano-banana-pro"),
                     ("nano-banana-pro_2k",           "nano-banana-pro 2K"),
                     ("nano-banana-pro_4k",           "nano-banana-pro 4K"),
-                    ("nano-banana",                  "nano-banana"),
                     ("gemini-2.5-flash-image",       "Gemini 2.5 Flash Image"),
                     ("gemini-2.5-flash-image-preview",    "Gemini 2.5 Flash Preview"),
                     ("gemini-2.5-flash-image-preview-hd", "Gemini 2.5 Flash Preview HD"),
