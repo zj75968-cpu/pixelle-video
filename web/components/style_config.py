@@ -717,7 +717,9 @@ def render_style_config(pixelle_video):
                     # 仅「文生视频」才放入标准流水线（脚本流/无图上传）；
                     # 「图生视频」与「首尾帧」需要图片输入，归属 i2v 流水线。
                     is_video_out = cat in ("text-to-video", "video-tools")
-                    is_image_out = cat.endswith("-to-image")
+                    # 标准流水线无图片上传入口，排除 image-to-image；
+                    # 仅保留 text-to-image 等文生图类别。
+                    is_image_out = cat.endswith("-to-image") and cat != "image-to-image"
                     return is_video_out if want_video else is_image_out
                 # 文件型工作流：按 key 名判断，并排除显式标记为 i2v 的文件
                 key_low = wf["key"].lower()
