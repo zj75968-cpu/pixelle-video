@@ -1056,11 +1056,24 @@ def render_publish_tab():
         "completed":      sum(1 for j in all_jobs if j.status in ("success", "done", "deleted")),
         "failed":         sum(1 for j in all_jobs if j.status in ("failed", "cancelled")),
     }
+    counts["ttl_expired"] = sum(
+        1 for j in all_jobs
+        if getattr(j, "delete_after_hours", None)
+        and j.finished_at
+        and j.status in ("success", "done")
+        and (
+            datetime.fromisoformat(j.finished_at)
+            + timedelta(hours=j.delete_after_hours)
+        ) <= datetime.now()
+    )
+
     with st.expander(
         f"🛠️ 批量操作  "
-        f"(待发布 {counts['pending_active']}  |  已完成 {counts['completed']}  |  失败/取消 {counts['failed']})"
+        f"(待发布 {counts['pending_active']}  |  已完成 {counts['completed']}  |  失败/取消 {counts['failed']}"
+        + (f"  |  ⚠️ TTL已过期 {counts['ttl_expired']}" if counts["ttl_expired"] else "")
+        + ")"
     ):
-        bcol1, bcol2, bcol3, bcol4 = st.columns(4)
+        bcol1, bcol2, bcol3, bcol4, bcol5 = st.columns(5)
 
         with bcol1:
             if st.button(
@@ -1114,6 +1127,26 @@ def render_publish_tab():
                 st.success(f"已清理 {n} 个失败/取消任务")
                 st.rerun()
 
+        with bcol5:
+            if st.button(
+                "🧹 扫清过期 TTL 帖",
+                key="bulk_ttl_sweep",
+                help="检查所有已完成任务，删除超过 TTL 的帖子（等同后台自动定时扫描）",
+                disabled=counts["ttl_expired"] == 0,
+                type="primary" if counts["ttl_expired"] > 0 else "secondary",
+                use_container_width=True,
+            ):
+                import asyncio as _asyncio
+                import concurrent.futures
+                with st.spinner("删除过期帖子中…"):
+                    try:
+                        with concurrent.futures.ThreadPoolExecutor() as _pool:
+                            _pool.submit(_asyncio.run, scheduler.check_and_delete_expired()).result(timeout=120)
+                    except Exception as _e:
+                        st.error(f"扫清异常: {_e}")
+                st.success(f"扫清完成，已遍历 {counts['ttl_expired']} 个过期帖")
+                st.rerun()
+
     _render_publish_queue_list(filter_val)
 
 
@@ -1134,7 +1167,24 @@ def _render_publish_queue_list(filter_val: str | None):
         post_type = getattr(job, "post_type", "content") or "content"
         type_tag = "📢 引流帖" if post_type == "traffic" else "📚 干货帖"
         delete_after = getattr(job, "delete_after_hours", None)
-        ttl_tag = f"  |  ⏱️ TTL {delete_after}h" if delete_after else ""
+        if delete_after:
+            if job.finished_at and job.status in ("success", "done"):
+                try:
+                    _expire_at = datetime.fromisoformat(job.finished_at) + timedelta(hours=delete_after)
+                    _now = datetime.now()
+                    if _now >= _expire_at:
+                        ttl_tag = "  |  ⚠️ TTL已过期"
+                    else:
+                        _rem = _expire_at - _now
+                        _h, _rem_s = divmod(int(_rem.total_seconds()), 3600)
+                        _m = _rem_s // 60
+                        ttl_tag = f"  |  ⏱️ 还剩 {_h}h {_m}m"
+                except Exception:
+                    ttl_tag = f"  |  ⏱️ TTL {delete_after}h"
+            else:
+                ttl_tag = f"  |  ⏱️ TTL {delete_after}h"
+        else:
+            ttl_tag = ""
         label = f"{badge}  |  {kind_tag}  |  {type_tag}{ttl_tag}  |  {job.title[:30]}  |  {job.serial}  |  {job.created_at[:16]}"
         with st.expander(label):
             col1, col2 = st.columns([3, 1])
@@ -1178,8 +1228,16 @@ def _render_publish_queue_list(filter_val: str | None):
                             m = rem // 60
                             payload["auto_delete_at"] = expire_at.strftime("%Y-%m-%d %H:%M")
                             payload["delete_in"] = f"{h}h {m}m"
+                            st.info(
+                                f"⏱️ TTL 倒计时：帖子将于 **{expire_at.strftime('%Y-%m-%d %H:%M')}** 自动删除"
+                                f"（还剩 **{h}h {m}m**）"
+                            )
                         else:
                             payload["auto_delete_at"] = "已过期（等待下次检查）"
+                            st.warning(
+                                f"⚠️ TTL 已过期（设定 {delete_after}h），帖子尚未删除。"
+                                "可点击批量操作中的《🧹 扫清过期 TTL 帖》立即删除。"
+                            )
                     except Exception:
                         pass
 
