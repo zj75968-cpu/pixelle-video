@@ -171,6 +171,7 @@ async def _generate_video(
     n_scenes: int = 3,
     media_workflow: Optional[str] = None,
     pipeline: str = "standard",
+    target_duration_s: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Generate a video from a natural-language topic."""
     from pixelle_video.service import pixelle_video as core
@@ -178,7 +179,24 @@ async def _generate_video(
     if not getattr(core, "_initialized", False):
         await core.initialize()
 
-    kwargs: Dict[str, Any] = {"n_scenes": int(n_scenes), "mode": "generate"}
+    kwargs: Dict[str, Any] = {"mode": "generate"}
+
+    # If caller specified a target duration, auto-derive n_scenes and word-count limits
+    # so the TTS/narration total length hits the requested duration.
+    # Heuristic: Chinese TTS ~3.5 chars/s; aim for ~7 s per scene.
+    if target_duration_s is not None and target_duration_s > 0:
+        computed_scenes = max(3, round(target_duration_s / 7))
+        chars_per_scene = max(15, round(target_duration_s * 3.5 / computed_scenes))
+        kwargs["n_scenes"] = computed_scenes
+        kwargs["min_narration_words"] = max(10, chars_per_scene - 8)
+        kwargs["max_narration_words"] = chars_per_scene
+        logger.info(
+            f"[agent] target_duration_s={target_duration_s} → "
+            f"n_scenes={computed_scenes}, max_words={chars_per_scene}"
+        )
+    else:
+        kwargs["n_scenes"] = int(n_scenes)
+
     if media_workflow:
         kwargs["media_workflow"] = media_workflow
 
@@ -977,13 +995,27 @@ TOOLS: List[ToolSpec] = [
         name="generate_video",
         description=(
             "根据主题文字生成一个视频，返回最终视频文件路径。"
-            "topic 必填；n_scenes 默认 3；media_workflow 可选，用于指定图像/视频生成 workflow。"
+            "topic 必填；"
+            "target_duration_s 为目标时长（秒），系统自动根据时长推算分镜数和台词字数；"
+            "n_scenes 默认 3（与 target_duration_s 互斥，指定 target_duration_s 时自动计算）；"
+            "media_workflow 可选，用于指定图像/视频生成 workflow。"
         ),
         args_schema={
             "type": "object",
             "properties": {
                 "topic": {"type": "string", "description": "视频选题/主题"},
-                "n_scenes": {"type": "integer", "description": "镜头数量", "default": 3},
+                "target_duration_s": {
+                    "type": "integer",
+                    "description": (
+                        "目标视频时长（秒）。填写后系统自动估算分镜数和台词长度。"
+                        "示例：30 表示约30秒视频。"
+                    ),
+                },
+                "n_scenes": {
+                    "type": "integer",
+                    "description": "镜头数量（指定 target_duration_s 时无需填写）",
+                    "default": 3,
+                },
                 "media_workflow": {
                     "type": "string",
                     "description": "可选 workflow key，未填则使用配置默认值",

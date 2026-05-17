@@ -117,6 +117,7 @@ SYSTEM_PROMPT_TEMPLATE = """你是 Pixelle-Video 项目的总控 Agent。\
    - 未提到时默认 "content"。
    - 当 post_type="traffic" 且用户提到时效（如「24 小时后删」「发完明天就删」「短效」）→ 同时设置 traffic_ttl_hours=对应小时数；后续 enqueue_publish 时把同样的值传给 delete_after_hours（不要遗漏，否则 TTL 不会生效）。
 9. **违禁词**：用户给出「不要出现 X」「禁止 X」「屏蔽 X」类指令时，先调用 add_banned_keywords（mode='append'）写入，再继续后续生成步骤；这样新生成的内容会在 LLM 层就避开这些词。
+10. **视频时长**：用户提到具体时长（如「30秒」「一分钟」「45秒」）时，将 generate_video 的 `target_duration_s` 设置为对应秒数（一分钟 → 60，30秒 → 30），**不要**手动设置 n_scenes，系统会自动推算。
 
 用户指令："{instruction}"
 """
