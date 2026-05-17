@@ -196,6 +196,7 @@ class MediaService(ComfyBaseService):
                     ("nano-banana-pro",              "nano-banana-pro"),
                     ("nano-banana-pro_2k",           "nano-banana-pro 2K"),
                     ("nano-banana-pro_4k",           "nano-banana-pro 4K"),
+                    ("nano-banana",                  "nano-banana"),
                     ("gemini-2.5-flash-image",       "Gemini 2.5 Flash Image"),
                     ("gemini-2.5-flash-image-preview",    "Gemini 2.5 Flash Preview"),
                     ("gemini-2.5-flash-image-preview-hd", "Gemini 2.5 Flash Preview HD"),
