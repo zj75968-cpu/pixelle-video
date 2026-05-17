@@ -345,12 +345,21 @@ def _run_brain(
                     prior_results.append(exec_record.result)
                     st.write(f"\u3000\u3000✅ 完成{suffix}")
                 else:
-                    st.error(
-                        f"❌ 步骤 {i + 1} 失败（尝试 {exec_record.attempts} 次）："
-                        f"{exec_record.error}"
+                    _err_title = (
+                        f"❌ 步骤 {i + 1} 失败"
+                        + (f"（已重试 {exec_record.attempts - 1} 次）" if exec_record.attempts > 1 else "")
                     )
-                    if exec_record.repair_notes:
-                        st.caption(f"🛠️ 修复尝试记录：{exec_record.repair_notes}")
+                    with st.expander(_err_title, expanded=True):
+                        st.error(exec_record.error or "未知错误")
+                        if exec_record.attempts > 1:
+                            st.caption(f"⚠️ 系统自动重试了 {exec_record.attempts - 1} 次，最终仍失败。")
+                        if exec_record.repair_notes:
+                            st.markdown("**🛠️ LLM 修复尝试记录：**")
+                            for _n_idx, _note in enumerate(
+                                (exec_record.repair_notes or "").split("; "), 1
+                            ):
+                                if _note.strip():
+                                    st.markdown(f"- 第 {_n_idx} 次：{_note.strip()}")
                     prog.progress(i / step_count, text=f"❌ 步骤 {i + 1} 失败")
                     break
 
@@ -556,7 +565,23 @@ else:
                                         st.warning(f"任务 {_jid[:8]}… 已是终态，无需取消")
                                     st.rerun()
                     elif ex:
-                        st.error(ex.get("error") or "失败")
+                        _ex_attempts = ex.get("attempts", 1)
+                        _ex_repair = ex.get("repair_notes") or ""
+                        _ex_err_title = (
+                            "❌ 失败"
+                            + (f"（重试 {_ex_attempts - 1} 次）" if _ex_attempts > 1 else "")
+                        )
+                        with st.expander(_ex_err_title, expanded=False):
+                            st.error(ex.get("error") or "失败")
+                            if _ex_attempts > 1:
+                                st.caption(f"⚠️ 共尝试 {_ex_attempts} 次（含 {_ex_attempts - 1} 次自动修复）")
+                            if _ex_repair:
+                                st.markdown("**🛠️ LLM 修复尝试：**")
+                                for _rn_idx, _rn in enumerate(
+                                    _ex_repair.split("; "), 1
+                                ):
+                                    if _rn.strip():
+                                        st.markdown(f"- 第 {_rn_idx} 次：{_rn.strip()}")
                     else:
                         st.caption("（未执行）")
                         if st.button(
