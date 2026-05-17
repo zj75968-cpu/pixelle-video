@@ -10,9 +10,9 @@ post_model_presets:
     base_url: https://api.deepseek.com
     model: deepseek-v4-flash
   post_image:
-    api_key: sk-56IvmW0fsb5XuvuqC5mUk01Tntf0BbjV4z9o624CrJUfrMih
-    base_url: https://cdn.12ai.org
-    model: gemini-2.5-flash-image
+    api_key: sk-MXBjq1odMGod9tl808ZSZkfC08kMwtCVcK3uzhqDUUmjhWYF
+    base_url: https://api.chatfire.cn
+    model: nano-banana-pro
 comfyui:
   comfyui_url: http://127.0.0.1:8188
   comfyui_api_key: ''

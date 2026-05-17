@@ -440,9 +440,11 @@ def main():
         _apply_history_params_to_form(pending_history)
         st.success("已应用历史参数到表单")
 
-    # Per-post model overrides removed — use global config from admin settings
+    # Load image LLM preset from global config (admin settings)
+    from pixelle_video.config import config_manager as _cm
     content_llm = None
-    image_llm = None
+    _img_preset = _cm.get_post_model_preset("post_image")
+    image_llm = _img_preset if _is_complete_override(_img_preset) else None
 
     with st.expander("🕘 历史参数复用（避免重复填写）", expanded=False):
         history_items = _list_recent_post_param_history(limit=20)

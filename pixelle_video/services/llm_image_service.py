@@ -93,7 +93,9 @@ class LLMImageService:
         - Chat-completions style fallback ``{"choices": [{"message": {"content": "..."}}]}``
         """
         # Build request body
-        body: dict = {"model": model, "prompt": prompt, "size": size, "n": 1}
+        # chatfire.cn uses ratio format (1x1, 9x16, 16x9, 3x4, 4x3)
+        effective_size = self._to_chatfire_size(size) if "chatfire" in api_base.lower() else size
+        body: dict = {"model": model, "prompt": prompt, "size": effective_size, "n": 1}
         if quality:
             body["quality"] = quality
         if style:
@@ -139,6 +141,17 @@ class LLMImageService:
         if api_base.endswith("/v1"):
             return f"{api_base}/chat/completions"
         return f"{api_base}/v1/chat/completions"
+
+    @staticmethod
+    def _to_chatfire_size(size: str) -> str:
+        """Convert WxH pixel size string to chatfire.cn ratio format (1x1, 9x16, 16x9, 3x4, 4x3)."""
+        _RATIOS = {"1x1": 1.0, "3x4": 0.75, "4x3": 4 / 3, "16x9": 16 / 9, "9x16": 9 / 16}
+        try:
+            w, h = size.lower().split("x", 1)
+            ratio = float(w) / float(h)
+        except Exception:
+            return "1x1"
+        return min(_RATIOS, key=lambda k: abs(_RATIOS[k] - ratio))
 
     async def generate_edit(
         self,
