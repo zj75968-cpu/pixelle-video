@@ -117,7 +117,7 @@ class LLMImageService:
 
         # Try images/generations first (works for OpenAI, Gemini proxies like cdn.12ai.org, etc.)
         # Fall back to chat/completions if images endpoint returns an error.
-        async with httpx.AsyncClient(proxy=None, follow_redirects=True, timeout=120) as http:
+        async with httpx.AsyncClient(trust_env=False, follow_redirects=True, timeout=120) as http:
             resp = await http.post(url, json=body, headers=headers)
             data = self._parse_response(resp)
 
@@ -213,7 +213,7 @@ class LLMImageService:
             f"[LLMImageService] generate_edit model={model} "
             f"images={len(input_images)} prompt[:80]={prompt[:80]!r}"
         )
-        async with httpx.AsyncClient(proxy=None, follow_redirects=True, timeout=180) as http:
+        async with httpx.AsyncClient(trust_env=False, follow_redirects=True, timeout=180) as http:
             resp = await http.post(chat_url, json=body, headers=headers)
             data = self._parse_response(resp)
         return self._extract_image(data, model)
