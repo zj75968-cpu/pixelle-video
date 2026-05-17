@@ -567,8 +567,7 @@ def render_devices_tab():
         with scan_col:
             if st.button("🔍 扫描局域网 (:5555)", key="scan_lan_5555"):
                 with st.spinner("正在扫描子网，约需 3–5 秒…"):
-                    from pixelle_video.services.device_manager import device_manager as _dm_scan
-                    results = _dm_scan.scan_lan_port(port=5555)
+                    results = dm.scan_lan_port(port=5555)
                 st.session_state["wifi_scan_results"] = results
 
         scan_res = st.session_state.get("wifi_scan_results", [])
@@ -632,8 +631,7 @@ def render_devices_tab():
         with mdns_col:
             if st.button("🔍 扫描 mDNS 设备", key="scan_mdns_btn"):
                 with st.spinner("正在扫描 mDNS（约 5 秒）…"):
-                    from pixelle_video.services.device_manager import device_manager as _dm_mdns
-                    mdns_found = _dm_mdns.scan_mdns(timeout=5.0)
+                    mdns_found = dm.scan_mdns(timeout=5.0)
                 st.session_state["mdns_scan_results"] = mdns_found
 
         mdns_res = st.session_state.get("mdns_scan_results")
