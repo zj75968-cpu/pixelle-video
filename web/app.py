@@ -111,6 +111,12 @@ def main():
         icon="🤖",
     )
 
+    scraper_page = st.Page(
+        "pages/9_🔄_Scraper.py",
+        title="搬运",
+        icon="🔄",
+    )
+
     banned_page = st.Page(
         "pages/7_🚫_违禁词.py",
         title="违禁词",
@@ -125,7 +131,7 @@ def main():
     )
 
     pg = st.navigation(
-        [create_page, history_page, publish_page, agent_page, banned_page, settings_page],
+        [create_page, history_page, publish_page, agent_page, scraper_page, banned_page, settings_page],
         position="top",
     )
     pg.run()

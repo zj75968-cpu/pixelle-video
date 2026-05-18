@@ -13,6 +13,12 @@ post_model_presets:
     api_key: sk-MXBjq1odMGod9tl808ZSZkfC08kMwtCVcK3uzhqDUUmjhWYF
     base_url: https://api.chatfire.cn
     model: gemini-3.1-flash-image-preview_1k
+  # 多模态反推 prompt 专用（必须是支持 vision 的 chat 模型；
+  # 注意：post_image 的图像生成预览模型不能用来反推）
+  post_vision:
+    api_key: sk-MXBjq1odMGod9tl808ZSZkfC08kMwtCVcK3uzhqDUUmjhWYF
+    base_url: https://api.chatfire.cn
+    model: gpt-4o-mini
 comfyui:
   comfyui_url: http://127.0.0.1:8188
   comfyui_api_key: ''
@@ -36,7 +42,7 @@ comfyui:
       clean lines, simple sketch style
   video:
     default_workflow: runninghub/video_wan2.2.json
-    prompt_prefix: 
+    prompt_prefix: ""
 template:
   default_template: 1080x1920/default.html
 xhs_publish:
