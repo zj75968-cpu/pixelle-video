@@ -45,7 +45,7 @@ st.markdown(
 
 col_btn, col_info = st.columns([1, 3])
 with col_btn:
-    run = st.button("🚀 开始检测", type="primary", use_container_width=True)
+    run = st.button("🚀 开始检测", type="primary", width="stretch")
 with col_info:
     st.caption("耗时约 5~30 秒（并发 4，单模型约 1~2 秒）；不会消耗任何调用余额。")
 
@@ -103,7 +103,7 @@ if run:
         }
         for r in results
     ])
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
 
     if inactivated:
         st.warning(f"还有 {len(inactivated)} 个模型未开通，可前往 RunningHub 一键接入。")

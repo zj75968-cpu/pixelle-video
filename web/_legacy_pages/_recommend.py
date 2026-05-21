@@ -53,7 +53,7 @@ with col_input:
         height=140,
     )
 
-run = st.button("🚀 让 LLM 推荐", type="primary", use_container_width=True)
+run = st.button("🚀 让 LLM 推荐", type="primary", width="stretch")
 
 
 async def _do_recommend():

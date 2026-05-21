@@ -95,7 +95,7 @@ def _key_field(label: str, field_key: str, current_value: str):
             new_val = current_value  # 未修改，沿用原值
     with col2:
         st.markdown("<div style='margin-top:28px'></div>", unsafe_allow_html=True)
-        if st.button("隐藏" if revealed else "显示", key=f"toggle_{field_key}", use_container_width=True):
+        if st.button("隐藏" if revealed else "显示", key=f"toggle_{field_key}", width="stretch"):
             st.session_state.reveal_keys[field_key] = not revealed
             st.rerun()
     return new_val.strip() if new_val.strip() else current_value
@@ -106,7 +106,7 @@ with col_title:
     st.title("⚙️ 管理员设置")
 with col_logout:
     st.markdown("<div style='margin-top:14px'></div>", unsafe_allow_html=True)
-    if st.button("退出", use_container_width=True):
+    if st.button("退出", width="stretch"):
         st.session_state.is_admin = False
         st.session_state.reveal_keys = {}
         st.switch_page("pages/1_🎨_创作.py")
@@ -360,7 +360,7 @@ with st.expander("📲 小红书发布配置"):
 st.divider()
 
 # ── 保存 ──────────────────────────────────────────────────────────
-if st.button("💾 保存配置", type="primary", use_container_width=True):
+if st.button("💾 保存配置", type="primary", width="stretch"):
     updates: dict = {
         "llm": {
             "api_key":  new_llm_key,

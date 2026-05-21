@@ -1214,7 +1214,7 @@ def render_publish_tab():
                 key="bulk_exec_pending",
                 disabled=counts["pending_active"] == 0,
                 help="对所有 pending/scheduled 任务立刻触发执行",
-                use_container_width=True,
+                width="stretch",
             ):
                 pending_ids = [
                     j.job_id for j in all_jobs if j.status in ("pending", "scheduled")
@@ -1231,7 +1231,7 @@ def render_publish_tab():
                 "⛔ 取消所有待发布",
                 key="bulk_cancel_pending",
                 disabled=counts["pending_active"] == 0,
-                use_container_width=True,
+                width="stretch",
             ):
                 n = scheduler.bulk_cancel_pending()
                 st.success(f"已取消 {n} 个任务")
@@ -1243,7 +1243,7 @@ def render_publish_tab():
                 key="bulk_remove_done",
                 disabled=counts["completed"] == 0,
                 help="从队列中移除 success/done/deleted 状态的任务记录",
-                use_container_width=True,
+                width="stretch",
             ):
                 n = scheduler.bulk_remove(["success", "done", "deleted"])
                 st.success(f"已清理 {n} 个已完成任务")
@@ -1254,7 +1254,7 @@ def render_publish_tab():
                 "🗑️ 清理失败/取消",
                 key="bulk_remove_failed",
                 disabled=counts["failed"] == 0,
-                use_container_width=True,
+                width="stretch",
             ):
                 n = scheduler.bulk_remove(["failed", "cancelled"])
                 st.success(f"已清理 {n} 个失败/取消任务")
@@ -1267,7 +1267,7 @@ def render_publish_tab():
                 help="检查所有已完成任务，删除超过 TTL 的帖子（等同后台自动定时扫描）",
                 disabled=counts["ttl_expired"] == 0,
                 type="primary" if counts["ttl_expired"] > 0 else "secondary",
-                use_container_width=True,
+                width="stretch",
             ):
                 import asyncio as _asyncio
                 import concurrent.futures
@@ -1411,7 +1411,7 @@ def _render_publish_queue_list(filter_val: str | None):
                             for idx, sc_path in enumerate(existing):
                                 with cols[idx % 3]:
                                     try:
-                                        st.image(sc_path, caption=Path(sc_path).name, use_container_width=True)
+                                        st.image(sc_path, caption=Path(sc_path).name, width="stretch")
                                     except Exception:
                                         st.caption(f"无法加载：{Path(sc_path).name}")
                         else:

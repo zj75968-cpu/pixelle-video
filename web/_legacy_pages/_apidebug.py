@@ -177,7 +177,7 @@ with left:
             st.warning(f"未知字段类型 {ftype}（{key}），跳过")
 
     submit = st.button(
-        "🚀 发送请求", type="primary", use_container_width=True, key="rh_api_dbg_submit"
+        "🚀 发送请求", type="primary", width="stretch", key="rh_api_dbg_submit"
     )
 
 

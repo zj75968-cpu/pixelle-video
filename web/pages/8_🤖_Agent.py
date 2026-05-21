@@ -165,14 +165,14 @@ instruction = st.text_area(
 # 三个动作按钮：优化提示词（增强后展示并允许编辑） / 直接执行 / 清空历史
 col_enhance, col_run, col_clear = st.columns([1.2, 1, 1])
 enhance_clicked = col_enhance.button(
-    "✨ 优化提示词", use_container_width=True,
+    "✨ 优化提示词", width="stretch",
     help="让 LLM 把模糊指令扩写成完整任务描述。优化后可编辑，再点「执行」才会跑。",
 )
 run_direct_clicked = col_run.button(
-    "🚀 直接执行", type="primary", use_container_width=True,
+    "🚀 直接执行", type="primary", width="stretch",
     help="跳过提示词优化，直接把当前指令交给 Agent 编排。",
 )
-if col_clear.button("🧹 清空历史", use_container_width=True):
+if col_clear.button("🧹 清空历史", width="stretch"):
     st.session_state.agent_history = []
     _save_history([])
     st.session_state.pop("agent_enhanced_text", None)
@@ -239,11 +239,11 @@ if "agent_enhanced_text" in st.session_state:
         )
         c1, c2 = st.columns([1, 1])
         confirm_clicked = c1.button(
-            "🚀 用此提示词执行", type="primary", use_container_width=True,
+            "🚀 用此提示词执行", type="primary", width="stretch",
             key="agent_confirm_enhanced",
         )
         discard_clicked = c2.button(
-            "❌ 放弃优化", use_container_width=True, key="agent_discard_enhanced",
+            "❌ 放弃优化", width="stretch", key="agent_discard_enhanced",
         )
         if discard_clicked:
             st.session_state.pop("agent_enhanced_text", None)

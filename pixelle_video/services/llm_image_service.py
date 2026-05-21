@@ -93,8 +93,12 @@ class LLMImageService:
         - Chat-completions style fallback ``{"choices": [{"message": {"content": "..."}}]}``
         """
         # Build request body
-        # chatfire.cn uses ratio format (1x1, 9x16, 16x9, 3x4, 4x3)
-        effective_size = self._to_chatfire_size(size) if "chatfire" in api_base.lower() else size
+        # chatfire.cn 多数模型用 ratio 格式 (1x1, 3x4, 4x3, 9x16, 16x9)
+        # 但 gpt-image-1.5 / gpt-image-2 要求像素格式 (1024x1024 / 1536x1024 / 1024x1536)
+        if "chatfire" in api_base.lower():
+            effective_size = self._to_chatfire_size(size, model=model)
+        else:
+            effective_size = size
         body: dict = {"model": model, "prompt": prompt, "size": effective_size, "n": 1}
         if quality:
             body["quality"] = quality
@@ -143,14 +147,29 @@ class LLMImageService:
         return f"{api_base}/v1/chat/completions"
 
     @staticmethod
-    def _to_chatfire_size(size: str) -> str:
-        """Convert WxH pixel size string to chatfire.cn ratio format (1x1, 9x16, 16x9, 3x4, 4x3)."""
-        _RATIOS = {"1x1": 1.0, "3x4": 0.75, "4x3": 4 / 3, "16x9": 16 / 9, "9x16": 9 / 16}
+    def _to_chatfire_size(size: str, model: str = "") -> str:
+        """Convert size string to the format the target chatfire model expects.
+
+        - gpt-image-1.5 / gpt-image-2 → pixel string (1024x1024 / 1536x1024 / 1024x1536)
+        - 其它模型 → ratio 字符串 (1x1 / 3x4 / 4x3 / 9x16 / 16x9)
+        """
+        # 先计算比例
         try:
-            w, h = size.lower().split("x", 1)
-            ratio = float(w) / float(h)
+            w_raw, h_raw = size.lower().split("x", 1)
+            ratio = float(w_raw) / float(h_raw)
         except Exception:
-            return "1x1"
+            ratio = 1.0
+
+        m = (model or "").lower()
+        if "gpt-image" in m:
+            # gpt-image 只接受 3 种像素尺寸
+            if ratio > 1.2:
+                return "1536x1024"
+            if ratio < 0.83:
+                return "1024x1536"
+            return "1024x1024"
+
+        _RATIOS = {"1x1": 1.0, "3x4": 0.75, "4x3": 4 / 3, "16x9": 16 / 9, "9x16": 9 / 16}
         return min(_RATIOS, key=lambda k: abs(_RATIOS[k] - ratio))
 
     async def generate_edit(

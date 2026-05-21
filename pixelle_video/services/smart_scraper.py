@@ -264,8 +264,10 @@ _SEARCH_PROMPT = """你是「小红书内容研究员」。请围绕主题「{to
 每条素材请输出：
 - title: 中文标题（≤20字，吸睛、可直接做小红书封面）
 - text:  80~200字的中文正文摘要（小红书风格、口语化、可带 emoji）
-- query: 用于真实图片搜索引擎的**英文**或**中文+英文混合**查询词
-         （4~10 个词，名词为主，便于 Bing/Google Images 命中真实生活/穿搭/插画图）
+- query_zh: **中文**搜索词（4~8 个词，名词为主，用于小红书/B站/微博/微信公众号等中文平台）
+- query_en: **英文**搜索词（4~10 个词，名词为主，用于 Pinterest/Behance/ArtStation 等国外平台）
+
+两个 query 必须**紧扣主题**，不要扩散到无关概念。
 
 严格用以下 JSON 数组格式返回，不要多余解释，不要 markdown 包裹：
 
@@ -274,7 +276,62 @@ _SEARCH_PROMPT = """你是「小红书内容研究员」。请围绕主题「{to
   {{
     "title": "...",
     "text":  "...",
-    "query": "..."
+    "query_zh": "...",
+    "query_en": "..."
+  }}
+]
+```
+"""
+
+_SEARCH_PROMPT_TUTORIAL = """你是「绘画教程内容研究员」。请围绕主题「{topic}」给出 {n_refs} 条**绘画教程**参考素材的元数据。
+我会用真实图片搜索引擎去抓步骤图，你**不要编造图片 URL**。
+
+内容定位：教程向、步骤拆解、技法讲解类（类似 B 站/小红书上的「XX 画法步骤」「如何画 XX」帖子）。
+
+每条素材请输出：
+- title: 中文标题（≤20字，要有"画法""教程""步骤"等教程感关键词）
+- text:  80~200字的教程摘要（说清楚这个教程讲什么技法/步骤，可带 emoji，小红书口语风）
+- query_zh: **中文**搜索词（必须含「画法 / 教程 / 步骤 / 怎么画」等关键词，紧扣主题，4~8 个词）
+- query_en: **英文**搜索词（必须含 "tutorial" 或 "step by step" 或 "how to draw"，紧扣主题，4~10 个词）
+
+两个 query 都必须**紧扣主题**，不要扩散到无关概念。
+
+严格用以下 JSON 数组格式返回，不要多余解释，不要 markdown 包裹：
+
+```json
+[
+  {{
+    "title": "...",
+    "text":  "...",
+    "query_zh": "...",
+    "query_en": "..."
+  }}
+]
+```
+"""
+
+_SEARCH_PROMPT_REF = """你是「视觉素材研究员」。请围绕主题「{topic}」给出 {n_refs} 条**参考素材**的元数据。
+图片我自己会用真实图片搜索引擎去抓，你**不要编造图片 URL**。
+
+内容定位：宽泛的灵感素材、参考图，不限风格。
+
+每条素材请输出：
+- title: 中文标题（≤20字）
+- text:  80~200字的素材描述（说明图片内容/风格/用途，口语化）
+- query_zh: **中文**搜索词（4~8 个词，名词为主，用于中文平台）
+- query_en: **英文**搜索词（4~10 个词，名词为主，用于国外平台）
+
+两个 query 都必须**紧扣主题**，不要扩散到无关概念。
+
+严格用以下 JSON 数组格式返回，不要多余解释，不要 markdown 包裹：
+
+```json
+[
+  {{
+    "title": "...",
+    "text":  "...",
+    "query_zh": "...",
+    "query_en": "..."
   }}
 ]
 ```
@@ -310,6 +367,80 @@ def _search_images_real(query: str, max_results: int = 4) -> list[str]:
             logger.warning(f"[deepsearch] backend={backend} 失败：{type(e).__name__}: {str(e)[:80]}")
             continue
     return []
+
+
+# 多平台 site: 过滤表 —— 通过 ddgs 图片搜索 + site: 限定域名抓不同平台
+_SOURCE_SITE_FILTERS: dict[str, str] = {
+    "小红书": "site:xiaohongshu.com OR site:xhscdn.com",
+    "Twitter/X": "site:twitter.com OR site:x.com OR site:pbs.twimg.com",
+    "Reddit": "site:reddit.com OR site:redd.it",
+    "微博": "site:weibo.com OR site:weibo.cn OR site:sinaimg.cn",
+    "B站": "site:bilibili.com OR site:hdslb.com",
+    "Pixiv": "site:pixiv.net OR site:pximg.net",
+    "Pinterest": "site:pinterest.com OR site:pinimg.com",
+    "Behance": "site:behance.net",
+    "ArtStation": "site:artstation.com",
+    "DeviantArt": "site:deviantart.com OR site:wixmp.com",
+    "站酷": "site:zcool.com.cn",
+    "百度贴吧": "site:tieba.baidu.com OR site:hiphotos.baidu.com",
+    "知乎": "site:zhihu.com OR site:zhimg.com",
+    "微信公众号": "site:mp.weixin.qq.com OR site:mmbiz.qpic.cn",
+    "花瓣": "site:huaban.com OR site:hbimg.huabanimg.com",
+    "B站文章": "site:bilibili.com/read OR site:bilibili.com/opus",
+    "通用图片": "",  # 不加 site: 限定，全网搜
+}
+
+# 中文为主的平台 → 应当用中文 query 搜索
+_CN_SOURCES: set[str] = {
+    "小红书", "微博", "B站", "B站文章", "站酷", "百度贴吧", "知乎",
+    "微信公众号", "花瓣",
+}
+
+
+def _search_images_by_source(query: str, source: str, max_results: int = 4) -> list[str]:
+    """按指定平台关键词过滤搜索图片。"""
+    site_filter = _SOURCE_SITE_FILTERS.get(source, "")
+    composed = f"{query} {site_filter}".strip() if site_filter else query
+    return _search_images_real(composed, max_results=max_results)
+
+
+def _search_images_multi_sources(
+    query_zh: str,
+    query_en: str,
+    sources: list[str],
+    per_source: int = 3,
+) -> list[str]:
+    """对多个平台并行搜图，按平台顺序合并去重。
+
+    - 中文平台（小红书/微博/B站/站酷/...）使用 query_zh
+    - 国外平台（Pinterest/Behance/...）使用 query_en
+    - "通用图片" 同时跑两次（中英各一次）取并集
+    """
+    if not sources:
+        sources = ["通用图片"]
+    all_urls: list[str] = []
+    seen: set[str] = set()
+
+    def _pick_query(src: str) -> list[str]:
+        if src == "通用图片":
+            qs = [q for q in (query_zh, query_en) if q]
+            return qs or [query_zh or query_en]
+        if src in _CN_SOURCES:
+            return [query_zh or query_en]
+        return [query_en or query_zh]
+
+    for src in sources:
+        for q in _pick_query(src):
+            try:
+                urls = _search_images_by_source(q, src, max_results=per_source)
+            except Exception as e:
+                logger.warning(f"[deepsearch] source={src} 搜图失败：{e}")
+                urls = []
+            for u in urls:
+                if u and u not in seen:
+                    seen.add(u)
+                    all_urls.append(u)
+    return all_urls
 
 
 # ─── Agent-Reach 集成：xhs / Exa ──────────────────────────────────────────────
@@ -549,20 +680,38 @@ def run_xhs_login(cookie_source: str = "auto") -> dict:
     }
 
 
-async def deepsearch(topic: str, n_refs: int = 4, save_dir: Path | None = None) -> list[ReferenceItem]:
+async def deepsearch(
+    topic: str,
+    n_refs: int = 4,
+    save_dir: Path | None = None,
+    content_type: str = "成品展示",
+    sources: list[str] | None = None,
+) -> list[ReferenceItem]:
     """两步法：
     1) 文本 LLM 生成 N 条 {title, text, query} 元数据（无图片 URL）
     2) 对每条 query，按优先级取真实素材：
          (a) Agent-Reach `xhs search`：已登录时直接拿小红书笔记（带封面 + 真实文案）
          (b) Agent-Reach `mcporter call exa.web_search_exa`：用 Exa 摘要增强 LLM 文案
-         (c) ddgs(bing 后端) 兜底搜图
+         (c) ddgs(bing 后端) 兜底搜图（可指定多平台 site: 过滤）
+    content_type: "教程步骤图" / "成品展示" / "素材参考"
+    sources: 多平台来源列表，如 ["小红书", "Twitter/X", "Reddit", "微博", "通用图片"]
+             默认 ["小红书", "通用图片"]
     """
+    if sources is None:
+        sources = ["小红书", "通用图片"]
     cfg = _load_text_llm()
     if not (cfg.get("api_key") and cfg.get("base_url")):
         raise RuntimeError("文本 LLM 未配置，请到 ⚙️ 设置中填写 post_content preset")
 
     text_model = cfg.get("model") or ""
-    prompt = _SEARCH_PROMPT.format(topic=topic, n_refs=n_refs)
+    # 根据 content_type 选择对应 prompt 模板
+    if content_type == "教程步骤图":
+        _prompt_tpl = _SEARCH_PROMPT_TUTORIAL
+    elif content_type == "素材参考":
+        _prompt_tpl = _SEARCH_PROMPT_REF
+    else:
+        _prompt_tpl = _SEARCH_PROMPT
+    prompt = _prompt_tpl.format(topic=topic, n_refs=n_refs)
 
     logger.info(f"[deepsearch] topic={topic!r} text_model={text_model} n={n_refs}")
     data = await _post_chat(
@@ -583,44 +732,115 @@ async def deepsearch(topic: str, n_refs: int = 4, save_dir: Path | None = None) 
     if isinstance(parsed, dict):
         parsed = [parsed]
 
-    refs: list[ReferenceItem] = []
-    for item in parsed[:n_refs]:
+    # 一次性检测 xhs 登录状态，避免对每条 query 都等 30s 超时
+    _xhs_logged_in: bool = False
+    if "小红书" in sources and _have_cli("xhs"):
+        rc_s, out_s = _run_cli(["xhs", "status", "--json"], timeout=8.0)
+        try:
+            _xhs_logged_in = json.loads(out_s).get("ok", False) if out_s.strip() else False
+        except Exception:
+            _xhs_logged_in = False
+    logger.info(f"[deepsearch] sources={sources} xhs_logged_in={_xhs_logged_in}")
+
+    # 非小红书的多平台来源（走 ddgs site: 过滤）
+    other_sources = [s for s in sources if s != "小红书"]
+    # 仅当用户没勾任何来源（不太可能，UI 有默认值）才兜底用通用图片
+    if not other_sources and not _xhs_logged_in:
+        other_sources = ["通用图片"]
+
+    async def _fetch_one(item: dict) -> ReferenceItem:
+        """并行执行单条 ref 的外部搜索：小红书 + 其它平台合并取图。"""
         if not isinstance(item, dict):
-            continue
+            return ReferenceItem(title="", text="", source_url="", image_urls=[])
         title = str(item.get("title", "")).strip()
         text_body = str(item.get("text", "")).strip()
-        query = str(item.get("query") or title or topic).strip()
+        # 兼容旧字段 query / 新字段 query_zh + query_en
+        query_zh = str(item.get("query_zh") or "").strip()
+        query_en = str(item.get("query_en") or "").strip()
+        legacy_q = str(item.get("query") or "").strip()
+        if not query_zh and not query_en:
+            # 旧版只有 query：当作通用 query 同时给中英
+            query_zh = legacy_q or title or topic
+            query_en = legacy_q or title or topic
+        elif not query_zh:
+            query_zh = title or topic
+        elif not query_en:
+            query_en = legacy_q or title or topic
+        # xhs CLI 专用 query：中文为主
+        xhs_query = query_zh or title or topic
 
-        # 优先级 1: xhs（已登录时直接拿带图笔记）
-        xhs_hits = await asyncio.to_thread(_search_via_xhs, query, 4)
         source_url = ""
         urls: list[str] = []
-        if xhs_hits:
+
+        # —— 并行启动：xhs（仅当登录且勾选小红书）+ 多平台 ddgs + exa
+        xhs_quota = 2 if (_xhs_logged_in and other_sources) else 4  # 有其它平台时只给 xhs 2 张
+        per_source = max(1, max(0, 4 - xhs_quota) // max(1, len(other_sources))) if other_sources else 0
+        # 至少给每个其它平台 1 张
+        per_source = max(per_source, 1) if other_sources else 0
+
+        tasks: dict[str, asyncio.Task] = {}
+        if _xhs_logged_in:
+            tasks["xhs"] = asyncio.create_task(asyncio.to_thread(_search_via_xhs, xhs_query, xhs_quota))
+        if other_sources:
+            tasks["ddgs"] = asyncio.create_task(asyncio.to_thread(
+                _search_images_multi_sources, query_zh, query_en, other_sources, per_source
+            ))
+        # exa 用英文 query 摘要更稳
+        tasks["exa"] = asyncio.create_task(asyncio.to_thread(_search_via_exa, query_en or query_zh, 2))
+
+        results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+        result_map = dict(zip(tasks.keys(), results))
+
+        # —— 处理 xhs 结果（贡献 title/text/source_url + 图）
+        xhs_imgs: list[str] = []
+        xhs_hits = result_map.get("xhs")
+        if isinstance(xhs_hits, list) and xhs_hits:
             head = xhs_hits[0]
             if head.get("title"):
                 title = head["title"]
             if head.get("text"):
                 text_body = head["text"]
             source_url = head.get("source_url", "")
-            for h in xhs_hits[:4]:
-                urls.extend(h.get("image_urls") or [])
-            # 去重 + 截断
-            seen: set[str] = set()
-            urls = [u for u in urls if not (u in seen or seen.add(u))][:4]
-        # 优先级 2: ddgs 兜底搜图（xhs 不可用 or 没取到图）
-        if not urls:
-            urls = await asyncio.to_thread(_search_images_real, query, 4)
-            # 仅当走 ddgs 时再用 Exa 增强文案（xhs 已经是真实文案，不必再叠）
-            exa_extra = await asyncio.to_thread(_search_via_exa, query, 2)
-            if exa_extra:
-                text_body = (text_body + "\n\n" + exa_extra).strip()
+            for h in xhs_hits:
+                xhs_imgs.extend(h.get("image_urls") or [])
 
-        refs.append(ReferenceItem(
+        # —— 多平台 ddgs 结果
+        ddgs_urls = result_map.get("ddgs")
+        ddgs_imgs: list[str] = ddgs_urls if isinstance(ddgs_urls, list) else []
+
+        # —— 交错合并：xhs[0], ddgs[0], xhs[1], ddgs[1], ... 保证多平台都能排进前 4
+        from itertools import zip_longest
+        interleaved: list[str] = []
+        for a, b in zip_longest(xhs_imgs, ddgs_imgs):
+            if a:
+                interleaved.append(a)
+            if b:
+                interleaved.append(b)
+
+        # —— 去重 + 截断到 4 张
+        seen: set[str] = set()
+        urls = [u for u in interleaved if u and not (u in seen or seen.add(u))][:4]
+
+        logger.info(
+            f"[deepsearch._fetch_one] zh={query_zh!r} en={query_en!r} "
+            f"xhs={len(xhs_imgs)} ddgs={len(ddgs_imgs)} merged={len(urls)} (interleaved)"
+        )
+
+        # —— exa 文案增强
+        exa_extra = result_map.get("exa")
+        if isinstance(exa_extra, str) and exa_extra:
+            text_body = (text_body + "\n\n" + exa_extra).strip()
+
+        return ReferenceItem(
             title=title,
             text=text_body,
             source_url=source_url,
             image_urls=urls,
-        ))
+        )
+
+    # 所有 ref 并行发起
+    valid_items = [it for it in parsed[:n_refs] if isinstance(it, dict)]
+    refs: list[ReferenceItem] = list(await asyncio.gather(*(_fetch_one(it) for it in valid_items)))
 
     # 下载图片
     if save_dir:
@@ -654,26 +874,29 @@ _REVERSE_PROMPT = """你是「AI 绘画 prompt 反推专家」。
 只输出英文 prompt 本身，不要其他解释。
 """
 
-_REVERSE_PROMPT_STRUCT = """你是「AI 绘画 prompt 反推专家」。请仔细观察图片并把视觉特征拆解为 6 个维度的**英文**关键词。
-
-严格用以下 JSON 格式返回（每个字段都是英文关键词字符串，不要中文，不要其他解释）：
+_REVERSE_PROMPT_STRUCT = """你是「AI 绘画 prompt 反推专家」。请仔细观察图片并把视觉特征拆解为以下维度的关键词。
+严格用以下 JSON 格式返回（不要其他解释）：
 
 ```json
 {
-  "subject": "main subject and core elements, ~10-20 words",
-  "style": "art style / medium, e.g. cinematic photo, flat illustration, anime, oil painting",
-  "lighting": "lighting setup, e.g. soft natural daylight, golden hour rim light, studio softbox",
-  "palette": "dominant color palette, e.g. warm pastel beige and cream, cool teal-orange contrast",
-  "composition": "composition / camera angle, e.g. centered eye-level close-up, low-angle wide shot, rule of thirds",
-  "mood": "mood and atmosphere, e.g. serene minimalist, energetic vibrant, mysterious moody"
+  "subject": "main subject and core elements, ~10-20 words (英文)",
+  "style": "art style / medium, e.g. cinematic photo, flat illustration, anime, oil painting (英文)",
+  "lighting": "lighting setup, e.g. soft natural daylight, golden hour rim light, studio softbox (英文)",
+  "palette": "dominant color palette, e.g. warm pastel beige and cream, cool teal-orange contrast (英文)",
+  "composition": "composition / camera angle, e.g. centered eye-level close-up, rule of thirds (英文)",
+  "mood": "mood and atmosphere, e.g. serene minimalist, energetic vibrant (英文)",
+  "text_overlay": "画面上出现的所有可读文字原文（中文/英文都原样输出）。例：\"头发上色 / 短发教程 / @procreate插画教程 / 自然棕色\"。没有文字填 \"none\"",
+  "annotations": "画面中的教学标注元素，如：箭头/数字编号/色卡圈/步骤拆解/辅助线/圈出的区域。用英文描述。没有填 \"none\"",
+  "layout": "画面布局：single subject / step-by-step grid / split panels / portrait with color swatches 等，英文一句话"
 }
 ```
 
 要求：
-- 全部使用英文
-- 每个字段不超过 25 词，使用逗号分隔关键词风格
-- 不要包含具体可识别的人名、品牌名
-- 6 个字段都必须填写
+- 前 6 个字段全部英文关键词，逗号分隔，每字段≤ 25 词
+- text_overlay 保留原始语言（中英文都不要翻译），并用斜杠 / 分隔各条文本
+- annotations 、layout 用英文
+- 不包含具体人名、品牌名
+- 9 个字段都必须填写，没有信息填 "none"
 """
 
 
@@ -683,13 +906,32 @@ def _compose_prompt(parts: dict) -> str:
     segs = []
     for k in order:
         v = str(parts.get(k, "") or "").strip().rstrip(".,;")
-        if v:
+        if v and v.lower() != "none":
             segs.append(v)
-    return ", ".join(segs)
+    base = ", ".join(segs)
+    # 教学元素：布局 + 标注 + 画面文字
+    extras: list[str] = []
+    layout = str(parts.get("layout", "") or "").strip().rstrip(".,;")
+    if layout and layout.lower() != "none":
+        extras.append(f"layout: {layout}")
+    annotations = str(parts.get("annotations", "") or "").strip().rstrip(".,;")
+    if annotations and annotations.lower() != "none":
+        extras.append(f"tutorial annotations: {annotations}")
+    text_overlay = str(parts.get("text_overlay", "") or "").strip().rstrip(".,;")
+    if text_overlay and text_overlay.lower() != "none":
+        # 明确告诉生图模型在画面上渲染这些文字
+        extras.append(
+            f'with on-image text overlay reading exactly: "{text_overlay}", '
+            f"crisp readable typography, preserve Chinese characters if present"
+        )
+    if extras:
+        base = base + ", " + ", ".join(extras)
+    return base
 
 
 async def reverse_prompt_structured(image_path: str) -> dict:
-    """反推结构化 prompt，返回 {subject, style, lighting, palette, composition, mood, full}。"""
+    """反推结构化 prompt，返回 {subject, style, lighting, palette, composition, mood,
+    text_overlay, annotations, layout, full}。"""
     cfg = _load_vision_llm()
     if not (cfg.get("api_key") and cfg.get("base_url") and cfg.get("model")):
         raise RuntimeError("视觉 LLM 未配置，请在 config.yaml 里填 post_vision 或 post_image preset")
@@ -745,7 +987,8 @@ async def reverse_prompt_structured(image_path: str) -> dict:
 
     parts = {
         k: str(parsed.get(k, "") or "").strip()
-        for k in ("subject", "style", "lighting", "palette", "composition", "mood")
+        for k in ("subject", "style", "lighting", "palette", "composition", "mood",
+                   "text_overlay", "annotations", "layout")
     }
     parts["full"] = _compose_prompt(parts)
     return parts
@@ -960,6 +1203,8 @@ async def smart_scrape(
     style_hint: str = "",
     size: str = "3x4",
     output_dir: Optional[str] = None,
+    content_type: str = "成品展示",
+    sources: list[str] | None = None,
 ) -> SmartScrapeResult:
     """端到端流程：搜索 → 反推 → 重画 → 写文案。"""
     if not output_dir:
@@ -975,7 +1220,7 @@ async def smart_scrape(
 
     try:
         # Step 1: 搜索
-        refs = await deepsearch(topic, n_refs=n_refs, save_dir=out_path)
+        refs = await deepsearch(topic, n_refs=n_refs, save_dir=out_path, content_type=content_type, sources=sources)
         if not refs:
             result.error = "搜索未返回结果，请尝试更换主题或检查 API 配置"
             return result
@@ -989,6 +1234,19 @@ async def smart_scrape(
 
         sample = all_local_imgs[:n_regen]
         semaphore = asyncio.Semaphore(3)  # 限制并发
+
+        # 教程模式：强制让生图模型保留教学元素
+        effective_style_hint = style_hint
+        if content_type == "教程步骤图":
+            tutorial_hint = (
+                "instructional tutorial illustration, include step numbers, "
+                "color palette swatches, directional arrows and labels, "
+                "preserve original Chinese text annotations verbatim, "
+                "crisp readable typography, infographic layout"
+            )
+            effective_style_hint = (
+                f"{style_hint}, {tutorial_hint}" if style_hint else tutorial_hint
+            )
 
         async def _process_one(idx: int, ref_img: str) -> GeneratedFrame:
             async with semaphore:
@@ -1006,7 +1264,7 @@ async def smart_scrape(
                         frame.image_prompt,
                         save_path=gen_path,
                         size=size,
-                        style_hint=style_hint,
+                        style_hint=effective_style_hint,
                     )
                 except Exception as e:
                     frame.error = str(e)

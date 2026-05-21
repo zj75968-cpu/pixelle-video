@@ -99,7 +99,7 @@ def _render_channel_status_bar() -> None:
             st.error("🔍 ddgs 未安装")
     # 刷新
     with cols[3]:
-        if st.button("🔄 刷新", key="ar_refresh", use_container_width=True):
+        if st.button("🔄 刷新", key="ar_refresh", width="stretch"):
             st.session_state["_ar_status_dirty"] = True
             st.rerun()
 
@@ -121,7 +121,7 @@ def _render_channel_status_bar() -> None:
                 st.link_button(
                     "🌐 打开小红书登录",
                     "https://www.xiaohongshu.com",
-                    use_container_width=True,
+                    width="stretch",
                 )
             with c2:
                 source = st.selectbox(
@@ -131,7 +131,7 @@ def _render_channel_status_bar() -> None:
                     label_visibility="collapsed",
                 )
             with c3:
-                if st.button("🔑 自动从浏览器提取 Cookie", key="xhs_do_login", use_container_width=True):
+                if st.button("🔑 自动从浏览器提取 Cookie", key="xhs_do_login", width="stretch"):
                     with st.spinner("从浏览器读取 xiaohongshu.com 的 Cookie..."):
                         res = run_xhs_login(source)
                     if res["ok"]:
@@ -207,7 +207,7 @@ if "ss_topic" not in st.session_state:
                 key="ss_topic_template",
             )
         with row1[1]:
-            if st.button("套用模板", use_container_width=True, key="ss_apply_template"):
+            if st.button("套用模板", width="stretch", key="ss_apply_template"):
                 st.session_state["ss_topic"] = topic_presets[preset_name]["theme"] if preset_name != "自定义" else st.session_state.get("ss_topic", "")
                 st.rerun()
 
@@ -270,6 +270,20 @@ with col5:
         key="ss_style",
     )
 
+# ── 多平台搜索来源 ────────────────────────────────────────────────────────
+_SOURCE_OPTIONS = [
+    "小红书", "Twitter/X", "Reddit", "微博", "B站", "Pixiv",
+    "Pinterest", "Behance", "ArtStation", "DeviantArt", "站酷",
+    "百度贴吧", "知乎", "微信公众号", "花瓣", "B站文章", "通用图片",
+]
+ss_sources = st.multiselect(
+    "🌐 搜索来源（多平台并行抓取；中文平台用中文 query，外文平台用英文 query）",
+    options=_SOURCE_OPTIONS,
+    default=st.session_state.get("ss_sources_last", ["小红书", "Pinterest", "通用图片"]),
+    key="ss_sources",
+)
+st.session_state["ss_sources_last"] = ss_sources
+
 st.caption(
     f"当前模板组合：{st.session_state.get('ss_topic_template','—')} · "
     f"{st.session_state.get('ss_art_type','—')} · "
@@ -280,7 +294,7 @@ st.caption(
 run_btn = st.button(
     "🚀 一键生成（搜索 → 反推 → 重画 → 写文案）",
     type="primary",
-    use_container_width=True,
+    width="stretch",
     disabled=not topic.strip(),
 )
 
@@ -300,6 +314,7 @@ if run_btn and topic.strip():
                     n_regen=int(n_regen),
                     style_hint=style_hint.strip(),
                     size=img_size,
+                    sources=st.session_state.get("ss_sources") or ["小红书", "通用图片"],
                 )
             )
         except Exception as e:
@@ -365,7 +380,7 @@ stat_col1.metric("✅ 可用", ok_count)
 stat_col2.metric("⚠️ 失败", err_count)
 stat_col3.metric("🗑 已排除", excl_count)
 with stat_col4:
-    if st.button("🔍 全部重新反推 prompt", use_container_width=True,
+    if st.button("🔍 全部重新反推 prompt", width="stretch",
                  help="并发批量反推 prompt（默认 3 并发），用于参考图微调后重新理解"):
         targets = [
             (idx, f["ref_image"]) for idx, f in enumerate(frames_state)
@@ -393,7 +408,7 @@ with stat_col4:
                      icon="✅" if ok_n == len(targets) else "⚠️")
             st.rerun()
 with stat_col5:
-    if st.button("♻️ 全部用当前 prompt 重画", use_container_width=True,
+    if st.button("♻️ 全部用当前 prompt 重画", width="stretch",
                  help="并发批量重新生成（默认 3 并发），可用于风格微调后整体刷新"):
         # 构建待重画任务（跳过已排除的）
         ts_batch = int(time.time())
@@ -458,13 +473,13 @@ for idx, f in enumerate(frames_state):
         with img_col1:
             st.caption("📷 原参考图")
             if Path(f["ref_image"]).exists():
-                st.image(f["ref_image"], use_container_width=True)
+                st.image(f["ref_image"], width="stretch")
             else:
                 st.info("参考图已丢失")
         with img_col2:
             st.caption("🎨 AI 重画")
             if is_ok:
-                st.image(f["generated_image"], use_container_width=True)
+                st.image(f["generated_image"], width="stretch")
             else:
                 st.warning(f"未生成 / 失败：{f['error'] or '未知'}")
 
@@ -509,7 +524,7 @@ for idx, f in enumerate(frames_state):
                             height=70, key=f"ss_part_{idx}_{k}",
                         )
                 if st.button("🧬 合成并保存到 Prompt", key=f"ss_compose_{idx}",
-                             use_container_width=True):
+                             width="stretch"):
                     f["prompt_parts"] = edited
                     composed = ", ".join(
                         edited[k].strip().rstrip(".,;")
@@ -531,7 +546,7 @@ for idx, f in enumerate(frames_state):
         # 操作按钮
         btn1, btn2, btn3, btn4 = st.columns([1, 1, 1, 1])
         with btn1:
-            if st.button("🔁 用此 prompt 重画", key=f"ss_regen_{idx}", use_container_width=True):
+            if st.button("🔁 用此 prompt 重画", key=f"ss_regen_{idx}", width="stretch"):
                 f["image_prompt"] = new_prompt
                 try:
                     gen_path = Path(result.output_dir) / "generated" / f"img_{idx + 1:02d}_v{int(time.time())}.png"
@@ -550,7 +565,7 @@ for idx, f in enumerate(frames_state):
                     st.toast(f"❌ 重画失败：{e}", icon="⚠️")
                 st.rerun()
         with btn2:
-            if st.button("🔍 重新反推 prompt", key=f"ss_reverse_{idx}", use_container_width=True,
+            if st.button("🔍 重新反推 prompt", key=f"ss_reverse_{idx}", width="stretch",
                          disabled=not Path(f["ref_image"]).exists()):
                 try:
                     new_parts = run_async(svc_reverse_structured(f["ref_image"]))
@@ -562,7 +577,7 @@ for idx, f in enumerate(frames_state):
                 st.rerun()
         with btn3:
             label = "↩️ 取消排除" if is_excluded else "🗑 排除发布"
-            if st.button(label, key=f"ss_excl_{idx}", use_container_width=True):
+            if st.button(label, key=f"ss_excl_{idx}", width="stretch"):
                 f["excluded"] = not is_excluded
                 st.rerun()
         with btn4:
@@ -595,7 +610,7 @@ edit_tags = st.text_input(
 
 regen_col1, regen_col2 = st.columns([1, 1])
 with regen_col1:
-    if st.button("✍️ 重新生成文案", use_container_width=True):
+    if st.button("✍️ 重新生成文案", width="stretch"):
         try:
             copy = run_async(svc_generate_copy(result.topic, result.references))
             st.session_state["ss_edit_title"] = copy["title"]
@@ -605,7 +620,7 @@ with regen_col1:
         except Exception as e:
             st.error(f"文案重生成失败：{e}")
 with regen_col2:
-    if st.button("🧹 清空结果重新开始", use_container_width=True):
+    if st.button("🧹 清空结果重新开始", width="stretch"):
         for k in [
             "ss_result", "ss_edit_title", "ss_edit_body", "ss_edit_tags",
             "ss_frames_state", "ss_frames_topic",
@@ -675,7 +690,7 @@ else:
             key="ss_sched_mode",
         )
 
-        if st.button("📤 加入发布队列", type="primary", use_container_width=True):
+        if st.button("📤 加入发布队列", type="primary", width="stretch"):
             if not edit_title.strip():
                 st.error("标题不能为空")
             elif not sel:
@@ -733,5 +748,5 @@ with st.expander("📚 查看 AI 搜到的原始参考素材（仅供对比）",
             for c, img in zip(cols, ref.local_images):
                 if Path(img).exists():
                     with c:
-                        st.image(img, use_container_width=True)
+                        st.image(img, width="stretch")
         st.markdown("---")

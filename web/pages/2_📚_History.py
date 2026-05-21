@@ -1,4 +1,4 @@
-﻿# Copyright (C) 2025 AIDC-AI
+# Copyright (C) 2025 AIDC-AI
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,7 +36,7 @@ from web.utils.async_helpers import run_async
 # Page config
 st.set_page_config(
     page_title="History - AI Video Generator",
-    page_icon="📚",
+    page_icon="?",
     layout="wide",
 )
 
@@ -87,7 +87,7 @@ def render_sidebar_controls(pixelle_video):
     """Render sidebar with statistics and filters"""
     with st.sidebar:
         # Statistics
-        st.markdown(f"**📊 {tr('history.total_tasks')}**")
+        st.markdown(f"**? {tr('history.total_tasks')}**")
         stats = run_async(pixelle_video.history.get_statistics())
         
         col1, col2 = st.columns(2)
@@ -99,7 +99,7 @@ def render_sidebar_controls(pixelle_video):
         st.divider()
         
         # Filters
-        st.markdown(f"**🔍 {tr('history.filter_status')}**")
+        st.markdown(f"**? {tr('history.filter_status')}**")
         status_options = {
             "all": tr("history.status_all"),
             "completed": tr("history.status_completed"),
@@ -119,7 +119,7 @@ def render_sidebar_controls(pixelle_video):
         filter_status = None if selected_status == "all" else selected_status
         
         # Sort
-        st.markdown(f"**📊 {tr('history.sort_by')}**")
+        st.markdown(f"**? {tr('history.sort_by')}**")
         
         sort_options = {
             "created_at": tr("history.sort_created_at"),
@@ -173,22 +173,22 @@ def render_grid_task_card(task: dict, pixelle_video):
     
     # Status badge
     status_map = {
-        "completed": "✅",
-        "failed": "❌",
-        "running": "🔄",
-        "pending": "⏸️",
+        "completed": "?",
+        "failed": "?",
+        "running": "?",
+        "pending": "??",
     }
-    status_icon = status_map.get(status, "❓")
+    status_icon = status_map.get(status, "?")
     
     # input_text not loaded in grid view (avoids N+1 queries per card)
     input_text = ""
     
     # Card container
     with st.container():
-        # 批量选择复选框
+        # ����ѡ��ѡ��
         if st.session_state.get("multiselect_mode", False):
             is_selected = st.checkbox(
-                "选择此项",
+                "ѡ�����",
                 value=task_id in st.session_state.get("selected_tasks", set()),
                 key=f"select_{task_id}",
                 label_visibility="collapsed",
@@ -198,11 +198,11 @@ def render_grid_task_card(task: dict, pixelle_video):
             else:
                 st.session_state.setdefault("selected_tasks", set()).discard(task_id)
 
-        # Video preview at top — removed from grid to avoid Streamlit hashing all video files on render.
-        # Use the 👁️ detail button to watch videos.
+        # Video preview at top �� removed from grid to avoid Streamlit hashing all video files on render.
+        # Use the ?? detail button to watch videos.
         st.markdown(
             f"<div style='background:#1a1a1a;height:120px;display:flex;align-items:center;"
-            f"justify-content:center;border-radius:6px;font-size:36px;'>📹</div>",
+            f"justify-content:center;border-radius:6px;font-size:36px;'>?</div>",
             unsafe_allow_html=True
         )
 
@@ -214,13 +214,13 @@ def render_grid_task_card(task: dict, pixelle_video):
             st.caption(truncate_text(input_text, 60))
         
         # Meta info (one line)
-        st.caption(f"🕒 {format_datetime(created_at)} | ⏱️ {format_duration(duration)} | 🎬 {n_frames}")
+        st.caption(f"? {format_datetime(created_at)} | ?? {format_duration(duration)} | ? {n_frames}")
         
         # Action buttons (compact, 3 columns)
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            if st.button("👁️", key=f"view_{task_id}", help=tr("history.task_card.view_detail"), width="stretch"):
+            if st.button("??", key=f"view_{task_id}", help=tr("history.task_card.view_detail"), width="stretch"):
                 st.session_state[f"detail_{task_id}"] = True
                 st.rerun()
         
@@ -230,7 +230,7 @@ def render_grid_task_card(task: dict, pixelle_video):
                 if st.session_state.get(f"dl_ready_{task_id}"):
                     with open(video_path, "rb") as _f:
                         st.download_button(
-                            "⬇️ 下载",
+                            "?? ����",
                             data=_f,
                             file_name=f"{title}.mp4",
                             mime="video/mp4",
@@ -239,23 +239,23 @@ def render_grid_task_card(task: dict, pixelle_video):
                             width="stretch"
                         )
                 else:
-                    if st.button("⬇️ 下载", key=f"prep_dl_{task_id}", width="stretch"):
+                    if st.button("?? ����", key=f"prep_dl_{task_id}", width="stretch"):
                         st.session_state[f"dl_ready_{task_id}"] = True
                         st.rerun()
             else:
-                st.button("⬇️ 下载", key=f"download_disabled_{task_id}", disabled=True, width="stretch")
+                st.button("?? ����", key=f"download_disabled_{task_id}", disabled=True, width="stretch")
         
         with col3:
-            if st.button("🗑️", key=f"delete_{task_id}", help=tr("history.task_card.delete"), width="stretch"):
+            if st.button("??", key=f"delete_{task_id}", help=tr("history.task_card.delete"), width="stretch"):
                 st.session_state[f"confirm_delete_{task_id}"] = True
                 st.rerun()
 
         # Delete confirmation (show in modal-like way)
         if st.session_state.get(f"confirm_delete_{task_id}", False):
-            st.warning("⚠️ 确认删除？")
+            st.warning("?? ȷ��ɾ����")
             col1, col2 = st.columns(2)
             with col1:
-                if st.button("✅", key=f"confirm_yes_{task_id}", width="stretch"):
+                if st.button("?", key=f"confirm_yes_{task_id}", width="stretch"):
                     try:
                         success = run_async(pixelle_video.history.delete_task(task_id))
                         if success:
@@ -263,11 +263,11 @@ def render_grid_task_card(task: dict, pixelle_video):
                             st.session_state[f"confirm_delete_{task_id}"] = False
                             st.rerun()
                         else:
-                            st.error("删除失败")
+                            st.error("ɾ��ʧ��")
                     except Exception as e:
-                        st.error(f"删除失败: {str(e)}")
+                        st.error(f"ɾ��ʧ��: {str(e)}")
             with col2:
-                if st.button("❌", key=f"confirm_no_{task_id}", width="stretch"):
+                if st.button("?", key=f"confirm_no_{task_id}", width="stretch"):
                     st.session_state[f"confirm_delete_{task_id}"] = False
                     st.rerun()
 
@@ -284,7 +284,7 @@ def render_task_detail_modal(task_id: str, pixelle_video):
     storyboard = detail["storyboard"]
     
     # Close button at the top
-    if st.button("�?" + tr("history.detail.close"), key=f"close_detail_top_{task_id}"):
+    if st.button("??" + tr("history.detail.close"), key=f"close_detail_top_{task_id}"):
         st.session_state[f"detail_{task_id}"] = False
         st.rerun()
     
@@ -296,7 +296,7 @@ def render_task_detail_modal(task_id: str, pixelle_video):
     
     # Left column: Input and config
     with col_input:
-        st.markdown(f"**📝 {tr('history.detail.input_params')}**")
+        st.markdown(f"**? {tr('history.detail.input_params')}**")
         
         input_params = metadata.get("input", {})
         
@@ -318,7 +318,7 @@ def render_task_detail_modal(task_id: str, pixelle_video):
     
     # Middle column: Storyboard frames
     with col_storyboard:
-        st.markdown(f"**🎬 {tr('history.detail.storyboard')}**")
+        st.markdown(f"**? {tr('history.detail.storyboard')}**")
         
         if storyboard and storyboard.frames:
             for frame in storyboard.frames:
@@ -349,7 +349,7 @@ def render_task_detail_modal(task_id: str, pixelle_video):
     
     # Right column: Final video
     with col_video:
-        st.markdown(f"**🎥 {tr('info.video_information')}**")
+        st.markdown(f"**? {tr('info.video_information')}**")
         
         video_path = metadata.get("result", {}).get("video_path")
         if video_path and os.path.exists(video_path):
@@ -380,7 +380,7 @@ def render_task_detail_modal(task_id: str, pixelle_video):
     st.divider()
     
     # Close button at the bottom
-    if st.button("�?" + tr("history.detail.close"), key=f"close_detail_bottom_{task_id}"):
+    if st.button("??" + tr("history.detail.close"), key=f"close_detail_bottom_{task_id}"):
         st.session_state[f"detail_{task_id}"] = False
         st.rerun()
 
@@ -425,7 +425,7 @@ def main():
         return
     
     # Otherwise, show the grid list
-    # Get task list — cached for 10s to avoid re-reading disk on every widget interaction
+    # Get task list �� cached for 10s to avoid re-reading disk on every widget interaction
     @st.cache_data(ttl=10, show_spinner=False)
     def _cached_task_list(page, page_size, status, sort_by, sort_order):
         return run_async(pixelle_video.history.get_task_list(
@@ -449,13 +449,13 @@ def main():
     total_pages = result["total_pages"]
     
     # Page title with count
-    st.markdown(f"##### 📚 {tr('history.page_title')} ({total})")
+    st.markdown(f"##### ? {tr('history.page_title')} ({total})")
 
-    # ── 批量操作工具栏 ──────────────────────────────────────────
+    # ���� �������������� ������������������������������������������������������������������������������������
     tb1, tb2, tb3, _ = st.columns([1.2, 1, 1.3, 4])
     with tb1:
-        label = "✕ 退出批量" if st.session_state.multiselect_mode else "☑️ 批量选择"
-        if st.button(label, use_container_width=True):
+        label = "? �˳�����" if st.session_state.multiselect_mode else "?? ����ѡ��"
+        if st.button(label, width="stretch"):
             st.session_state.multiselect_mode = not st.session_state.multiselect_mode
             if not st.session_state.multiselect_mode:
                 st.session_state.selected_tasks = set()
@@ -463,28 +463,28 @@ def main():
             st.rerun()
     if st.session_state.multiselect_mode:
         with tb2:
-            if st.button("全选本页", use_container_width=True):
+            if st.button("ȫѡ��ҳ", width="stretch"):
                 for t in tasks:
                     st.session_state.selected_tasks.add(t["task_id"])
                 st.rerun()
         with tb3:
             n_sel = len(st.session_state.selected_tasks)
             if st.button(
-                f"🗑️ 删除 ({n_sel})" if n_sel else "🗑️ 删除",
+                f"?? ɾ�� ({n_sel})" if n_sel else "?? ɾ��",
                 disabled=n_sel == 0,
                 type="primary" if n_sel else "secondary",
-                use_container_width=True,
+                width="stretch",
             ):
                 st.session_state.confirm_bulk_delete = True
                 st.rerun()
 
-    # 批量删除确认
+    # ����ɾ��ȷ��
     if st.session_state.get("confirm_bulk_delete", False):
         n_sel = len(st.session_state.selected_tasks)
-        st.warning(f"⚠️ 确认删除选中的 **{n_sel}** 条历史记录？此操作不可恢复。")
+        st.warning(f"?? ȷ��ɾ��ѡ�е� **{n_sel}** ����ʷ��¼���˲������ɻָ���")
         bc1, bc2 = st.columns(2)
         with bc1:
-            if st.button("✅ 确认删除", type="primary", use_container_width=True, key="bulk_confirm_yes"):
+            if st.button("? ȷ��ɾ��", type="primary", width="stretch", key="bulk_confirm_yes"):
                 deleted = 0
                 for tid in list(st.session_state.selected_tasks):
                     try:
@@ -495,14 +495,14 @@ def main():
                 st.session_state.selected_tasks = set()
                 st.session_state.confirm_bulk_delete = False
                 st.session_state.multiselect_mode = False
-                st.success(f"✅ 成功删除 {deleted} 条记录")
+                st.success(f"? �ɹ�ɾ�� {deleted} ����¼")
                 st.rerun()
         with bc2:
-            if st.button("❌ 取消", use_container_width=True, key="bulk_confirm_no"):
+            if st.button("? ȡ��", width="stretch", key="bulk_confirm_no"):
                 st.session_state.confirm_bulk_delete = False
                 st.rerun()
 
-    # ────────────────────────────────────────────────────────────────────────
+    # ������������������������������������������������������������������������������������������������������������������������������������������������
     # Show task cards in grid layout (4 columns)
     if not tasks:
         st.info(tr("history.no_tasks"))
@@ -527,7 +527,7 @@ def main():
         col1, col2, col3 = st.columns([1, 2, 1])
         
         with col1:
-            if st.button("⬅️ Previous", disabled=st.session_state.history_page == 1, width="stretch"):
+            if st.button("?? Previous", disabled=st.session_state.history_page == 1, width="stretch"):
                 st.session_state.history_page -= 1
                 st.rerun()
         
@@ -540,7 +540,7 @@ def main():
             )
         
         with col3:
-            if st.button("Next ➡️", disabled=st.session_state.history_page == total_pages, width="stretch"):
+            if st.button("Next ??", disabled=st.session_state.history_page == total_pages, width="stretch"):
                 st.session_state.history_page += 1
                 st.rerun()
 

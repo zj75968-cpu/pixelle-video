@@ -585,12 +585,12 @@ class DigitalHumanPipelineUI(PipelineUI):
                     with _btn_c1:
                         _do_video = st.button(
                             "✅ 确认，生成视频", type="primary",
-                            use_container_width=True, key="dh_swf_confirm_video"
+                            width="stretch", key="dh_swf_confirm_video"
                         )
                     with _btn_c2:
                         _do_retry = st.button(
                             "🔄 重新生成合成图",
-                            use_container_width=True, key="dh_swf_retry_composite"
+                            width="stretch", key="dh_swf_retry_composite"
                         )
                     if _do_retry:
                         for _k in (_SK_COMP, _SK_COMP_PATH, _SK_TASK_DIR):
