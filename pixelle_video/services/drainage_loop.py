@@ -153,18 +153,54 @@ def _parse_json(text: str) -> dict:
     """从模型输出抓 JSON。"""
     if not text:
         return {}
-    m = re.search(r"\{.*?\}", text, re.DOTALL)
-    if not m:
-        return {}
+    # 1. Try direct parsing
     try:
-        return json.loads(m.group(0))
+        return json.loads(text)
     except Exception:
-        # 尝试修复尾随逗号
-        cleaned = re.sub(r",\s*([}\]])", r"\1", m.group(0))
+        pass
+
+    # 2. Try extracting from markdown code block
+    match = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", text)
+    if match:
         try:
-            return json.loads(cleaned)
+            return json.loads(match.group(1))
         except Exception:
-            return {}
+            pass
+
+    # 3. Try finding outermost braces
+    brace_start = text.find('{')
+    brace_end = text.rfind('}')
+    if brace_start != -1 and brace_end > brace_start:
+        json_str = text[brace_start:brace_end + 1]
+        try:
+            return json.loads(json_str)
+        except Exception:
+            # Try cleaning trailing commas
+            cleaned = re.sub(r",\s*([}\]])", r"\1", json_str)
+            try:
+                return json.loads(cleaned)
+            except Exception:
+                pass
+
+    # 4. Try json_repair
+    try:
+        from json_repair import repair_json
+        _block = text
+        _fence = re.search(r'```(?:json)?\s*([\s\S]+?)\s*```', text, re.DOTALL)
+        if _fence:
+            _block = _fence.group(1)
+        else:
+            brace_start = text.find('{')
+            brace_end = text.rfind('}')
+            if brace_start != -1 and brace_end > brace_start:
+                _block = text[brace_start:brace_end + 1]
+        repaired = repair_json(_block, return_objects=True)
+        if isinstance(repaired, dict) and repaired:
+            return repaired
+    except Exception:
+        pass
+
+    return {}
 
 
 async def generate_drainage_pair(

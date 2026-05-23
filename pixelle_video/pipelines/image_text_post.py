@@ -373,15 +373,51 @@ class ImageTextPostPipeline:
         output_path.write_bytes(source.read_bytes())
 
     def _parse_json(self, text: str) -> Dict:
+        # 1. Try direct parsing
         try:
             return json.loads(text)
         except json.JSONDecodeError:
             pass
 
+        # 2. Try extracting from markdown code block
         match = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", text)
         if match:
-            return json.loads(match.group(1))
+            try:
+                return json.loads(match.group(1))
+            except json.JSONDecodeError:
+                pass
 
+        # 3. Try finding any JSON object by matching outermost braces
+        brace_start = text.find('{')
+        brace_end = text.rfind('}')
+        if brace_start != -1 and brace_end > brace_start:
+            try:
+                json_str = text[brace_start:brace_end + 1]
+                return json.loads(json_str)
+            except json.JSONDecodeError:
+                pass
+
+        # 4. Try using json_repair to fix and parse
+        try:
+            from json_repair import repair_json
+            _block = text
+            _fence = re.search(r'```(?:json)?\s*([\s\S]+?)\s*```', text, re.DOTALL)
+            if _fence:
+                _block = _fence.group(1)
+            else:
+                brace_start = text.find('{')
+                brace_end = text.rfind('}')
+                if brace_start != -1 and brace_end > brace_start:
+                    _block = text[brace_start:brace_end + 1]
+
+            repaired = repair_json(_block, return_objects=True)
+            if isinstance(repaired, dict) and repaired:
+                return repaired
+        except Exception as repair_exc:
+            logger.debug(f"[PostPipeline] json_repair failed: {repair_exc}")
+
+        # If all else fails, log raw response and raise error
+        logger.error(f"[PostPipeline] Failed to parse JSON from LLM response. Raw response:\n{text}")
         raise ValueError("No valid JSON found in LLM response")
 
     def _escape_html(self, text: str) -> str:

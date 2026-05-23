@@ -188,35 +188,54 @@ def _extract_text(data: dict) -> str:
 
 
 def _parse_json_block(text: str) -> Optional[dict | list]:
-    """从模型输出里抓取 JSON 块（兼容 ```json 围栏 / 裸 JSON）。"""
+    """从模型输出里抓取 JSON 块（兼容 ```json 围栏 / 裸 JSON，并使用 json_repair 兜底）。"""
     if not text:
         return None
 
-    # 1. 优先尝试 ```json ... ``` 块
-    m = re.search(r"```(?:json)?\s*([\[\{].*?[\]\}])\s*```", text, re.DOTALL)
+    # 1. 优先尝试直接解析
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+
+    # 2. 尝试从 markdown 代码块提取
+    m = re.search(r"```(?:json)?\s*([\s\S]+?)\s*```", text, re.DOTALL)
     if m:
         try:
             return json.loads(m.group(1))
-        except json.JSONDecodeError:
+        except Exception:
             pass
 
-    # 2. 裸 JSON：找第一个 { 或 [ 到对应结束符
-    for opener, closer in (("[", "]"), ("{", "}")):
+    # 3. 尝试匹配最外层括号/大括号
+    for opener, closer in (("{", "}"), ("[", "]")):
         i = text.find(opener)
-        if i < 0:
-            continue
-        # 简单括号配对
-        depth = 0
-        for j in range(i, len(text)):
-            if text[j] == opener:
-                depth += 1
-            elif text[j] == closer:
-                depth -= 1
-                if depth == 0:
-                    try:
-                        return json.loads(text[i:j + 1])
-                    except json.JSONDecodeError:
-                        break
+        j = text.rfind(closer)
+        if i != -1 and j > i:
+            try:
+                return json.loads(text[i:j + 1])
+            except Exception:
+                pass
+
+    # 4. 尝试使用 json_repair 修复和解析
+    try:
+        from json_repair import repair_json
+        _block = text
+        _fence = re.search(r'```(?:json)?\s*([\s\S]+?)\s*```', text, re.DOTALL)
+        if _fence:
+            _block = _fence.group(1)
+        else:
+            for opener, closer in (("{", "}"), ("[", "]")):
+                i = text.find(opener)
+                j = text.rfind(closer)
+                if i != -1 and j > i:
+                    _block = text[i:j + 1]
+                    break
+        repaired = repair_json(_block, return_objects=True)
+        if isinstance(repaired, (dict, list)) and repaired:
+            return repaired
+    except Exception:
+        pass
+
     return None
 
 

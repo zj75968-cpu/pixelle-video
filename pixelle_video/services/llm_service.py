@@ -329,6 +329,24 @@ You MUST respond with ONLY a valid JSON object (no markdown, no extra text)."""
                 return response_type.model_validate(data)
             except json.JSONDecodeError:
                 pass
+
+        # Try using json_repair to parse and repair
+        try:
+            from json_repair import repair_json
+            _block = content
+            _fence = re.search(json_pattern, content, re.DOTALL)
+            if _fence:
+                _block = _fence.group(1)
+            else:
+                brace_start = content.find('{')
+                brace_end = content.rfind('}')
+                if brace_start != -1 and brace_end > brace_start:
+                    _block = content[brace_start:brace_end + 1]
+            repaired = repair_json(_block, return_objects=True)
+            if isinstance(repaired, dict) and repaired:
+                return response_type.model_validate(repaired)
+        except Exception:
+            pass
         
         raise ValueError(f"Failed to parse LLM response as {response_type.__name__}: {content[:200]}...")
     

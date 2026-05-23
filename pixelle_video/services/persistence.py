@@ -64,12 +64,33 @@ class PersistenceService:
         Args:
             output_dir: Base output directory (default: "output")
         """
-        self.output_dir = Path(output_dir)
-        self.output_dir.mkdir(exist_ok=True)
-        
-        # Index file for fast listing
-        self.index_file = self.output_dir / ".index.json"
-        self._ensure_index()
+        self.base_output_dir = Path(output_dir)
+
+    @property
+    def output_dir(self) -> Path:
+        from pixelle_video.utils.user_context import get_current_username
+        username = get_current_username()
+        if username == "default":
+            path = self.base_output_dir
+        else:
+            path = self.base_output_dir / "users" / username
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @property
+    def index_file(self) -> Path:
+        path = self.output_dir / ".index.json"
+        if not path.exists():
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with open(path, "w", encoding="utf-8") as f:
+                    json.dump({"version": "1.0", "tasks": [], "last_updated": datetime.now().isoformat()}, f)
+            except Exception as e:
+                logger.error(f"Failed to create default index at {path}: {e}")
+        return path
+    
+    def _ensure_index(self):
+        pass
     
     def get_task_dir(self, task_id: str) -> Path:
         """Get task directory path"""
@@ -469,10 +490,9 @@ class PersistenceService:
     # Index Management (for fast listing)
     # ========================================================================
     
-    def _ensure_index(self):
+    def _ensure_index_legacy(self):
         """Ensure index file exists, create if not"""
-        if not self.index_file.exists():
-            self._save_index({"version": "1.0", "tasks": []})
+        pass
     
     def _load_index(self) -> Dict[str, Any]:
         """Load index from file"""

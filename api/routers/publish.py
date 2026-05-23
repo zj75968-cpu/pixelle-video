@@ -191,7 +191,12 @@ async def get_pending_job_for_agent(serials: str, request: Request, agent_id: st
         ACTIVE_AGENTS.pop(k, None)
         
     # Search the queue for a RUNNING job matching these serials
-    running_jobs = publish_scheduler.list_jobs(status_filter=JobStatus.RUNNING)
+    token = request.headers.get("X-Token", "")
+    from pixelle_video.utils.user_context import find_username_by_token, set_current_user
+    username = find_username_by_token(token)
+    
+    with set_current_user(username):
+        running_jobs = publish_scheduler.list_jobs(status_filter=JobStatus.RUNNING)
     for job in running_jobs:
         if job.serial in serial_list:
             # We found a job for this agent!
@@ -261,18 +266,20 @@ async def download_client_agent():
 @router.post("/agent/jobs/{job_id}/progress")
 async def update_agent_job_progress(job_id: str, payload: dict):
     """Post progress update from client agent."""
-    job = publish_scheduler.get_job(job_id)
+    job = publish_scheduler._jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
         
-    log_msg = payload.get("log", "")
-    if log_msg:
-        ts = datetime.now().strftime("%H:%M:%S")
-        job.progress_log.append(f"[{ts}] {log_msg}")
-        publish_scheduler._save()
-        logger.info(f"[Agent][{job_id}] {log_msg}")
-        
-    return {"status": "ok"}
+    from pixelle_video.utils.user_context import set_current_user
+    with set_current_user(getattr(job, "username", "default")):
+        log_msg = payload.get("log", "")
+        if log_msg:
+            ts = datetime.now().strftime("%H:%M:%S")
+            job.progress_log.append(f"[{ts}] {log_msg}")
+            publish_scheduler._save()
+            logger.info(f"[Agent][{job_id}] {log_msg}")
+            
+        return {"status": "ok"}
 
 
 @router.post("/agent/jobs/{job_id}/result")
@@ -283,45 +290,47 @@ async def submit_agent_job_result(
     screenshot: UploadFile = File(None)
 ):
     """Submit execution result (success/failure) from client agent, with optional screenshot."""
-    job = publish_scheduler.get_job(job_id)
+    job = publish_scheduler._jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
         
-    logger.info(f"Received agent result for job {job_id}: status={status}, error={error}")
-    
-    # Save uploaded screenshot if present
-    if screenshot:
-        try:
-            dest_dir = Path("runtime/mobile_results") / job.serial / job_id
-            dest_dir.mkdir(parents=True, exist_ok=True)
-            
-            ext = Path(screenshot.filename).suffix.lower() if screenshot.filename else ".png"
-            if ext not in (".png", ".jpg", ".jpeg"):
-                ext = ".png"
-            dest_path = dest_dir / f"screenshot{ext}"
-            
-            with open(dest_path, "wb") as f:
-                shutil.copyfileobj(screenshot.file, f)
-                
-            job.screenshots = [str(dest_path).replace("\\", "/")]
-            logger.info(f"Saved agent screenshot to {dest_path}")
-        except Exception as e:
-            logger.error(f"Failed to save agent screenshot: {e}")
-            
-    # Update job state
-    if status == "success":
-        if job.kind == "delete":
-            job.status = "deleted"
-        elif job.kind == "comment":
-            job.status = "comment_success"
-        else:
-            job.status = JobStatus.SUCCESS
-        job.error = None
-    else:
-        job.status = JobStatus.FAILED
-        job.error = error or "Agent reported execution failure"
+    from pixelle_video.utils.user_context import set_current_user
+    with set_current_user(getattr(job, "username", "default")):
+        logger.info(f"Received agent result for job {job_id}: status={status}, error={error}")
         
-    job.finished_at = datetime.now().isoformat()
-    publish_scheduler._save()
-    
-    return {"status": "ok"}
+        # Save uploaded screenshot if present
+        if screenshot:
+            try:
+                dest_dir = Path("runtime/mobile_results") / job.serial / job_id
+                dest_dir.mkdir(parents=True, exist_ok=True)
+                
+                ext = Path(screenshot.filename).suffix.lower() if screenshot.filename else ".png"
+                if ext not in (".png", ".jpg", ".jpeg"):
+                    ext = ".png"
+                dest_path = dest_dir / f"screenshot{ext}"
+                
+                with open(dest_path, "wb") as f:
+                    shutil.copyfileobj(screenshot.file, f)
+                    
+                job.screenshots = [str(dest_path).replace("\\", "/")]
+                logger.info(f"Saved agent screenshot to {dest_path}")
+            except Exception as e:
+                logger.error(f"Failed to save agent screenshot: {e}")
+                
+        # Update job state
+        if status == "success":
+            if job.kind == "delete":
+                job.status = "deleted"
+            elif job.kind == "comment":
+                job.status = "comment_success"
+            else:
+                job.status = JobStatus.SUCCESS
+            job.error = None
+        else:
+            job.status = JobStatus.FAILED
+            job.error = error or "Agent reported execution failure"
+            
+        job.finished_at = datetime.now().isoformat()
+        publish_scheduler._save()
+        
+        return {"status": "ok"}

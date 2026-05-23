@@ -167,6 +167,15 @@ _ANALYSIS_PROMPT = """\
 """
 
 
+class FailureAnalysisSchema(BaseModel):
+    problem: str = Field(description="一句话描述这个问题（≤30字）")
+    error_pattern: str = Field(description="用于未来匹配此类错误的关键词，逗号分隔（3-6个词）")
+    root_cause: str = Field(description="根本原因（2-3句话，聚焦于为什么出错）")
+    solution: str = Field(description="解决方案（1-2句话，具体可操作）")
+    resolution_steps: List[str] = Field(default_factory=list, description="具体步骤，包括代码路径或 UI 操作")
+    resolved: bool = Field(description="如果能从错误信息推断出确定的解决方法，置为 true，否则 false")
+
+
 async def analyze_and_record_failure(
     job_id: str,
     job_kind: str,
@@ -195,23 +204,21 @@ async def analyze_and_record_failure(
         )
 
         logger.info(f"[知识库] 分析任务 {job_id} 失败原因…")
-        response = await core.llm(prompt, temperature=0.1, max_tokens=600)
+        data = await core.llm(
+            prompt=prompt,
+            response_type=FailureAnalysisSchema,
+            temperature=0.1,
+            max_tokens=600,
+        )
 
-        # Extract JSON from response (sometimes wrapped in markdown fences)
-        m = re.search(r"\{.*\}", response, re.DOTALL)
-        if not m:
-            logger.warning(f"[知识库] LLM 返回非 JSON: {response[:200]}")
-            return None
-
-        data: Dict[str, Any] = json.loads(m.group())
         entry = KnowledgeEntry(
             job_kind=job_kind or "",
-            problem=data.get("problem", error[:60]),
-            error_pattern=data.get("error_pattern", ""),
-            root_cause=data.get("root_cause", ""),
-            solution=data.get("solution", ""),
-            resolution_steps=data.get("resolution_steps", []),
-            resolved=bool(data.get("resolved", False)),
+            problem=data.problem or error[:60],
+            error_pattern=data.error_pattern or "",
+            root_cause=data.root_cause or "",
+            solution=data.solution or "",
+            resolution_steps=data.resolution_steps or [],
+            resolved=bool(data.resolved),
         )
         saved = publish_knowledge.add_or_update(entry)
         logger.info(f"[知识库] 已记录条目 {saved.id}: {saved.problem}")

@@ -94,9 +94,35 @@ class DeviceManager:
     Manages device registry, connection status, and basic ADB operations.
     """
 
+    @property
+    def devices_file(self) -> Path:
+        from pixelle_video.utils.user_context import get_current_username
+        username = get_current_username()
+        if username == "default":
+            return DATA_DIR / "devices.json"
+        path = DATA_DIR / "users" / username / "devices.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+
+    @property
+    def _devices(self) -> Dict[str, DeviceInfo]:
+        from pixelle_video.utils.user_context import get_current_username
+        username = get_current_username()
+        if username not in self._user_devices:
+            self._user_devices[username] = {}
+            # 开启临时标志避免重入，然后载入
+            self._load()
+        return self._user_devices[username]
+
+    @_devices.setter
+    def _devices(self, value: Dict[str, DeviceInfo]):
+        from pixelle_video.utils.user_context import get_current_username
+        username = get_current_username()
+        self._user_devices[username] = value
+
     def __init__(self):
         DATA_DIR.mkdir(parents=True, exist_ok=True)
-        self._devices: Dict[str, DeviceInfo] = {}
+        self._user_devices: Dict[str, Dict[str, DeviceInfo]] = {}
         self._adb_cmd = self._resolve_adb_command()
         self._adb_server_host: str = "127.0.0.1"
         self._adb_server_port: int = 5037
@@ -115,9 +141,9 @@ class DeviceManager:
     def _load(self):
         """Load device registry from JSON file."""
         with self._lock:
-            if DEVICES_FILE.exists():
+            if self.devices_file.exists():
                 try:
-                    with open(DEVICES_FILE, "r", encoding="utf-8") as f:
+                    with open(self.devices_file, "r", encoding="utf-8") as f:
                         data = json.load(f)
                     self._devices = {
                         s: DeviceInfo.from_dict(d)
@@ -132,7 +158,7 @@ class DeviceManager:
         """Persist device registry to JSON file."""
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         try:
-            with open(DEVICES_FILE, "w", encoding="utf-8") as f:
+            with open(self.devices_file, "w", encoding="utf-8") as f:
                 json.dump(
                     {s: d.to_dict() for s, d in self._devices.items()},
                     f,

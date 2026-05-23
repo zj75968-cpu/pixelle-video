@@ -40,9 +40,40 @@ class ConfigManager:
         if hasattr(self, '_initialized'):
             return
         
-        self.config_path = Path(config_path)
-        self.config: PixelleVideoConfig = self._load()
+        self.base_config_path = Path(config_path)
+        self._user_configs = {}
         self._initialized = True
+
+    @property
+    def config_path(self) -> Path:
+        from pixelle_video.utils.user_context import get_current_username
+        username = get_current_username()
+        if username == "default":
+            return self.base_config_path
+        
+        path = Path(f"data/users/{username}/config.yaml")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if not path.exists():
+            import shutil
+            if self.base_config_path.exists():
+                shutil.copy(self.base_config_path, path)
+            elif Path("config.example.yaml").exists():
+                shutil.copy("config.example.yaml", path)
+        return path
+
+    @property
+    def config(self) -> PixelleVideoConfig:
+        from pixelle_video.utils.user_context import get_current_username
+        username = get_current_username()
+        if username not in self._user_configs:
+            self._user_configs[username] = self._load()
+        return self._user_configs[username]
+
+    @config.setter
+    def config(self, value: PixelleVideoConfig):
+        from pixelle_video.utils.user_context import get_current_username
+        username = get_current_username()
+        self._user_configs[username] = value
     
     def _load(self) -> PixelleVideoConfig:
         """Load configuration from file"""

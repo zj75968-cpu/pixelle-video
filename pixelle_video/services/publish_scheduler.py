@@ -70,6 +70,7 @@ class PublishJob:
         delete_after_hours: Optional[float] = None,  # auto-delete TTL (traffic posts)
         kind_backup: Optional[str] = None,
         body_backup: Optional[str] = None,
+        username: str = "default",
     ):
         self.job_id = job_id
         self.serial = serial
@@ -86,6 +87,7 @@ class PublishJob:
         self.delete_after_hours: Optional[float] = delete_after_hours
         self.kind_backup: Optional[str] = kind_backup
         self.body_backup: Optional[str] = body_backup
+        self.username = username
         self.status: str = JobStatus.PENDING
         self.created_at: str = datetime.now().isoformat()
         self.started_at: Optional[str] = None
@@ -111,6 +113,7 @@ class PublishJob:
             "delete_after_hours": self.delete_after_hours,
             "kind_backup": self.kind_backup,
             "body_backup": self.body_backup,
+            "username": self.username,
             "scheduled_at": self.scheduled_at,
             "status": self.status,
             "created_at": self.created_at,
@@ -140,6 +143,7 @@ class PublishJob:
             delete_after_hours=data.get("delete_after_hours"),
             kind_backup=data.get("kind_backup"),
             body_backup=data.get("body_backup"),
+            username=data.get("username", "default"),
         )
         job.status = data.get("status", JobStatus.PENDING)
         job.created_at = data.get("created_at", datetime.now().isoformat())
@@ -327,6 +331,7 @@ class PublishScheduler:
         except Exception as _exc:  # noqa: BLE001
             logger.warning(f"[banned_keywords] filter skipped: {_exc}")
 
+        from pixelle_video.utils.user_context import get_current_username
         job = PublishJob(
             job_id=str(uuid.uuid4()),
             serial=serial,
@@ -341,6 +346,7 @@ class PublishScheduler:
             dry_run=dry_run,
             post_type=post_type,
             delete_after_hours=delete_after_hours,
+            username=get_current_username(),
         )
         self._jobs[job.job_id] = job
         self._save()
@@ -438,8 +444,10 @@ class PublishScheduler:
 
     def cancel_job(self, job_id: str) -> bool:
         """Cancel a pending, scheduled, or running job."""
+        from pixelle_video.utils.user_context import get_current_username
+        current_user = get_current_username()
         job = self._jobs.get(job_id)
-        if job and job.status in (JobStatus.PENDING, JobStatus.SCHEDULED, JobStatus.RUNNING):
+        if job and getattr(job, "username", "default") == current_user and job.status in (JobStatus.PENDING, JobStatus.SCHEDULED, JobStatus.RUNNING):
             job.status = JobStatus.CANCELLED
             job.error = job.error or "Cancelled by user"
             job.finished_at = datetime.now().isoformat()
@@ -460,8 +468,10 @@ class PublishScheduler:
         Active jobs (pending/scheduled/running) cannot be removed — cancel first.
         Returns True if the job was removed.
         """
+        from pixelle_video.utils.user_context import get_current_username
+        current_user = get_current_username()
         job = self._jobs.get(job_id)
-        if not job:
+        if not job or getattr(job, "username", "default") != current_user:
             return False
         if job.status in (JobStatus.PENDING, JobStatus.SCHEDULED, JobStatus.RUNNING):
             return False
@@ -477,10 +487,12 @@ class PublishScheduler:
 
     def bulk_remove(self, statuses: List[str]) -> int:
         """Remove all jobs whose status is in `statuses`. Returns count removed."""
+        from pixelle_video.utils.user_context import get_current_username
+        current_user = get_current_username()
         active = {JobStatus.PENDING, JobStatus.SCHEDULED, JobStatus.RUNNING}
         targets = [
             jid for jid, j in self._jobs.items()
-            if j.status in statuses and j.status not in active
+            if j.status in statuses and j.status not in active and getattr(j, "username", "default") == current_user
         ]
         for jid in targets:
             del self._jobs[jid]
@@ -496,9 +508,11 @@ class PublishScheduler:
 
     def bulk_cancel_pending(self) -> int:
         """Cancel all pending/scheduled jobs. Returns count cancelled."""
+        from pixelle_video.utils.user_context import get_current_username
+        current_user = get_current_username()
         targets = [
             jid for jid, j in self._jobs.items()
-            if j.status in (JobStatus.PENDING, JobStatus.SCHEDULED)
+            if j.status in (JobStatus.PENDING, JobStatus.SCHEDULED) and getattr(j, "username", "default") == current_user
         ]
         for jid in targets:
             self.cancel_job(jid)
@@ -508,7 +522,9 @@ class PublishScheduler:
         return self._jobs.get(job_id)
 
     def list_jobs(self, status_filter: Optional[str] = None) -> List[PublishJob]:
-        jobs = list(self._jobs.values())
+        from pixelle_video.utils.user_context import get_current_username
+        current_user = get_current_username()
+        jobs = [j for j in self._jobs.values() if getattr(j, "username", "default") == current_user]
         if status_filter:
             jobs = [j for j in jobs if j.status == status_filter]
         jobs.sort(key=lambda j: j.created_at, reverse=True)
@@ -580,11 +596,16 @@ class PublishScheduler:
 
     async def _execute_job(self, job_id: str):
         """Execute a publish job (serialized per device) with automatic retry."""
-        from pixelle_video.services.xhs_publisher import XHSPublisher, XHSPublishError
-
         job = self._jobs.get(job_id)
         if not job or job.status == JobStatus.CANCELLED:
             return
+
+        from pixelle_video.utils.user_context import set_current_user
+        with set_current_user(getattr(job, "username", "default")):
+            await self._execute_job_impl(job)
+
+    async def _execute_job_impl(self, job: PublishJob):
+        from pixelle_video.services.xhs_publisher import XHSPublisher, XHSPublishError
 
         # Acquire per-device lock to prevent concurrent execution on same device
         if job.serial not in self._device_locks:
@@ -723,6 +744,11 @@ class PublishScheduler:
 
     async def _do_delete_job(self, job: "PublishJob") -> bool:
         """Call XHSPublisher.delete_post for a finished job."""
+        from pixelle_video.utils.user_context import set_current_user
+        with set_current_user(getattr(job, "username", "default")):
+            return await self._do_delete_job_impl(job)
+
+    async def _do_delete_job_impl(self, job: "PublishJob") -> bool:
         from pixelle_video.services.android_device_dispatcher import DistributionAdapter
         mode = DistributionAdapter.get_mode()
         
@@ -795,7 +821,12 @@ class PublishScheduler:
         if not job or job.status not in (JobStatus.SUCCESS, "done"):
             logger.warning(f"comment_post_now: job {job_id} not in a completed state (status={getattr(job, 'status', None)})")
             return False
-            
+
+        from pixelle_video.utils.user_context import set_current_user
+        with set_current_user(getattr(job, "username", "default")):
+            return await self._comment_post_now_impl(job, comment_text)
+
+    async def _comment_post_now_impl(self, job: "PublishJob", comment_text: str) -> bool:
         from pixelle_video.services.android_device_dispatcher import DistributionAdapter
         mode = DistributionAdapter.get_mode()
         
