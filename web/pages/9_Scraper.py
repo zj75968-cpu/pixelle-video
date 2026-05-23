@@ -198,6 +198,100 @@ def _render_channel_status_bar() -> None:
                             except Exception as e:
                                 st.error(f"❌ 激活失败: {e}")
 
+            st.markdown("---")
+            st.markdown(
+                """
+                **方式 C：手机扫码登录（最省心，支持多用户独立登录）**
+                无需找 Cookie，直接使用小红书 App 扫描下方二维码即可。
+                """
+            )
+            
+            from web.utils.xhs_qr_login import get_or_create_session, get_session, remove_session
+            username = st.session_state.get("username") or "default"
+            session = get_session(username)
+            
+            # 按钮：获取/刷新二维码
+            if st.button("🖥️ 获取/刷新登录二维码", key="xhs_qr_get_btn", width="stretch"):
+                with st.spinner("正在获取小红书二维码..."):
+                    session = get_or_create_session(username, _project_root)
+                    # 等待最多 10 秒以让二维码加载出来
+                    for _ in range(20):
+                        if session.status != "initializing":
+                            break
+                        time.sleep(0.5)
+                st.rerun()
+            
+            if session:
+                if session.status == "initializing":
+                    st.info("⏳ 正在初始化浏览器并拉取二维码，请稍候...")
+                elif session.status == "waiting_scan":
+                    if session.qr_code_base64:
+                        st.image(session.qr_code_base64, caption="请使用小红书 App 扫码登录", width=240)
+                        
+                        col_check, col_cancel = st.columns(2)
+                        with col_check:
+                            if st.button("🔄 检查登录状态", key="xhs_qr_check_btn", type="primary", width="stretch"):
+                                if session.status == "logged_in":
+                                    try:
+                                        import json
+                                        user_home = _project_root / "data" / "users" / username
+                                        xhs_config_dir = user_home / ".xiaohongshu-cli"
+                                        xhs_config_dir.mkdir(parents=True, exist_ok=True)
+                                        
+                                        cookie_payload = {**session.cookies, "saved_at": time.time()}
+                                        (xhs_config_dir / "cookies.json").write_text(
+                                            json.dumps(cookie_payload, indent=2), 
+                                            encoding="utf-8"
+                                        )
+                                        try:
+                                            (xhs_config_dir / "cookies.json").chmod(0o600)
+                                        except Exception:
+                                            pass
+                                        
+                                        remove_session(username)
+                                        st.session_state["_ar_status_dirty"] = True
+                                        st.success("🎉 扫码登录成功！状态已激活。")
+                                        time.sleep(1.0)
+                                        st.rerun()
+                                    except Exception as e:
+                                        st.error(f"保存凭证失败: {e}")
+                                else:
+                                    st.info("⏳ 尚未检测到扫码成功，请在手机上确认同意登录后重试。")
+                        with col_cancel:
+                            if st.button("❌ 取消登录", key="xhs_qr_cancel_btn", width="stretch"):
+                                remove_session(username)
+                                st.rerun()
+                elif session.status == "logged_in":
+                    try:
+                        import json
+                        user_home = _project_root / "data" / "users" / username
+                        xhs_config_dir = user_home / ".xiaohongshu-cli"
+                        xhs_config_dir.mkdir(parents=True, exist_ok=True)
+                        
+                        cookie_payload = {**session.cookies, "saved_at": time.time()}
+                        (xhs_config_dir / "cookies.json").write_text(
+                            json.dumps(cookie_payload, indent=2), 
+                            encoding="utf-8"
+                        )
+                        try:
+                            (xhs_config_dir / "cookies.json").chmod(0o600)
+                        except Exception:
+                            pass
+                        
+                        remove_session(username)
+                        st.session_state["_ar_status_dirty"] = True
+                        st.success("🎉 扫码登录成功！状态已激活。")
+                        time.sleep(1.0)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"保存凭证失败: {e}")
+                elif session.status == "expired":
+                    st.error("❌ 二维码已过期，请重新点击「🖥️ 获取/刷新登录二维码」生成。")
+                    remove_session(username)
+                elif session.status == "failed":
+                    st.error("❌ 二维码获取失败，请重试或使用方式 B。")
+                    remove_session(username)
+
 
 _render_channel_status_bar()
 
