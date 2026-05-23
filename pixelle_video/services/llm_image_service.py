@@ -95,15 +95,24 @@ class LLMImageService:
         # Build request body
         # chatfire.cn 多数模型用 ratio 格式 (1x1, 3x4, 4x3, 9x16, 16x9)
         # 但 gpt-image-1.5 / gpt-image-2 要求像素格式 (1024x1024 / 1536x1024 / 1024x1536)
-        if "chatfire" in api_base.lower():
+        is_chatfire = "chatfire" in api_base.lower()
+        if is_chatfire:
             effective_size = self._to_chatfire_size(size, model=model)
         else:
             effective_size = size
         body: dict = {"model": model, "prompt": prompt, "size": effective_size, "n": 1}
-        if quality:
-            body["quality"] = quality
-        if style:
-            body["style"] = style
+
+        # 特殊处理 chatfire 的 gpt-image 模型，补充必填字段以防接口报错
+        if is_chatfire and "gpt-image" in model.lower():
+            body["quality"] = quality if quality else "medium"
+            body["output_compression"] = 100
+            body["response_format"] = "url"
+            body["image"] = []  # 文生图传空数组
+        else:
+            if quality:
+                body["quality"] = quality
+            if style:
+                body["style"] = style
 
         # Determine the URL to post to.
         # Some providers use /v1/ prefix, others expose endpoints at the root.

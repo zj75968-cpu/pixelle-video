@@ -193,8 +193,13 @@ class MediaService(ComfyBaseService):
                 workflows = [wf for wf in workflows if not _is_image_wf(wf)]
 
                 _CHATFIRE_MODELS = [
+                    ("gpt-image-2", "GPT Image 2"),
                     ("gemini-3.1-flash-image-preview_1k", "Gemini 3.1 Flash Preview 1K"),
                 ]
+                _cfg_model = _preset.get("model")
+                if _cfg_model and _cfg_model not in [m[0] for m in _CHATFIRE_MODELS]:
+                    _CHATFIRE_MODELS.insert(0, (_cfg_model, _cfg_model.replace("-", " ").title()))
+
                 for _mid, _label in _CHATFIRE_MODELS:
                     workflows.append({
                         "key": f"chatfire/{_mid}",
@@ -297,6 +302,9 @@ class MediaService(ComfyBaseService):
             )
         """
         # 1. Resolve workflow (returns structured info)
+        if workflow is None:
+            workflow = self._get_default_workflow()
+
         # --- Chatfire.cn 直接路由 (OpenAI-兼容 图片生成 API) ---
         if workflow and workflow.startswith("chatfire/"):
             from pixelle_video.services.llm_image_service import LLMImageService
@@ -304,7 +312,7 @@ class MediaService(ComfyBaseService):
             _preset = _cf_mgr.get_post_model_preset("post_image")
             _model_id = workflow[len("chatfire/"):]
             _llm_svc = LLMImageService()
-            _size = _llm_svc._to_chatfire_size(f"{width or 1080}x{height or 1080}")
+            _size = _llm_svc._to_chatfire_size(f"{width or 1080}x{height or 1080}", model=_model_id)
             _url = await _llm_svc.generate(
                 prompt=prompt,
                 api_key=_preset["api_key"],

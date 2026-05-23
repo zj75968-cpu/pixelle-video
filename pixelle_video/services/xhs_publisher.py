@@ -629,10 +629,19 @@ class XHSPublisher:
             logger.warning(f"Coordinate tab click failed: {e}")
             return False
 
-    def _open_xhs_publish(self, d):
-        """Launch XHS app and navigate to the publish screen."""
+    def _start_xhs(self, d):
+        """Start Xiaohongshu app and handle any dual-app choice dialogs."""
         d.app_start(XHS_PACKAGE, stop=True)
         time.sleep(3)
+        # Vivo dual app resolver: select clone instance (second Xiaohongshu)
+        if d(resourceId="com.vivo.doubleinstance:id/clone").exists(timeout=2):
+            logger.info("Detected Vivo dual app resolver. Selecting the clone instance (second Xiaohongshu)...")
+            d(resourceId="com.vivo.doubleinstance:id/clone").click()
+            time.sleep(3)
+
+    def _open_xhs_publish(self, d):
+        """Launch XHS app and navigate to the publish screen."""
+        self._start_xhs(d)
 
         # Grant any immediate permissions
         self._grant_permissions(d)
@@ -1221,8 +1230,7 @@ class XHSPublisher:
         try:
             self._unlock_screen()
             # 1. Start XHS and go to profile tab
-            d.app_start(XHS_PACKAGE, stop=True)
-            time.sleep(3)
+            self._start_xhs(d)
             self._grant_permissions(d)
             self._dismiss_blocking_dialogs(d)
 
@@ -1389,6 +1397,179 @@ class XHSPublisher:
         """Delete a published Xiaohongshu post by title (async wrapper)."""
         loop = asyncio.get_event_loop()
         return await loop.run_in_executor(None, self._delete_post_sync, post_title)
+
+    # -------------------------------------------------------------------------
+    # Comment Post API
+    # -------------------------------------------------------------------------
+
+    def _comment_on_post_sync(self, post_title: str, comment_text: str) -> bool:
+        """
+        Navigate to My Profile → Notes, find the post by title, open it,
+        and post a comment.
+        """
+        import re as _re
+        d = self._get_device()
+        orig_timeout = self._get_screen_timeout()
+        self._set_screen_timeout(300000)
+        try:
+            self._unlock_screen()
+            # 1. Start XHS and go to profile tab
+            self._start_xhs(d)
+            self._grant_permissions(d)
+            self._dismiss_blocking_dialogs(d)
+
+            # 2. Tap profile/me tab (rightmost bottom nav item)
+            profile_tapped = (
+                self._click_desc(d, "我", "我的", "个人中心", timeout=4)
+                or self._click_text(d, "我", "我的", timeout=4)
+                or self._click_resource(d, f"{XHS_PACKAGE}:id/tab_me", timeout=3)
+            )
+            if not profile_tapped:
+                w, h = self._screen_size(d)
+                d.click(int(w * 0.9), int(h * 0.972))  # far-right nav tab
+            time.sleep(2)
+
+            # 3. Find the note by title
+            base_title = _re.split(r"[（(]", post_title)[0].strip() or post_title
+            probe_short = post_title[:6] if len(post_title) >= 6 else post_title
+            probe_long = post_title[:10] if len(post_title) >= 10 else post_title
+
+            def _find_note():
+                candidates = [
+                    d(text=post_title),
+                    d(descriptionContains=probe_long),
+                    d(textContains=probe_long),
+                    d(descriptionContains=probe_short),
+                    d(textContains=probe_short),
+                ]
+                if base_title and base_title != post_title:
+                    candidates.append(d(descriptionContains=base_title))
+                for selector in candidates:
+                    if selector.exists(timeout=1):
+                        return selector
+                return None
+
+            # Dismiss any in-feed banners
+            if d(text="去看看").exists(timeout=1):
+                for closer in (
+                    d(descriptionContains="关闭"),
+                    d(description="关闭"),
+                    d(textContains="✕"),
+                    d(text="×"),
+                ):
+                    if closer.exists(timeout=0.5):
+                        try:
+                            closer.click()
+                            break
+                        except Exception:
+                            pass
+
+            note_el = _find_note()
+            w, h = self._screen_size(d)
+            if note_el is None:
+                # Scroll down up to 10 times to find the note
+                for _ in range(10):
+                    d.swipe(w // 2, int(h * 0.6), w // 2, int(h * 0.3), duration=0.4)
+                    time.sleep(0.8)
+                    note_el = _find_note()
+                    if note_el is not None:
+                        break
+
+            if note_el is None:
+                self._screenshot(d, "comment_note_not_found")
+                logger.warning(f"[{self.serial}] comment_on_post: note '{post_title}' not found")
+                return False
+
+            # 4. Click note to open detail page
+            note_el.click()
+            time.sleep(3)
+            self._dismiss_blocking_dialogs(d)
+
+            # 5. Click comment entry field (bottom left of detail page)
+            comment_entry = None
+            for txt in ("说点什么...", "说点什么", "写评论", "评论", "有爱评论，说点什么"):
+                el = d(text=txt)
+                if el.exists(timeout=1):
+                    comment_entry = el
+                    break
+                el = d(textContains=txt)
+                if el.exists(timeout=1):
+                    comment_entry = el
+                    break
+
+            if comment_entry is not None:
+                comment_entry.click()
+            else:
+                # Fallback: click near bottom left (e.g. Y=96%, X=25%)
+                logger.warning(f"[{self.serial}] comment_entry text not found, using coordinate fallback")
+                d.click(int(w * 0.25), int(h * 0.96))
+            
+            time.sleep(2)
+
+            # 6. Locate edit text field and set text
+            input_field = d(className="android.widget.EditText")
+            if input_field.exists(timeout=3):
+                input_field.set_text(comment_text)
+            else:
+                logger.warning(f"[{self.serial}] EditText not found, trying send_keys fallback")
+                d.send_keys(comment_text)
+            
+            time.sleep(1.5)
+
+            # 7. Click send button
+            send_btn = None
+            for txt in ("发送", "确定"):
+                el = d(text=txt)
+                if el.exists(timeout=1):
+                    send_btn = el
+                    break
+            
+            if send_btn is not None:
+                send_btn.click()
+            else:
+                logger.warning(f"[{self.serial}] Send button text not found, trying resource-id / coordinates")
+                for rid in (f"{XHS_PACKAGE}:id/send_btn", f"{XHS_PACKAGE}:id/send_button"):
+                    el = d(resourceId=rid)
+                    if el.exists(timeout=1):
+                        send_btn = el
+                        send_btn.click()
+                        break
+                else:
+                    if input_field.exists():
+                        try:
+                            bounds = input_field.info.get("bounds", {})
+                            top = bounds.get("top", 0)
+                            bottom = bounds.get("bottom", h)
+                            center_y = (top + bottom) // 2
+                            d.click(int(w * 0.9), center_y)
+                        except Exception:
+                            d.click(int(w * 0.9), int(h * 0.96))
+                    else:
+                        d.click(int(w * 0.9), int(h * 0.96))
+            
+            time.sleep(2)
+            self._screenshot(d, "comment_post_done")
+            
+            # Back out of post back to profile
+            try:
+                d.press("back")
+            except Exception:
+                pass
+                
+            logger.info(f"[{self.serial}] ✅ Successfully commented '{comment_text}' on post '{post_title}'")
+            return True
+
+        except Exception as exc:
+            logger.error(f"[{self.serial}] comment_on_post error: {exc}")
+            return False
+        finally:
+            self._set_screen_timeout(orig_timeout)
+
+    async def comment_on_post(self, post_title: str, comment_text: str) -> bool:
+        """Comment on a published Xiaohongshu post by title (async wrapper)."""
+        loop = asyncio.get_event_loop()
+        return await loop.run_in_executor(None, self._comment_on_post_sync, post_title, comment_text)
+
 
     # -------------------------------------------------------------------------
     # Video Publish API

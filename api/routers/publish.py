@@ -14,8 +14,16 @@
 Publish queue management endpoints.
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request, UploadFile, File, Form
+from fastapi.responses import StreamingResponse
 from loguru import logger
+import os
+import shutil
+import zipfile
+import io
+from pathlib import Path
+from datetime import datetime
+from typing import Dict, List, Any
 
 from api.schemas.publish import (
     PublishJobRequest,
@@ -26,6 +34,26 @@ from api.schemas.publish import (
 from pixelle_video.services.publish_scheduler import publish_scheduler, JobStatus
 
 router = APIRouter(prefix="/publish", tags=["Publish Queue"])
+
+
+# In-memory dictionary tracking active agents
+# Format: {agent_id: {"ip": str, "serials": list[str], "last_seen": str}}
+ACTIVE_AGENTS: Dict[str, Dict[str, Any]] = {}
+
+
+def to_relative_path(p: str) -> str:
+    """Helper to convert absolute path to relative path from project root."""
+    if not p:
+        return p
+    try:
+        path_obj = Path(p)
+        if path_obj.is_absolute():
+            cwd = Path.cwd()
+            if path_obj.is_relative_to(cwd):
+                return str(path_obj.relative_to(cwd)).replace("\\", "/")
+        return str(path_obj).replace("\\", "/")
+    except Exception:
+        return p
 
 
 def _job_to_response(job) -> PublishJobResponse:
@@ -135,3 +163,165 @@ async def run_job_now(job_id: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(publish_scheduler.execute_now, job_id)
     job.status = JobStatus.RUNNING
     return _job_to_response(job)
+
+
+@router.get("/agent/pending")
+async def get_pending_job_for_agent(serials: str, request: Request, agent_id: str = None):
+    """
+    Poll for pending/running jobs matching client connected device serials.
+    Also registers or updates the client agent's online status.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    if not agent_id:
+        agent_id = client_ip
+    
+    serial_list = [s.strip() for s in serials.split(",") if s.strip()]
+    
+    # Update active agent registration
+    ACTIVE_AGENTS[agent_id] = {
+        "ip": client_ip,
+        "serials": serial_list,
+        "last_seen": datetime.now().isoformat()
+    }
+    
+    # Clean up old agents (older than 30s) while we are here
+    now = datetime.now()
+    stale_keys = [k for k, v in ACTIVE_AGENTS.items() if (now - datetime.fromisoformat(v["last_seen"])).total_seconds() > 30]
+    for k in stale_keys:
+        ACTIVE_AGENTS.pop(k, None)
+        
+    # Search the queue for a RUNNING job matching these serials
+    running_jobs = publish_scheduler.list_jobs(status_filter=JobStatus.RUNNING)
+    for job in running_jobs:
+        if job.serial in serial_list:
+            # We found a job for this agent!
+            # Format and return job details
+            return {
+                "job": {
+                    "job_id": job.job_id,
+                    "serial": job.serial,
+                    "kind": job.kind,
+                    "title": job.title,
+                    "body": job.body,
+                    "hashtags": job.hashtags,
+                    "images": [to_relative_path(img) for img in job.images],
+                    "video_path": to_relative_path(job.video_path) if job.video_path else None,
+                    "dry_run": job.dry_run,
+                }
+            }
+            
+    return {"job": None}
+
+
+@router.get("/agent/list")
+async def list_active_agents():
+    """List currently online agents."""
+    now = datetime.now()
+    stale_keys = [k for k, v in ACTIVE_AGENTS.items() if (now - datetime.fromisoformat(v["last_seen"])).total_seconds() > 30]
+    for k in stale_keys:
+        ACTIVE_AGENTS.pop(k, None)
+    return {"agents": list(ACTIVE_AGENTS.values())}
+
+
+@router.get("/agent/download-client")
+async def download_client_agent():
+    """Package and download the minimal client agent files as a ZIP."""
+    memory_file = io.BytesIO()
+    try:
+        with zipfile.ZipFile(memory_file, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            files_to_zip = [
+                ("scripts/local_agent.py", "scripts/local_agent.py"),
+                ("pixelle_video/__init__.py", "pixelle_video/__init__.py"),
+                ("pixelle_video/services/__init__.py", "pixelle_video/services/__init__.py"),
+                ("pixelle_video/services/xhs_publisher.py", "pixelle_video/services/xhs_publisher.py"),
+                ("config/xhs_ui_selectors.yaml", "config/xhs_ui_selectors.yaml"),
+                ("packaging/windows/platform-tools/adb.exe", "packaging/windows/platform-tools/adb.exe"),
+                ("packaging/windows/platform-tools/AdbWinApi.dll", "packaging/windows/platform-tools/AdbWinApi.dll"),
+                ("packaging/windows/platform-tools/AdbWinUsbApi.dll", "packaging/windows/platform-tools/AdbWinUsbApi.dll"),
+            ]
+            for src, arcname in files_to_zip:
+                if arcname == "pixelle_video/__init__.py":
+                    # Avoid importing server modules like comfykit on the client agent side
+                    zipf.writestr(arcname, "__version__ = '0.1.0'\n__all__ = []\n")
+                elif os.path.exists(src):
+                    zipf.write(src, arcname)
+                else:
+                    logger.warning(f"Zip packager: source file {src} not found")
+        memory_file.seek(0)
+        return StreamingResponse(
+            memory_file,
+            media_type="application/zip",
+            headers={"Content-Disposition": "attachment; filename=pixelle_agent.zip"}
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate client agent zip: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate agent zip: {e}")
+
+
+@router.post("/agent/jobs/{job_id}/progress")
+async def update_agent_job_progress(job_id: str, payload: dict):
+    """Post progress update from client agent."""
+    job = publish_scheduler.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    log_msg = payload.get("log", "")
+    if log_msg:
+        ts = datetime.now().strftime("%H:%M:%S")
+        job.progress_log.append(f"[{ts}] {log_msg}")
+        publish_scheduler._save()
+        logger.info(f"[Agent][{job_id}] {log_msg}")
+        
+    return {"status": "ok"}
+
+
+@router.post("/agent/jobs/{job_id}/result")
+async def submit_agent_job_result(
+    job_id: str,
+    status: str = Form(...),
+    error: str = Form(None),
+    screenshot: UploadFile = File(None)
+):
+    """Submit execution result (success/failure) from client agent, with optional screenshot."""
+    job = publish_scheduler.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    logger.info(f"Received agent result for job {job_id}: status={status}, error={error}")
+    
+    # Save uploaded screenshot if present
+    if screenshot:
+        try:
+            dest_dir = Path("runtime/mobile_results") / job.serial / job_id
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            
+            ext = Path(screenshot.filename).suffix.lower() if screenshot.filename else ".png"
+            if ext not in (".png", ".jpg", ".jpeg"):
+                ext = ".png"
+            dest_path = dest_dir / f"screenshot{ext}"
+            
+            with open(dest_path, "wb") as f:
+                shutil.copyfileobj(screenshot.file, f)
+                
+            job.screenshots = [str(dest_path).replace("\\", "/")]
+            logger.info(f"Saved agent screenshot to {dest_path}")
+        except Exception as e:
+            logger.error(f"Failed to save agent screenshot: {e}")
+            
+    # Update job state
+    if status == "success":
+        if job.kind == "delete":
+            job.status = "deleted"
+        elif job.kind == "comment":
+            job.status = "comment_success"
+        else:
+            job.status = JobStatus.SUCCESS
+        job.error = None
+    else:
+        job.status = JobStatus.FAILED
+        job.error = error or "Agent reported execution failure"
+        
+    job.finished_at = datetime.now().isoformat()
+    publish_scheduler._save()
+    
+    return {"status": "ok"}

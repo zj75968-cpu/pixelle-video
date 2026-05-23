@@ -68,6 +68,8 @@ class PublishJob:
         dry_run: bool = False,
         post_type: str = "content",          # "content" | "traffic"
         delete_after_hours: Optional[float] = None,  # auto-delete TTL (traffic posts)
+        kind_backup: Optional[str] = None,
+        body_backup: Optional[str] = None,
     ):
         self.job_id = job_id
         self.serial = serial
@@ -82,6 +84,8 @@ class PublishJob:
         self.dry_run: bool = bool(dry_run)
         self.post_type: str = post_type  # "content" | "traffic"
         self.delete_after_hours: Optional[float] = delete_after_hours
+        self.kind_backup: Optional[str] = kind_backup
+        self.body_backup: Optional[str] = body_backup
         self.status: str = JobStatus.PENDING
         self.created_at: str = datetime.now().isoformat()
         self.started_at: Optional[str] = None
@@ -105,6 +109,8 @@ class PublishJob:
             "dry_run": self.dry_run,
             "post_type": self.post_type,
             "delete_after_hours": self.delete_after_hours,
+            "kind_backup": self.kind_backup,
+            "body_backup": self.body_backup,
             "scheduled_at": self.scheduled_at,
             "status": self.status,
             "created_at": self.created_at,
@@ -132,6 +138,8 @@ class PublishJob:
             dry_run=bool(data.get("dry_run", False)),
             post_type=data.get("post_type", "content"),
             delete_after_hours=data.get("delete_after_hours"),
+            kind_backup=data.get("kind_backup"),
+            body_backup=data.get("body_backup"),
         )
         job.status = data.get("status", JobStatus.PENDING)
         job.created_at = data.get("created_at", datetime.now().isoformat())
@@ -592,7 +600,8 @@ class PublishScheduler:
             job.started_at = datetime.now().isoformat()
             self._save()
 
-            publisher = XHSPublisher(serial=job.serial, job_id=job.job_id)
+            from pixelle_video.services.android_device_dispatcher import DistributionAdapter
+            adapter = DistributionAdapter()
             last_error: Optional[str] = None
 
             def _progress(msg: str):
@@ -609,52 +618,35 @@ class PublishScheduler:
                     )
                     job.retry_count = attempt
                     self._save()
-                    # Force-stop XHS to get a clean state before retry
-                    try:
-                        import subprocess as _sp
-                        _sp.run(
-                            [
-                                XHSPublisher._resolve_adb(), "-s", job.serial,
-                                "shell", "am", "force-stop", "com.xingin.xhs",
-                            ],
-                            capture_output=True, timeout=10,
-                        )
-                    except Exception:
-                        pass
+                    # Force-stop XHS to get a clean state before retry (only if legacy mode)
+                    if DistributionAdapter.get_mode() == "legacy":
+                        try:
+                            import subprocess as _sp
+                            _sp.run(
+                                [
+                                    XHSPublisher._resolve_adb(), "-s", job.serial,
+                                    "shell", "am", "force-stop", "com.xingin.xhs",
+                                ],
+                                capture_output=True, timeout=10,
+                            )
+                        except Exception:
+                            pass
                     await asyncio.sleep(RETRY_DELAY_SECONDS)
 
                 try:
-                    if job.kind == "video":
-                        if not job.video_path:
-                            raise XHSPublishError("Video job missing video_path")
-                        success = await asyncio.wait_for(
-                            publisher.publish_video(
-                                video_path=job.video_path,
-                                title=job.title,
-                                body=job.body,
-                                hashtags=job.hashtags,
-                                dry_run=job.dry_run,
-                                progress_callback=_progress,
-                            ),
-                            timeout=PUBLISH_TIMEOUT_SECONDS,
-                        )
-                    else:
-                        success = await asyncio.wait_for(
-                            publisher.publish(
-                                images=job.images,
-                                title=job.title,
-                                body=job.body,
-                                hashtags=job.hashtags,
-                                progress_callback=_progress,
-                            ),
-                            timeout=PUBLISH_TIMEOUT_SECONDS,
-                        )
+                    success = await asyncio.wait_for(
+                        adapter.execute_job(
+                            job=job,
+                            progress_callback=_progress,
+                        ),
+                        timeout=PUBLISH_TIMEOUT_SECONDS,
+                    )
 
                     if success:
                         job.status = JobStatus.SUCCESS
                         break  # done, exit retry loop
                     else:
-                        last_error = "Publish did not confirm success"
+                        last_error = job.error or "Publish did not confirm success"
                         if attempt < MAX_JOB_RETRIES:
                             continue
                         job.status = JobStatus.FAILED
@@ -668,11 +660,10 @@ class PublishScheduler:
                     logger.error(f"Job {job_id} timed out")
                     break  # don't retry timeouts
 
-                except XHSPublishError as exc:
+                except Exception as exc:
                     last_error = str(exc)
                     # 不要重试由代码 bug 引发的失败：例如 AttributeError/TypeError/NameError/ImportError
-                    # 这些错误重试多少次都一样，只会让 XHS 反复被 force-stop + 重启
-                    _cause = exc.__cause__ or exc.__context__
+                    _cause = getattr(exc, "__cause__", None) or getattr(exc, "__context__", None) or exc
                     _is_code_bug = isinstance(
                         _cause,
                         (AttributeError, TypeError, NameError, ImportError, SyntaxError),
@@ -692,13 +683,6 @@ class PublishScheduler:
                         )
                     break
 
-                except Exception as exc:
-                    job.status = JobStatus.FAILED
-                    job.error = str(exc)
-                    logger.error(f"Job {job_id} unexpected error: {exc}")
-                    break  # don't retry unexpected errors
-
-            job.screenshots = list(publisher.screenshots)  # capture all debug screenshots
             job.finished_at = datetime.now().isoformat()
             self._save()
 
@@ -739,18 +723,142 @@ class PublishScheduler:
 
     async def _do_delete_job(self, job: "PublishJob") -> bool:
         """Call XHSPublisher.delete_post for a finished job."""
-        from pixelle_video.services.xhs_publisher import XHSPublisher
-        publisher = XHSPublisher(serial=job.serial, strict_mode=False)
-        try:
-            success = await publisher.delete_post(post_title=job.title)
-            if success:
-                job.status = "deleted"
-                self._save()
-                logger.info(f"Auto-deleted post for job {job.job_id} ('{job.title}')")
-            return success
-        except Exception as exc:
-            logger.error(f"Auto-delete failed for job {job.job_id}: {exc}")
+        from pixelle_video.services.android_device_dispatcher import DistributionAdapter
+        mode = DistributionAdapter.get_mode()
+        
+        if mode == "agent_pull":
+            # Backup original kind and body
+            if not job.kind_backup:
+                job.kind_backup = job.kind
+            if not job.body_backup:
+                job.body_backup = job.body
+                
+            job.kind = "delete"
+            job.status = JobStatus.RUNNING
+            self._save()
+            
+            # Wait for client agent to complete
+            import time
+            wait_timeout = 300
+            try:
+                from pixelle_video.config import config_manager
+                glb = config_manager.config
+                if hasattr(glb, "distribution") and glb.distribution and glb.distribution.result_wait_seconds:
+                    wait_timeout = glb.distribution.result_wait_seconds
+            except Exception:
+                pass
+                
+            start_time = time.time()
+            while time.time() - start_time < wait_timeout:
+                if job.status == "deleted":
+                    # Keep deleted status, restore metadata
+                    job.kind = job.kind_backup or job.kind
+                    job.body = job.body_backup or job.body
+                    self._save()
+                    return True
+                elif job.status == JobStatus.FAILED:
+                    logger.error(f"Agent failed delete post for job {job.job_id}: {job.error}")
+                    # Restore original status
+                    job.status = JobStatus.SUCCESS
+                    job.kind = job.kind_backup or job.kind
+                    job.body = job.body_backup or job.body
+                    self._save()
+                    return False
+                await asyncio.sleep(2)
+                
+            # Timeout
+            logger.error(f"Timeout waiting for agent to delete post for job {job.job_id}")
+            job.status = JobStatus.SUCCESS
+            job.kind = job.kind_backup or job.kind
+            job.body = job.body_backup or job.body
+            self._save()
             return False
+            
+        else:
+            # Fall back to legacy ADB XHSPublisher execution
+            from pixelle_video.services.xhs_publisher import XHSPublisher
+            publisher = XHSPublisher(serial=job.serial, strict_mode=False)
+            try:
+                success = await publisher.delete_post(post_title=job.title)
+                if success:
+                    job.status = "deleted"
+                    self._save()
+                    logger.info(f"Auto-deleted post for job {job.job_id} ('{job.title}')")
+                return success
+            except Exception as exc:
+                logger.error(f"Auto-delete failed for job {job.job_id}: {exc}")
+                return False
+
+    async def comment_post_now(self, job_id: str, comment_text: str) -> bool:
+        """Manually trigger comment on a completed job's post."""
+        job = self._jobs.get(job_id)
+        if not job or job.status not in (JobStatus.SUCCESS, "done"):
+            logger.warning(f"comment_post_now: job {job_id} not in a completed state (status={getattr(job, 'status', None)})")
+            return False
+            
+        from pixelle_video.services.android_device_dispatcher import DistributionAdapter
+        mode = DistributionAdapter.get_mode()
+        
+        if mode == "agent_pull":
+            # Backup original kind and body
+            if not job.kind_backup:
+                job.kind_backup = job.kind
+            if not job.body_backup:
+                job.body_backup = job.body
+                
+            job.kind = "comment"
+            job.body = comment_text
+            job.status = JobStatus.RUNNING
+            self._save()
+            
+            # Wait for client agent to complete
+            import time
+            wait_timeout = 300
+            try:
+                from pixelle_video.config import config_manager
+                glb = config_manager.config
+                if hasattr(glb, "distribution") and glb.distribution and glb.distribution.result_wait_seconds:
+                    wait_timeout = glb.distribution.result_wait_seconds
+            except Exception:
+                pass
+                
+            start_time = time.time()
+            while time.time() - start_time < wait_timeout:
+                if job.status == "comment_success":
+                    # Restore status to SUCCESS, restore metadata
+                    job.status = JobStatus.SUCCESS
+                    job.kind = job.kind_backup or job.kind
+                    job.body = job.body_backup or job.body
+                    self._save()
+                    return True
+                elif job.status == JobStatus.FAILED:
+                    logger.error(f"Agent failed to comment on post for job {job.job_id}: {job.error}")
+                    # Restore original status
+                    job.status = JobStatus.SUCCESS
+                    job.kind = job.kind_backup or job.kind
+                    job.body = job.body_backup or job.body
+                    self._save()
+                    return False
+                await asyncio.sleep(2)
+                
+            # Timeout
+            logger.error(f"Timeout waiting for agent to comment on post for job {job.job_id}")
+            job.status = JobStatus.SUCCESS
+            job.kind = job.kind_backup or job.kind
+            job.body = job.body_backup or job.body
+            self._save()
+            return False
+            
+        else:
+            # Fall back to legacy ADB XHSPublisher execution
+            from pixelle_video.services.xhs_publisher import XHSPublisher
+            publisher = XHSPublisher(serial=job.serial, strict_mode=False)
+            try:
+                success = await publisher.comment_on_post(post_title=job.title, comment_text=comment_text)
+                return success
+            except Exception as exc:
+                logger.error(f"Comment failed for job {job.job_id}: {exc}")
+                return False
 
     async def check_and_delete_expired(self):
         """

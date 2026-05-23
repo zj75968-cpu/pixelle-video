@@ -1,4 +1,4 @@
-﻿# Copyright (C) 2025 AIDC-AI
+# Copyright (C) 2025 AIDC-AI
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1437,9 +1437,9 @@ def _render_publish_queue_list(filter_val: str | None):
                     if st.button("❌ 取消", key=f"cancel_{job.job_id}"):
                         scheduler.cancel_job(job.job_id)
                         st.rerun()
-                # Delete button for completed posts
+                # Delete and Comment for completed posts
                 if job.status in ("done", "success") and job.status != "deleted":
-                    if st.button("🗑️ 删除帖子", key=f"delete_{job.job_id}"):
+                    if st.button("🗑️ 删除帖子", key=f"delete_{job.job_id}", use_container_width=True):
                         import concurrent.futures
                         import asyncio as _asyncio
                         with st.spinner("正在删除帖子…"):
@@ -1455,6 +1455,369 @@ def _render_publish_queue_list(filter_val: str | None):
                             st.rerun()
                         else:
                             st.error("删除失败，请手动删除或查看日志")
+                    
+                    st.write("") # spacing
+                    comment_text = st.text_input(
+                        "💬 评论内容",
+                        key=f"cmt_text_{job.job_id}",
+                        placeholder="输入要发表的评论...",
+                        label_visibility="collapsed"
+                    )
+                    if st.button("💬 发表评论", key=f"cmt_btn_{job.job_id}", use_container_width=True):
+                        if not comment_text.strip():
+                            st.warning("请输入评论内容")
+                        else:
+                            import concurrent.futures
+                            import asyncio as _asyncio
+                            with st.spinner("正在发表评论…"):
+                                try:
+                                    with concurrent.futures.ThreadPoolExecutor() as _pool:
+                                        _future = _pool.submit(
+                                            _asyncio.run,
+                                            scheduler.comment_post_now(job.job_id, comment_text.strip())
+                                        )
+                                        ok = _future.result(timeout=120)
+                                except Exception as _e:
+                                    ok = False
+                                    st.error(f"评论异常: {_e}")
+                            if ok:
+                                st.success("评论发表成功")
+                                st.rerun()
+                            else:
+                                st.error("评论发表失败")
+
+
+# ---- Client Agent Tab --------------------------------------------------------
+
+def render_client_agent_tab():
+    """Render client agent pull-mode management tab."""
+    st.subheader("💻 客户端代理模式 (多端拉取)")
+    st.caption("适合多用户协作：其他发布人员在他们自己的电脑上运行代理，控制自己电脑上连接的手机进行自动发布。")
+
+    from pixelle_video.config import config_manager
+    
+    # 1. Distribution Mode Selector
+    current_mode = config_manager.config.distribution_mode or config_manager.config.distribution.mode
+    
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        st.markdown(f"当前系统分发模式：**`{current_mode}`**")
+        if current_mode == "agent_pull":
+            st.success("🟢 客户端代理模式已启用。任务将放入队列，等待局域网/公网的客户端代理拉取。")
+        else:
+            st.warning(f"⚠️ 当前处于 `{current_mode}` 模式下，系统不会把发布任务派发给客户端代理。若要启用，请点击下方切换。")
+            
+        # Selectbox to change mode
+        modes = {
+            "agent_pull": "💻 客户端代理模式 (推荐给跨电脑控制)",
+            "legacy": "🔌 服务端直接 ADB 模式 (手机接在当前服务器上)",
+            "mobile_tasker_ssh": "📡 Termux SSH 模式 (免 USB 长期连接)"
+        }
+        
+        selected_mode = st.selectbox(
+            "选择全局分发模式",
+            options=list(modes.keys()),
+            format_func=lambda x: modes[x],
+            index=list(modes.keys()).index(current_mode) if current_mode in modes else 0,
+            key="dist_mode_select"
+        )
+        
+        if selected_mode != current_mode:
+            if st.button("💾 应用分发模式"):
+                config_manager.update({"distribution_mode": selected_mode})
+                config_manager.save()
+                st.success(f"分发模式已成功保存并切换为: {selected_mode}")
+                st.rerun()
+                
+    with col2:
+        st.info(
+            "ℹ️ **什么是客户端代理模式？**\n\n"
+            "在该模式下，你可以在网页里统一生成并排期帖子，"
+            "然后把命令行和脚本分享给别人。他们运行后，代理会自动从你的服务器下载视频/图片，"
+            "并控制他们手机上的小红书发布！"
+        )
+
+    st.markdown("---")
+
+    # 2. Setup Guide
+    st.subheader("💡 快速使用指南 (分享给其他使用者)")
+    
+    # Resolve local/public server IP
+    server_port = 8000
+    import socket
+    local_ip = "127.0.0.1"
+    try:
+        hostname = socket.gethostname()
+        ip_list = socket.gethostbyname_ex(hostname)[2]
+        # Prefer private LAN IPs (192.168.x.x, 10.x.x.x, 172.16.x.x-172.31.x.x), avoiding Clash virtual IPs (198.18.x.x)
+        lan_ips = []
+        for ip in ip_list:
+            if ip.startswith("192.168.") or ip.startswith("10."):
+                lan_ips.append(ip)
+            elif ip.startswith("172."):
+                parts = ip.split('.')
+                if len(parts) == 4 and 16 <= int(parts[1]) <= 31:
+                    lan_ips.append(ip)
+        if lan_ips:
+            local_ip = lan_ips[0]
+        else:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            candidate_ip = s.getsockname()[0]
+            s.close()
+            if candidate_ip.startswith("198.18."):
+                other_ips = [ip for ip in ip_list if not ip.startswith("127.") and not ip.startswith("198.18.")]
+                if other_ips:
+                    local_ip = other_ips[0]
+                else:
+                    local_ip = candidate_ip
+            else:
+                local_ip = candidate_ip
+    except Exception:
+        pass
+        
+    # Batch script content for Windows (Pure ASCII to avoid cmd.exe parsing crashes)
+    bat_content = f"""@echo off
+echo ======================================================
+echo       Pixelle-Video Client Agent Startup Script
+echo ======================================================
+echo.
+
+:: 1. Check Python
+python --version >nul 2>&1
+if %errorlevel% neq 0 (
+    echo [ERROR] Python was not found on your system!
+    echo Please install Python 3.9 or higher and check "Add Python to PATH".
+    echo Download: https://www.python.org/downloads/
+    echo.
+    pause
+    exit /b 1
+)
+
+:: 2. Set Server URL
+set SERVER_URL=http://{local_ip}:{server_port}
+echo Server URL: %SERVER_URL%
+
+:: 3. Prepare Directory
+set AGENT_DIR=%USERPROFILE%\\PixelleAgent
+echo Preparing agent directory: %AGENT_DIR%
+if not exist "%AGENT_DIR%" mkdir "%AGENT_DIR%"
+cd /d "%AGENT_DIR%"
+
+:: 4. Download Client
+echo.
+echo Downloading agent package from server...
+powershell -Command "[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; (New-Object System.Net.WebClient).DownloadFile('%SERVER_URL%/api/publish/agent/download-client', 'pixelle_agent.zip')"
+if %errorlevel% neq 0 (
+    echo.
+    echo [ERROR] Download failed!
+    echo Please check:
+    echo 1. Is your PC in the same network/LAN as the server?
+    echo 2. Is the server running?
+    echo 3. Does the server firewall allow port {server_port}?
+    echo.
+    pause
+    exit /b 1
+)
+
+:: 5. Unzip
+echo.
+echo Unzipping package...
+powershell -Command "Expand-Archive -Path 'pixelle_agent.zip' -DestinationPath '.' -Force"
+if %errorlevel% neq 0 (
+    echo [ERROR] Unzip failed!
+    pause
+    exit /b 1
+)
+del pixelle_agent.zip
+
+:: 6. Dependencies
+echo.
+echo Installing dependencies (requests, uiautomator2, loguru, pyyaml)...
+pip install -i https://pypi.tuna.tsinghua.edu.cn/simple requests uiautomator2 loguru pyyaml
+if %errorlevel% neq 0 (
+    echo [WARNING] Dependency installation failed or had warnings. Trying to run anyway...
+)
+
+:: 7. Run Agent
+echo.
+echo ------------------------------------------------------
+echo Starting agent. Ensure USB debugging is enabled on your phone.
+echo ------------------------------------------------------
+echo.
+python scripts/local_agent.py --server %SERVER_URL%
+if %errorlevel% neq 0 (
+    echo.
+    echo [INFO] Agent execution stopped.
+    pause
+)
+"""
+    # Normalize line endings to Windows CRLF (\r\n) for batch file compatibility
+    bat_content = bat_content.replace("\r\n", "\n").replace("\n", "\r\n")
+
+
+    # Shell script content for macOS/Linux
+    sh_content = f"""#!/bin/bash
+echo "======================================================"
+echo "      Pixelle-Video 客户端代理一键启动脚本 (Mac/Linux)"
+echo "======================================================"
+echo
+
+# 1. 检查 Python 环境
+if ! command -v python3 &> /dev/null; then
+    echo "[错误] 未检测到 python3 环境！"
+    echo "请先安装 Python 3 (建议 3.9 或更高版本)。"
+    exit 1
+fi
+
+# 2. 设置服务器地址
+SERVER_URL="http://{local_ip}:{server_port}"
+echo "服务器地址: $SERVER_URL"
+
+# 3. 准备工作目录
+AGENT_DIR="$HOME/PixelleAgent"
+echo "正在准备工作目录: $AGENT_DIR"
+mkdir -p "$AGENT_DIR"
+cd "$AGENT_DIR" || exit 1
+
+# 4. 下载代理包
+echo
+echo "正在从服务器下载代理程序包..."
+if command -v curl &> /dev/null; then
+    curl -L -o pixelle_agent.zip "$SERVER_URL/api/publish/agent/download-client"
+elif command -v wget &> /dev/null; then
+    wget -O pixelle_agent.zip "$SERVER_URL/api/publish/agent/download-client"
+else
+    echo "[错误] 未找到 curl 或 wget，无法下载代理包！"
+    exit 1
+fi
+
+if [ $? -ne 0 ]; then
+    echo "[错误] 下载失败！"
+    exit 1
+fi
+
+# 5. 解压代理包
+echo
+echo "正在解压缩代理程序包..."
+if command -v unzip &> /dev/null; then
+    unzip -o pixelle_agent.zip
+else
+    # 回退到 python 解压
+    python3 -c "import zipfile; zipfile.ZipFile('pixelle_agent.zip').extractall('.')"
+fi
+rm -f pixelle_agent.zip
+
+# 6. 安装依赖
+echo
+echo "正在检查并安装 Python 依赖项..."
+python3 -m pip install -i https://pypi.tuna.tsinghua.edu.cn/simple requests uiautomator2 loguru pyyaml
+if [ $? -ne 0 ]; then
+    echo "[警告] 依赖项安装可能遇到问题，尝试继续运行..."
+fi
+
+# 7. 启动代理
+echo
+echo "------------------------------------------------------"
+echo "正在启动客户端代理，请确保手机已通过 USB 连接并开启 USB 调试！"
+echo "------------------------------------------------------"
+echo
+python3 scripts/local_agent.py --server "$SERVER_URL"
+"""
+
+    col_btn1, col_btn2 = st.columns(2)
+    with col_btn1:
+        st.download_button(
+            label="📥 下载 Windows 一键启动脚本 (start_agent.bat)",
+            data=bat_content,
+            file_name="start_agent.bat",
+            mime="application/x-bat",
+            type="primary",
+            use_container_width=True,
+            help="适合 Windows 系统用户，下载后双击即可全自动运行。"
+        )
+    with col_btn2:
+        st.download_button(
+            label="📥 下载 macOS / Linux 一键启动脚本 (start_agent.sh)",
+            data=sh_content,
+            file_name="start_agent.sh",
+            mime="text/x-sh",
+            use_container_width=True,
+            help="适合 macOS / Linux 系统用户。下载后需要在终端运行 chmod +x start_agent.sh 赋予权限，然后运行。"
+        )
+
+    st.markdown("#### 🚀 使用步骤（零配置，一步到位）：")
+    st.markdown(
+        "1. **准备电脑与手机**：\n"
+        "   - 使用 USB 数据线连接手机与电脑，确保开启手机的「开发者选项」和「USB 调试」模式。\n"
+        "   - 确保电脑上安装了 Python 环境 (3.9+)。\n"
+        "2. **一键运行代理**：\n"
+        "   - **Windows**：双击下载的 `start_agent.bat` 脚本即可。脚本会自动下载代理包、解压、安装依赖并运行。\n"
+        "   - **macOS / Linux**：打开终端，运行 `chmod +x start_agent.sh` 赋予权限，然后运行 `./start_agent.sh` 即可。\n"
+        "3. **自动同步**：运行后，代理会在终端显示连接成功，并在此电脑连接的手机上自动执行服务器下发的帖子发布、评论或删除任务。"
+    )
+
+    st.caption(f"当前配置的连接服务器地址为：`http://{local_ip}:{server_port}`。如需外网使用，可自行编辑下载的脚本文件，将服务器 IP 修改为您的公网 IP 或域名。")
+    st.markdown("---")
+
+    # 3. Active Agents Monitor (using st.fragment for auto-refresh)
+    st.subheader("🖥️ 在线代理监控")
+    
+    @st.fragment(run_every="5s")
+    def render_agents_list():
+        st.caption("在线代理状态每 5 秒自动更新一次。")
+        import requests
+        agents = []
+        try:
+            res = requests.get(f"http://127.0.0.1:{server_port}/api/publish/agent/list", timeout=2)
+            if res.status_code == 200:
+                agents = res.json().get("agents", [])
+        except Exception:
+            st.warning("⚠️ 无法获取在线代理列表，请确认 API 服务已在 8000 端口启动。")
+            return
+            
+        if not agents:
+            st.info("🔌 当前暂无在线的客户端代理。请在其电脑上运行上述代理命令。")
+            return
+            
+        for idx, agent in enumerate(agents):
+            agent_id = agent.get("agent_id") or f"agent_{idx}"
+            ip = agent.get("ip") or "未知"
+            serials = agent.get("serials") or []
+            last_seen_str = agent.get("last_seen", "")
+            
+            # Format last seen
+            try:
+                dt = datetime.fromisoformat(last_seen_str)
+                if dt.tzinfo is not None:
+                    dt = dt.astimezone().replace(tzinfo=None)
+                seconds_ago = int((datetime.now() - dt).total_seconds())
+                if seconds_ago < 0:
+                    seconds_ago = 0
+                if seconds_ago < 5:
+                    seen_label = "刚刚 (活跃)"
+                else:
+                    seen_label = f"{seconds_ago} 秒前"
+            except Exception:
+                seen_label = last_seen_str
+                seconds_ago = 999
+                
+            with st.container(border=True):
+                c1, c2, c3 = st.columns([2, 2, 1])
+                with c1:
+                    st.markdown(f"💻 **代理 ID**: `{agent_id}`")
+                    st.markdown(f"🌐 **客户端 IP**: `{ip}`")
+                with c2:
+                    st.markdown(f"📱 **检测到手机数量**: `{len(serials)}` 台")
+                    if serials:
+                        st.markdown(f"📋 **手机 Serial**: `{', '.join(serials)}`")
+                    else:
+                        st.markdown("⚠️ *未检测到已连接手机，请确保已运行 adb devices 并授权*")
+                with c3:
+                    st.markdown(f"⏱️ **最后心跳**: {seen_label}")
+                    st.markdown("🟢 **在线**" if "刚刚" in seen_label or seconds_ago <= 15 else "🔴 **离线**")
+
+    render_agents_list()
 
 
 # ---- Main --------------------------------------------------------------------
@@ -1487,13 +1850,21 @@ def main():
     st.title("📱 发布管理")
     st.caption("管理 Android 设备并将图文帖子发布到小红书")
 
-    tab_devices, tab_publish, tab_gallery = st.tabs(["📱 设备管理", "📤 发布队列", "📸 上传到相册"])
+    tab_devices, tab_publish, tab_agent, tab_gallery = st.tabs([
+        "📱 设备管理", 
+        "📤 发布队列", 
+        "💻 客户端代理模式", 
+        "📸 上传到相册"
+    ])
 
     with tab_devices:
         render_devices_tab()
 
     with tab_publish:
         render_publish_tab()
+
+    with tab_agent:
+        render_client_agent_tab()
 
     with tab_gallery:
         render_gallery_upload_tab()

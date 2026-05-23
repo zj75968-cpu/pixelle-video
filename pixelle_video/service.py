@@ -16,6 +16,7 @@ Pixelle-Video Core - Service Layer
 Provides unified access to all capabilities (LLM, TTS, Image, etc.)
 """
 
+import asyncio
 import hashlib
 import json
 from typing import Optional
@@ -86,6 +87,7 @@ class PixelleVideoCore:
         # ComfyKit lazy initialization (created on first use, recreated on config change)
         self._comfykit: Optional[ComfyKit] = None
         self._comfykit_config_hash: Optional[str] = None
+        self._comfykit_loop: Optional[asyncio.AbstractEventLoop] = None
         
         # Core services (initialized in initialize())
         self.llm: Optional[LLMService] = None
@@ -159,12 +161,20 @@ class PixelleVideoCore:
         """
         current_config = self._get_comfykit_config()
         current_hash = self._compute_comfykit_config_hash(current_config)
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = asyncio.get_event_loop()
         
         # Check if we need to create or recreate ComfyKit
-        if self._comfykit is None or self._comfykit_config_hash != current_hash:
+        if (
+            self._comfykit is None 
+            or self._comfykit_config_hash != current_hash 
+            or self._comfykit_loop != current_loop
+        ):
             # Close old instance if exists
             if self._comfykit is not None:
-                logger.info("🔄 ComfyUI configuration changed, recreating ComfyKit instance...")
+                logger.info("🔄 Event loop or ComfyUI configuration changed, recreating ComfyKit instance...")
                 try:
                     await self._comfykit.close()
                 except Exception as e:
@@ -176,6 +186,7 @@ class PixelleVideoCore:
             logger.debug(f"ComfyKit config: {current_config}")
             self._comfykit = ComfyKit(**current_config)
             self._comfykit_config_hash = current_hash
+            self._comfykit_loop = current_loop
             logger.info("✅ ComfyKit instance created")
         
         return self._comfykit

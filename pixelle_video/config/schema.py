@@ -162,6 +162,26 @@ class XHSPublishConfig(BaseModel):
     )
 
 
+class RemotePathsConfig(BaseModel):
+    """Remote directory paths on target phone"""
+    job_dir: str = Field(default="/sdcard/Tasker/jobs", description="Directory for job definition and trigger files")
+    image_dir: str = Field(default="/sdcard/Pictures/TaskerUpload", description="Directory for uploading image assets")
+    video_dir: str = Field(default="/sdcard/Movies/TaskerUpload", description="Directory for uploading video assets")
+    screenshot_dir: str = Field(default="/sdcard/Tasker/jobs/screenshots", description="Directory for screenshots")
+
+
+class DistributionConfig(BaseModel):
+    """Android Tasker SSH distribution configuration"""
+    mode: str = Field(default="legacy", description="Distribution mode: 'legacy' or 'mobile_tasker_ssh'")
+    result_wait_seconds: int = Field(default=60, description="Timeout waiting for job completion")
+    result_poll_interval_seconds: int = Field(default=5, description="Polling interval for result file")
+    max_retry: int = Field(default=2, description="Maximum number of retries")
+    batch_size: int = Field(default=3, description="Task batch size")
+    send_interval_seconds: int = Field(default=2, description="Interval between sending files")
+    mobile_devices_config: str = Field(default="config/devices.yaml", description="Path to devices config file")
+    remote_paths: RemotePathsConfig = Field(default_factory=RemotePathsConfig, description="Paths on target device")
+
+
 class PixelleVideoConfig(BaseModel):
     """Pixelle-Video main configuration"""
     project_name: str = Field(default="Pixelle-Video", description="Project name")
@@ -181,6 +201,8 @@ class PixelleVideoConfig(BaseModel):
     template: TemplateConfig = Field(default_factory=TemplateConfig)
     xhs_publish: XHSPublishConfig = Field(default_factory=XHSPublishConfig)
     phone_agent: PhoneAgentConfig = Field(default_factory=PhoneAgentConfig)
+    distribution_mode: Optional[str] = Field(default=None, description="Global distribution mode override")
+    distribution: DistributionConfig = Field(default_factory=DistributionConfig)
 
     def is_llm_configured(self) -> bool:
         """Check if LLM is properly configured"""

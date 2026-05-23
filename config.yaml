@@ -1,25 +1,22 @@
 project_name: Pixelle-Video
-admin_password: "5793"       # ← 在这里添加
+admin_password: '5793'
 llm:
-  api_key: sk-57e4d54bfa5d49c1948501a211fb20a1
-  base_url: https://api.deepseek.com
-  model: deepseek-chat
+  api_key: sk-cp-bqsZYHiiwx79rAXldpY58pYsY8lL1J81C6nm5udVjG_m0zbp5c8GmkAsAjgymOswY6hN6poRBmeIUun52ZreeRc6QuvxFE0ZLxDifOft5K_bUckLCRcm5s4
+  base_url: https://api.minimaxi.com/v1
+  model: MiniMax-M2.5
 post_model_presets:
   post_content:
-    api_key: sk-57e4d54bfa5d49c1948501a211fb20a1
-    base_url: https://api.deepseek.com
-    model: deepseek-v4-flash
+    api_key: sk-cp-bqsZYHiiwx79rAXldpY58pYsY8lL1J81C6nm5udVjG_m0zbp5c8GmkAsAjgymOswY6hN6poRBmeIUun52ZreeRc6QuvxFE0ZLxDifOft5K_bUckLCRcm5s4
+    base_url: https://api.minimaxi.com/v1
+    model: MiniMax-M2.5
   post_image:
     api_key: sk-MXBjq1odMGod9tl808ZSZkfC08kMwtCVcK3uzhqDUUmjhWYF
     base_url: https://api.chatfire.cn
-    # gpt-image-1.5 / gpt-image-2 对中文字渲染明显优于 gemini-3.1-flash-image-preview
     model: gpt-image-2
-  # 多模态反推 prompt 专用（必须是支持 vision 的 chat 模型；
-  # 注意：post_image 的图像生成预览模型不能用来反推）
   post_vision:
-    api_key: sk-MXBjq1odMGod9tl808ZSZkfC08kMwtCVcK3uzhqDUUmjhWYF
-    base_url: https://api.chatfire.cn
-    model: gpt-4o-mini
+    api_key: sk-GExqJhdYBIhDFIqOC40mnokXXdnXp4HAlonoJOJmxXIXd2RP
+    base_url: https://cdn.12ai.org
+    model: gemini-3-pro-preview-c
 comfyui:
   comfyui_url: http://127.0.0.1:8188
   comfyui_api_key: ''
@@ -38,23 +35,40 @@ comfyui:
     comfyui:
       default_workflow: null
   image:
-    default_workflow: runninghub/image_qwen.json
+    default_workflow: chatfire/gpt-image-2
     prompt_prefix: Minimalist black-and-white matchstick figure style illustration,
       clean lines, simple sketch style
   video:
     default_workflow: runninghub/video_wan2.2.json
-    prompt_prefix: ""
+    prompt_prefix: ''
 template:
   default_template: 1080x1920/default.html
 xhs_publish:
   strict_mode: true
   push_dir: /sdcard/DCIM/PixelleVideo
-  lock_pin: ""   # 填写手机解锁 PIN，如 "1234"；留空则不自动解锁
-
-# 手机 HTTP Agent 配置（替代 USB ADB，支持云端部署）
-# 使用方式：在手机 Termux 运行 scripts/phone_agent.py，配合 cloudflared 穿透
+  lock_pin: ''
+  daily_schedule_times:
+  - 09:00
+  - '12:00'
+  - '18:00'
+  adb_server_host: 127.0.0.1
+  adb_server_port: 5037
 phone_agent:
-  url: ""        # cloudflared 输出的 URL，如 https://xxx-yyy.trycloudflare.com
-  token: ""      # 与 phone_agent.py --token 保持一致
+  url: ''
+  token: ''
   chunk_size_mb: 5
   timeout_push: 120
+distribution_mode: legacy
+distribution:
+  mode: legacy
+  result_wait_seconds: 240
+  result_poll_interval_seconds: 5
+  max_retry: 2
+  batch_size: 3
+  send_interval_seconds: 2
+  mobile_devices_config: config/devices.yaml
+  remote_paths:
+    job_dir: /sdcard/Tasker/jobs
+    image_dir: /sdcard/Pictures/TaskerUpload
+    video_dir: /sdcard/Movies/TaskerUpload
+    screenshot_dir: /sdcard/Tasker/jobs/screenshots

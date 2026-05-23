@@ -269,17 +269,36 @@ async def _enqueue_publish(
             raise RuntimeError("No Android device connected; cannot enqueue publish.")
         serial = connected[0]
 
-    # 图文模式：自动从 frames/*_composed.png 取场景合成图
+    # 图文模式：自动从 frames/*_composed.png 取场景合成图，或从 images/*.png 等获取图片
     from pathlib import Path as _Path
     images_for_job: list = [video_path]
     if kind == "image_text":
-        frames_dir = _Path(video_path).parent / "frames"
-        composed = sorted(frames_dir.glob("*_composed.png"))
+        p = _Path(video_path)
+        # Determine the directory containing files
+        target_dir = p.parent if p.is_file() else p
+        
+        # If target_dir is named 'frames' or 'images', the other might be next to it
+        task_dir = target_dir
+        if target_dir.name in ("frames", "images"):
+            task_dir = target_dir.parent
+            
+        frames_dir = task_dir / "frames"
+        images_dir = task_dir / "images"
+        
+        composed = sorted(frames_dir.glob("*_composed.png")) if frames_dir.exists() else []
         if composed:
-            images_for_job = [str(p) for p in composed]
-            logger.info(f"[agent] image_text: {len(images_for_job)} scene images found")
+            images_for_job = [str(x) for x in composed]
+            logger.info(f"[agent] image_text: {len(images_for_job)} composed scene images found in {frames_dir}")
         else:
-            logger.warning(f"[agent] image_text: no composed images in {frames_dir}, falling back to video path")
+            raw_imgs = []
+            if images_dir.exists():
+                for ext in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
+                    raw_imgs.extend(sorted(images_dir.glob(ext)))
+            if raw_imgs:
+                images_for_job = [str(x) for x in raw_imgs]
+                logger.info(f"[agent] image_text: {len(images_for_job)} raw images found in {images_dir}")
+            else:
+                logger.warning(f"[agent] image_text: no composed or raw images found, falling back to video path")
 
     # 按每日计划自动安排：若 use_schedule=True 且未手动指定 scheduled_at，
     # 则从 daily_schedule_times 中取该设备下一个未被占用的时间槽。
@@ -776,7 +795,11 @@ async def _generate_image_text_post(
         "title": result.content.title,
         "body": result.content.body,
         "hashtags": list(result.content.hashtags or []),
-        "images": [str(p) for p in sorted((result.output_dir / "frames").glob("*_composed.png"))],
+        "images": (
+            [str(p) for p in sorted((result.output_dir / "frames").glob("*_composed.png"))]
+            if (result.output_dir / "frames").exists() and list((result.output_dir / "frames").glob("*_composed.png"))
+            else [str(p) for p in sorted((result.output_dir / "images").glob("*.png"))]
+        ),
         "post_type": pt,
         "traffic_ttl_hours": ttl_val if pt == "traffic" else 0.0,
     }
@@ -885,6 +908,11 @@ async def _read_post_params(task_id: str) -> Dict[str, Any]:
 
     frames_dir = output_root / task_id / "frames"
     composed = sorted(frames_dir.glob("*_composed.png")) if frames_dir.exists() else []
+    if not composed:
+        images_dir = output_root / task_id / "images"
+        if images_dir.exists():
+            for ext in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
+                composed.extend(sorted(images_dir.glob(ext)))
     return {
         "found": True,
         "task_id": task_id,
