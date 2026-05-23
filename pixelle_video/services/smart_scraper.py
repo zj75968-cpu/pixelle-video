@@ -478,17 +478,25 @@ def _run_cli(cmd: list[str], timeout: float = 30.0) -> tuple[int, str]:
         resolved = shutil.which(cmd[0])
         if not resolved:
             return 127, ""
+        
+        from pixelle_video.utils.user_context import get_current_username
+        username = get_current_username() or "default"
+        
+        proj_root = Path(__file__).resolve().parent.parent.parent
+        user_home = proj_root / "data" / "users" / username
+        user_home.mkdir(parents=True, exist_ok=True)
+        
         env = dict(os.environ)
         env.setdefault("PYTHONIOENCODING", "utf-8")
+        env["HOME"] = str(user_home)
+        env["USERPROFILE"] = str(user_home)
+        
         r = subprocess.run(
             [resolved, *cmd[1:]],
             capture_output=True,
             timeout=timeout,
             env=env,
-            # mcporter/xhs 等 agent-reach 工具的配置在用户目录（~/config/mcporter.json、
-            # ~/.config/xhs/）按 cwd 解析。从项目工作区调用时必须切到 HOME，否则
-            # mcporter 会报 "Unknown MCP server 'exa'"。
-            cwd=os.path.expanduser("~"),
+            cwd=str(user_home),
         )
         out = (r.stdout or b"").decode("utf-8", errors="replace")
         err = (r.stderr or b"").decode("utf-8", errors="replace")

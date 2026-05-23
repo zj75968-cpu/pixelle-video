@@ -111,9 +111,9 @@ def _render_channel_status_bar() -> None:
                 小红书数据源比 Bing 图片搜索更贴近平台审美：拿到的是**真实笔记的封面 + 文案**，
                 可直接用于反推 prompt 与改写文案。
 
-                **步骤**：
-                1. 点下面按钮在新标签页打开 [www.xiaohongshu.com](https://www.xiaohongshu.com) 并扫码登录
-                2. 回到这里，点「自动从浏览器提取 Cookie」即可激活
+                **方式 A：如果您是在本地电脑运行本项目**
+                1. 点击下方按钮在新标签页打开 [www.xiaohongshu.com](https://www.xiaohongshu.com) 并扫码登录
+                2. 回到这里选择您的浏览器，点击「自动从浏览器提取 Cookie」即可激活
                 """
             )
             c1, c2, c3 = st.columns([1, 1, 2])
@@ -140,12 +140,63 @@ def _render_channel_status_bar() -> None:
                         st.rerun()
                     else:
                         st.error(f"❌ {res['message']}")
-                        st.caption(
-                            "若自动提取失败，参考: "
-                            "1) 在 Chrome/Edge 安装 [Cookie-Editor](https://chromewebstore.google.com/detail/cookie-editor/hlkenndednhfkekhgcdicdfddnkalmdm)；"
-                            "2) 导出 xiaohongshu.com 全部 cookies 为 JSON；"
-                            "3) 运行 `xhs login --cookie-file <path>`。"
-                        )
+
+            st.markdown("---")
+            st.markdown(
+                """
+                **方式 B：手动输入 Cookie（推荐远程部署/多用户时使用，非常稳定）**
+                1. 电脑浏览器打开 [www.xiaohongshu.com](https://www.xiaohongshu.com) 并登录
+                2. 按 **F12** (或右键检查) 打开开发者工具，切换到 **Network (网络)** 标签页
+                3. 刷新小红书页面，点击任意以 `xiaohongshu.com` 结尾的请求
+                4. 在右侧 **Headers (标头) -> Request Headers (请求标头)** 中找到 `cookie:`
+                5. 复制 `cookie:` 后面的那一长串文本，粘贴在下方并点击保存
+                """
+            )
+            
+            cookie_input = st.text_area(
+                "粘贴小红书 Cookie String",
+                placeholder="例如: a1=1903e...; web_session=04008...;",
+                key="xhs_manual_cookie_input"
+            )
+            
+            if st.button("🔑 保存并激活小红书 Cookie", key="xhs_manual_login", width="stretch"):
+                if not cookie_input.strip():
+                    st.error("请输入 Cookie 内容")
+                else:
+                    cookies = {}
+                    for item in cookie_input.split(";"):
+                        item = item.strip()
+                        if "=" in item:
+                            k, v = item.split("=", 1)
+                            cookies[k.strip()] = v.strip()
+                    
+                    if "a1" not in cookies:
+                        st.error("❌ Cookie 格式不正确或缺少必要参数（如 `a1`），请确保复制了完整的 Request Headers 里的 Cookie 文本。")
+                    else:
+                        with st.spinner("正在保存并激活 Cookie..."):
+                            try:
+                                import json
+                                username = st.session_state.get("username") or "default"
+                                user_home = _project_root / "data" / "users" / username
+                                xhs_config_dir = user_home / ".xiaohongshu-cli"
+                                xhs_config_dir.mkdir(parents=True, exist_ok=True)
+                                
+                                cookie_payload = {**cookies, "saved_at": time.time()}
+                                (xhs_config_dir / "cookies.json").write_text(
+                                    json.dumps(cookie_payload, indent=2), 
+                                    encoding="utf-8"
+                                )
+                                try:
+                                    (xhs_config_dir / "cookies.json").chmod(0o600)
+                                except Exception:
+                                    pass
+                                
+                                st.session_state["_ar_status_dirty"] = True
+                                st.success("✅ Cookie 保存并激活成功！")
+                                time.sleep(1.0)
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"❌ 激活失败: {e}")
 
 
 _render_channel_status_bar()
