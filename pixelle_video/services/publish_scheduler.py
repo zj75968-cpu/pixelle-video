@@ -71,6 +71,7 @@ class PublishJob:
         kind_backup: Optional[str] = None,
         body_backup: Optional[str] = None,
         username: str = "default",
+        auto_comment_text: Optional[str] = None,
     ):
         self.job_id = job_id
         self.serial = serial
@@ -88,6 +89,7 @@ class PublishJob:
         self.kind_backup: Optional[str] = kind_backup
         self.body_backup: Optional[str] = body_backup
         self.username = username
+        self.auto_comment_text: Optional[str] = auto_comment_text
         self.status: str = JobStatus.PENDING
         self.created_at: str = datetime.now().isoformat()
         self.started_at: Optional[str] = None
@@ -111,6 +113,7 @@ class PublishJob:
             "dry_run": self.dry_run,
             "post_type": self.post_type,
             "delete_after_hours": self.delete_after_hours,
+            "auto_comment_text": self.auto_comment_text,
             "kind_backup": self.kind_backup,
             "body_backup": self.body_backup,
             "username": self.username,
@@ -144,6 +147,7 @@ class PublishJob:
             kind_backup=data.get("kind_backup"),
             body_backup=data.get("body_backup"),
             username=data.get("username", "default"),
+            auto_comment_text=data.get("auto_comment_text"),
         )
         job.status = data.get("status", JobStatus.PENDING)
         job.created_at = data.get("created_at", datetime.now().isoformat())
@@ -315,6 +319,7 @@ class PublishScheduler:
         dry_run: bool = False,
         post_type: str = "content",
         delete_after_hours: Optional[float] = None,
+        auto_comment_text: Optional[str] = None,
     ) -> PublishJob:
         """Add a new publish job to the queue."""
         # 过滤小红书违禁词（标题 / 正文 / 标签）
@@ -346,6 +351,7 @@ class PublishScheduler:
             dry_run=dry_run,
             post_type=post_type,
             delete_after_hours=delete_after_hours,
+            auto_comment_text=auto_comment_text,
             username=get_current_username(),
         )
         self._jobs[job.job_id] = job
@@ -634,7 +640,7 @@ class PublishScheduler:
             for attempt in range(MAX_JOB_RETRIES + 1):
                 if attempt > 0:
                     logger.warning(
-                        f"Job {job_id}: retry {attempt}/{MAX_JOB_RETRIES} "
+                        f"Job {job.job_id}: retry {attempt}/{MAX_JOB_RETRIES} "
                         f"after failure: {last_error}"
                     )
                     job.retry_count = attempt
@@ -665,6 +671,13 @@ class PublishScheduler:
 
                     if success:
                         job.status = JobStatus.SUCCESS
+                        if job.auto_comment_text:
+                            _progress(f"触发自动评论: {job.auto_comment_text}")
+                            comment_success = await self._comment_post_now_impl(job, job.auto_comment_text)
+                            if comment_success:
+                                _progress("自动评论成功")
+                            else:
+                                _progress("自动评论失败")
                         break  # done, exit retry loop
                     else:
                         last_error = job.error or "Publish did not confirm success"
@@ -678,7 +691,7 @@ class PublishScheduler:
                     job.error = (
                         f"Publish timed out after {PUBLISH_TIMEOUT_SECONDS // 60} minutes"
                     )
-                    logger.error(f"Job {job_id} timed out")
+                    logger.error(f"Job {job.job_id} timed out")
                     break  # don't retry timeouts
 
                 except Exception as exc:
@@ -695,12 +708,12 @@ class PublishScheduler:
                     job.error = last_error
                     if _is_code_bug:
                         logger.error(
-                            f"Job {job_id} failed due to code bug ({type(_cause).__name__}); "
+                            f"Job {job.job_id} failed due to code bug ({type(_cause).__name__}); "
                             f"skipping remaining retries: {exc}"
                         )
                     else:
                         logger.error(
-                            f"Job {job_id} failed after {attempt + 1} attempt(s): {exc}"
+                            f"Job {job.job_id} failed after {attempt + 1} attempt(s): {exc}"
                         )
                     break
 
@@ -800,6 +813,44 @@ class PublishScheduler:
             self._save()
             return False
             
+        elif mode == "phone_agent":
+            from pixelle_video.services.phone_agent_client import delete_http, wait_for_status
+            from pixelle_video.config import config_manager
+            
+            cfg = config_manager.config
+            agent_url = cfg.phone_agent.url.strip()
+            token = cfg.phone_agent.token.strip()
+            
+            if not agent_url:
+                logger.error("phone_agent.url not configured, cannot delete post")
+                return False
+                
+            res = delete_http(title=job.title, agent_url=agent_url, token=token)
+            if not res.get("ok"):
+                logger.error(f"Failed to trigger delete via HTTP agent: {res.get('error')}")
+                return False
+                
+            task_id = res["task_id"]
+            loop = asyncio.get_event_loop()
+            wait_res = await loop.run_in_executor(
+                None,
+                lambda: wait_for_status(
+                    task_id=task_id,
+                    agent_url=agent_url,
+                    token=token,
+                    success_states=("deleted",),
+                )
+            )
+            
+            if wait_res.get("status") == "deleted":
+                job.status = "deleted"
+                self._save()
+                logger.info(f"Auto-deleted post via HTTP agent for job {job.job_id} ('{job.title}')")
+                return True
+            else:
+                logger.error(f"HTTP Agent failed to delete post: {wait_res.get('message')}")
+                return False
+                
         else:
             # Fall back to legacy ADB XHSPublisher execution
             from pixelle_video.services.xhs_publisher import XHSPublisher
@@ -880,6 +931,41 @@ class PublishScheduler:
             self._save()
             return False
             
+        elif mode == "phone_agent":
+            from pixelle_video.services.phone_agent_client import comment_http, wait_for_status
+            from pixelle_video.config import config_manager
+            
+            cfg = config_manager.config
+            agent_url = cfg.phone_agent.url.strip()
+            token = cfg.phone_agent.token.strip()
+            
+            if not agent_url:
+                logger.error("phone_agent.url not configured, cannot comment post")
+                return False
+                
+            res = comment_http(title=job.title, comment_text=comment_text, agent_url=agent_url, token=token)
+            if not res.get("ok"):
+                logger.error(f"Failed to trigger comment via HTTP agent: {res.get('error')}")
+                return False
+                
+            task_id = res["task_id"]
+            loop = asyncio.get_event_loop()
+            wait_res = await loop.run_in_executor(
+                None,
+                lambda: wait_for_status(
+                    task_id=task_id,
+                    agent_url=agent_url,
+                    token=token,
+                    success_states=("comment_success", "success"),
+                )
+            )
+            
+            if wait_res.get("status") in ("comment_success", "success"):
+                logger.info(f"Auto-commented post via HTTP agent for job {job.job_id} ('{job.title}')")
+                return True
+            else:
+                logger.error(f"Failed waiting for comment via HTTP agent: {wait_res.get('message')}")
+                return False
         else:
             # Fall back to legacy ADB XHSPublisher execution
             from pixelle_video.services.xhs_publisher import XHSPublisher

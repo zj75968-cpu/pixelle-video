@@ -108,10 +108,19 @@ class DeviceManager:
     def _devices(self) -> Dict[str, DeviceInfo]:
         from pixelle_video.utils.user_context import get_current_username
         username = get_current_username()
-        if username not in self._user_devices:
-            self._user_devices[username] = {}
-            # 开启临时标志避免重入，然后载入
+        
+        path = self.devices_file
+        current_mtime = 0
+        try:
+            if path.exists():
+                current_mtime = path.stat().st_mtime
+        except Exception:
+            pass
+            
+        if (username not in self._user_devices or 
+            self._user_devices_mtimes.get(username, 0) != current_mtime):
             self._load()
+            
         return self._user_devices[username]
 
     @_devices.setter
@@ -119,10 +128,20 @@ class DeviceManager:
         from pixelle_video.utils.user_context import get_current_username
         username = get_current_username()
         self._user_devices[username] = value
+        
+        path = self.devices_file
+        try:
+            if path.exists():
+                self._user_devices_mtimes[username] = path.stat().st_mtime
+            else:
+                self._user_devices_mtimes[username] = 0
+        except Exception:
+            self._user_devices_mtimes[username] = 0
 
     def __init__(self):
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         self._user_devices: Dict[str, Dict[str, DeviceInfo]] = {}
+        self._user_devices_mtimes: Dict[str, float] = {}  # Added
         self._adb_cmd = self._resolve_adb_command()
         self._adb_server_host: str = "127.0.0.1"
         self._adb_server_port: int = 5037
@@ -132,7 +151,7 @@ class DeviceManager:
         self._auto_sync_interval = DEFAULT_AUTO_SYNC_INTERVAL
         self._wifi_reconnect_cooldown = DEFAULT_WIFI_RECONNECT_COOLDOWN
         self._last_wifi_attempt: Dict[str, float] = {}
-        self._load()
+        # load will be triggered automatically when property accessed
 
     # -------------------------------------------------------------------------
     # Persistence
@@ -140,31 +159,44 @@ class DeviceManager:
 
     def _load(self):
         """Load device registry from JSON file."""
+        from pixelle_video.utils.user_context import get_current_username
+        username = get_current_username()
         with self._lock:
-            if self.devices_file.exists():
+            path = self.devices_file
+            if path.exists():
                 try:
-                    with open(self.devices_file, "r", encoding="utf-8") as f:
+                    with open(path, "r", encoding="utf-8") as f:
                         data = json.load(f)
-                    self._devices = {
+                    self._user_devices[username] = {
                         s: DeviceInfo.from_dict(d)
                         for s, d in data.items()
                     }
-                    logger.info(f"Loaded {len(self._devices)} devices from registry")
+                    self._user_devices_mtimes[username] = path.stat().st_mtime
+                    logger.info(f"Loaded {len(self._user_devices[username])} devices from registry")
                 except Exception as e:
                     logger.warning(f"Failed to load devices registry: {e}")
-                    self._devices = {}
+                    self._user_devices[username] = {}
+                    self._user_devices_mtimes[username] = 0
+            else:
+                self._user_devices[username] = {}
+                self._user_devices_mtimes[username] = 0
 
     def _save(self):
         """Persist device registry to JSON file."""
+        from pixelle_video.utils.user_context import get_current_username
+        username = get_current_username()
         DATA_DIR.mkdir(parents=True, exist_ok=True)
+        path = self.devices_file
         try:
-            with open(self.devices_file, "w", encoding="utf-8") as f:
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(
                     {s: d.to_dict() for s, d in self._devices.items()},
                     f,
                     ensure_ascii=False,
                     indent=2,
                 )
+            if path.exists():
+                self._user_devices_mtimes[username] = path.stat().st_mtime
         except Exception as e:
             logger.error(f"Failed to save devices registry: {e}")
 
@@ -375,27 +407,86 @@ class DeviceManager:
         return changed
 
     def list_connected_serials(self) -> List[str]:
-        """Return list of ADB-connected device serials."""
+        """Return list of ADB-connected device serials (and client agent serials)."""
+        serials = []
+        # 1. 物理/本地 WiFi ADB 连接的设备
         try:
             self.refresh_adb_command()
             result = self._adb("devices")
-            serials = []
             for line in result.stdout.splitlines()[1:]:
                 parts = line.strip().split()
                 if len(parts) >= 2 and parts[1] == "device":
                     serials.append(parts[0])
-            if serials:
-                logger.debug(f"Found connected devices: {serials}")
-            return serials
-        except FileNotFoundError:
-            logger.error("ADB not found in PATH. Install Android SDK Platform-Tools to enable device management.")
-            return []
-        except subprocess.TimeoutExpired:
-            logger.error("ADB devices command timed out. Check if ADB is responsive.")
-            return []
         except Exception as e:
-            logger.error(f"ADB devices error: {e}", exc_info=True)
-            return []
+            logger.debug(f"Local ADB check skipped/failed: {e}")
+
+        # 2. 从 Client Agent (客户端拉取代理) 获取在线设备（在云端/VPS环境下，即使模式不是agent_pull也应显示在线的代理设备，以便用户选择）
+        try:
+            from pixelle_video.services.android_device_dispatcher import DistributionAdapter
+            if True:  # 允许所有模式同步并显示在线的 Client Agent 设备
+                import os
+                from datetime import datetime
+                now = datetime.now()
+                agents_list = []
+                
+                if os.environ.get("IS_FASTAPI_PROCESS") == "1":
+                    # 在 FastAPI 进程内，直接读内存字典
+                    try:
+                        from api.routers.publish import ACTIVE_AGENTS
+                        agents_list = list(ACTIVE_AGENTS.values())
+                    except ImportError:
+                        pass
+                else:
+                    # 在 Streamlit 进程内，发起 HTTP 请求向 FastAPI 查询
+                    import requests
+                    try:
+                        res = requests.get("http://127.0.0.1:8000/api/publish/agent/list", timeout=1.5)
+                        if res.status_code == 200:
+                            agents_list = res.json().get("agents", [])
+                    except Exception as ex:
+                        logger.debug(f"Failed to query active agents via HTTP: {ex}")
+                
+                for agent in agents_list:
+                    last_seen_str = agent.get("last_seen", "")
+                    if last_seen_str:
+                        # 兼容有无 T/Z 的 ISO 字符串
+                        try:
+                            last_seen = datetime.fromisoformat(last_seen_str.replace("Z", "+00:00"))
+                            if last_seen.tzinfo is not None:
+                                # 统一转为无时区本地时间进行比较
+                                last_seen = last_seen.astimezone().replace(tzinfo=None)
+                        except Exception:
+                            continue
+                        # 如果代理在 30 秒内活跃，则认为其连接的所有设备在线
+                        if (now - last_seen).total_seconds() <= 30:
+                            for s in agent.get("serials", []):
+                                if s not in serials:
+                                    serials.append(s)
+        except Exception as e:
+            logger.warning(f"Failed to load active client agents: {e}")
+
+        # 3. 兼容 phone_agent 虚拟代理在线状态
+        try:
+            from pixelle_video.config import config_manager
+            from pixelle_video.services.phone_agent_client import ping
+            cfg = config_manager.config
+            agent_url = cfg.phone_agent.url.strip()
+            if agent_url:
+                # 检查是否在线
+                is_online = ping(agent_url, token=cfg.phone_agent.token.strip(), timeout=2)
+                if is_online:
+                    serial_name = "phone_agent"
+                    if serial_name not in serials:
+                        serials.append(serial_name)
+                    # 自动将其注册进设备管理器，以防 get_all() 过滤掉
+                    if serial_name not in self._devices:
+                        self.add_device(serial=serial_name, name="手机 HTTP 代理", theme="默认主题")
+        except Exception as e:
+            logger.debug(f"Failed to check phone agent online status: {e}")
+
+        if serials:
+            logger.debug(f"Found connected devices: {serials}")
+        return serials
 
     def connect_wifi(self, host: str, port: int = 5555, quiet: bool = False) -> Tuple[bool, str]:
         """Connect to a device over WiFi (TCP/IP).

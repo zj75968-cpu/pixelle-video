@@ -68,6 +68,8 @@ def _job_to_response(job) -> PublishJobResponse:
         started_at=job.started_at,
         finished_at=job.finished_at,
         error=job.error,
+        delete_after_hours=getattr(job, "delete_after_hours", None),
+        auto_comment_text=getattr(job, "auto_comment_text", None),
     )
 
 
@@ -112,6 +114,8 @@ async def create_job(body: PublishJobRequest):
                 hashtags=body.hashtags,
                 images=body.images,
                 scheduled_at=body.scheduled_at,
+                delete_after_hours=body.delete_after_hours,
+                auto_comment_text=body.auto_comment_text,
             )
             created.append(_job_to_response(job))
         except Exception as e:
@@ -237,6 +241,7 @@ async def download_client_agent():
             files_to_zip = [
                 ("scripts/local_agent.py", "scripts/local_agent.py"),
                 ("pixelle_video/__init__.py", "pixelle_video/__init__.py"),
+                ("pixelle_video/config/schema.py", "pixelle_video/config/schema.py"),
                 ("pixelle_video/services/__init__.py", "pixelle_video/services/__init__.py"),
                 ("pixelle_video/services/xhs_publisher.py", "pixelle_video/services/xhs_publisher.py"),
                 ("config/xhs_ui_selectors.yaml", "config/xhs_ui_selectors.yaml"),

@@ -214,10 +214,11 @@ def open_termux(serial: str) -> bool:
 
 def try_run_setup_in_termux(serial: str) -> bool:
     """
-    尝试通过 Termux RUN_COMMAND 广播自动运行安装脚本。
-    需要手机 Termux 中开启「允许外部应用」。
-    失败时静默返回 False（不影响主流程，让用户手动操作）。
+    尝试运行安装脚本。
+    1. 优先尝试通过 Termux RUN_COMMAND 广播（需要开启外部应用权限）
+    2. 如果广播返回失败，则通过 adb input text 模拟键盘输入自动在 Termux 中执行命令，实现免打字灌装。
     """
+    # 方法 1：广播
     rc, _, _ = _adb(
         serial,
         "shell", "am", "broadcast",
@@ -230,7 +231,21 @@ def try_run_setup_in_termux(serial: str) -> bool:
         "-n", f"{TERMUX_PACKAGE}/.app.RunCommandService",
         timeout=15,
     )
-    return rc == 0
+    if rc == 0:
+        return True
+
+    # 方法 2：模拟按键输入（键盘注入兜底）
+    # 给 Termux 窗口拉起留出充足的时间
+    import time
+    time.sleep(2.0)
+    
+    # 拆分模拟输入命令 "bash /sdcard/pixelle_setup.sh" 并发送回车
+    _adb(serial, "shell", "input", "text", "bash")
+    _adb(serial, "shell", "input", "keyevent", "62") # space
+    _adb(serial, "shell", "input", "text", "/sdcard/pixelle_setup.sh")
+    _adb(serial, "shell", "input", "keyevent", "66") # enter
+    
+    return True
 
 
 def setup_phone_agent(serial: str) -> dict:

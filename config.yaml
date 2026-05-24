@@ -55,12 +55,12 @@ xhs_publish:
   adb_server_port: 5037
 phone_agent:
   url: ''
-  token: ''
+  token: pixelle_secure_agent_token_2026
   chunk_size_mb: 5
   timeout_push: 120
 distribution_mode: legacy
 distribution:
-  mode: legacy
+  mode: phone_agent
   result_wait_seconds: 240
   result_poll_interval_seconds: 5
   max_retry: 2

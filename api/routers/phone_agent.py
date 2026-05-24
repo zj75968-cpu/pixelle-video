@@ -4,10 +4,23 @@ Receives the cloudflared tunnel URL from the phone and updates config.yaml.
 """
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, HttpUrl
 from loguru import logger
+from pathlib import Path
 
 router = APIRouter(prefix="/phone-agent", tags=["Phone Agent"])
+
+
+@router.get("/setup")
+async def get_setup_script():
+    """直接返回本地 static/setup_termux.sh 的内容。"""
+    script_path = Path(__file__).resolve().parent.parent.parent / "static" / "setup_termux.sh"
+    if not script_path.exists():
+        script_path = Path(__file__).resolve().parent.parent.parent / "scripts" / "setup_termux.sh"
+    if not script_path.exists():
+        raise HTTPException(status_code=404, detail="Setup script not found")
+    return FileResponse(script_path, media_type="text/plain")
 
 
 class RegisterRequest(BaseModel):

@@ -406,13 +406,14 @@ _SOURCE_SITE_FILTERS: dict[str, str] = {
     "微信公众号": "site:mp.weixin.qq.com OR site:mmbiz.qpic.cn",
     "花瓣": "site:huaban.com OR site:hbimg.huabanimg.com",
     "B站文章": "site:bilibili.com/read OR site:bilibili.com/opus",
+    "抖音": "site:douyin.com OR site:amemv.com OR site:iesdouyin.com",
     "通用图片": "",  # 不加 site: 限定，全网搜
 }
 
 # 中文为主的平台 → 应当用中文 query 搜索
 _CN_SOURCES: set[str] = {
     "小红书", "微博", "B站", "B站文章", "站酷", "百度贴吧", "知乎",
-    "微信公众号", "花瓣",
+    "微信公众号", "花瓣", "抖音",
 }
 
 
@@ -428,12 +429,13 @@ def _search_images_multi_sources(
     query_en: str,
     sources: list[str],
     per_source: int = 3,
+    has_foreign: bool = False,
 ) -> list[str]:
     """对多个平台并行搜图，按平台顺序合并去重。
 
     - 中文平台（小红书/微博/B站/站酷/...）使用 query_zh
     - 国外平台（Pinterest/Behance/...）使用 query_en
-    - "通用图片" 同时跑两次（中英各一次）取并集
+    - "通用图片"：若不含国外平台则仅用中文搜索，否则使用中英文合并取并集
     """
     if not sources:
         sources = ["通用图片"]
@@ -442,11 +444,13 @@ def _search_images_multi_sources(
 
     def _pick_query(src: str) -> list[str]:
         if src == "通用图片":
+            if not has_foreign:
+                return [query_zh] if query_zh else [query_en]
             qs = [q for q in (query_zh, query_en) if q]
             return qs or [query_zh or query_en]
         if src in _CN_SOURCES:
-            return [query_zh or query_en]
-        return [query_en or query_zh]
+            return [query_zh] if query_zh else [query_en]
+        return [query_en] if query_en else [query_zh]
 
     for src in sources:
         for q in _pick_query(src):
@@ -470,7 +474,7 @@ def _have_cli(name: str) -> bool:
     return shutil.which(name) is not None
 
 
-def _run_cli(cmd: list[str], timeout: float = 30.0) -> tuple[int, str]:
+def _run_cli(cmd: list[str], timeout: float = 30.0, override_username: str = None) -> tuple[int, str]:
     """运行 CLI，返回 (returncode, stdout_text)。失败时 stdout 为合并后的输出。
     Windows 上 npm-installed 工具（如 mcporter）通常是 .cmd/.ps1 包装器，
     subprocess 直接传 'mcporter' 会 WinError 2，必须用 shutil.which 解析完整路径。"""
@@ -480,11 +484,25 @@ def _run_cli(cmd: list[str], timeout: float = 30.0) -> tuple[int, str]:
             return 127, ""
         
         from pixelle_video.utils.user_context import get_current_username
-        username = get_current_username() or "default"
+        username = override_username or get_current_username() or "default"
         
         proj_root = Path(__file__).resolve().parent.parent.parent
         user_home = proj_root / "data" / "users" / username
         user_home.mkdir(parents=True, exist_ok=True)
+        
+        xhs_config_dir = user_home / ".xiaohongshu-cli"
+        active_account_file = xhs_config_dir / "active_account.txt"
+        
+        # 1. 如果是 xhs 命令且存在激活账号配置，执行前把对应的 cookies_*.json 覆盖到 cookies.json
+        if cmd[0] == "xhs" and active_account_file.exists() and xhs_config_dir.exists():
+            try:
+                active_acc = active_account_file.read_text(encoding="utf-8").strip()
+                if active_acc:
+                    acc_cookie = xhs_config_dir / f"cookies_{active_acc}.json"
+                    if acc_cookie.exists():
+                        shutil.copy(acc_cookie, xhs_config_dir / "cookies.json")
+            except Exception as e:
+                logger.warning(f"Failed to copy active cookie before running xhs command: {e}")
         
         env = dict(os.environ)
         env.setdefault("PYTHONIOENCODING", "utf-8")
@@ -500,6 +518,19 @@ def _run_cli(cmd: list[str], timeout: float = 30.0) -> tuple[int, str]:
         )
         out = (r.stdout or b"").decode("utf-8", errors="replace")
         err = (r.stderr or b"").decode("utf-8", errors="replace")
+        
+        # 2. 如果是 xhs 命令且执行完后，主 cookies.json 存在，同步回写至对应的 active 账号文件
+        if cmd[0] == "xhs" and active_account_file.exists() and xhs_config_dir.exists():
+            try:
+                active_acc = active_account_file.read_text(encoding="utf-8").strip()
+                if active_acc:
+                    main_cookie = xhs_config_dir / "cookies.json"
+                    acc_cookie = xhs_config_dir / f"cookies_{active_acc}.json"
+                    if main_cookie.exists():
+                        shutil.copy(main_cookie, acc_cookie)
+            except Exception as e:
+                logger.warning(f"Failed to copy cookie back to active account: {e}")
+                
         return r.returncode, (out + err) if r.returncode != 0 else out
     except subprocess.TimeoutExpired:
         return 124, ""
@@ -644,7 +675,8 @@ def get_channel_status() -> dict:
             data = {}
         xhs["logged_in"] = bool(data.get("ok"))
         if xhs["logged_in"]:
-            xhs["username"] = (data.get("data", {}) or {}).get("username") or data.get("username") or ""
+            user_info = (data.get("data", {}) or {}).get("user") or {}
+            xhs["username"] = user_info.get("nickname") or user_info.get("name") or user_info.get("username") or (data.get("data", {}) or {}).get("username") or data.get("username") or ""
             xhs["message"] = "已登录"
         else:
             err = (data.get("error") or {}).get("code") or "not_authenticated"
@@ -793,6 +825,11 @@ async def deepsearch(
             query_zh = title or topic
         elif not query_en:
             query_en = legacy_q or title or topic
+
+        # Sanitize query to prevent splitting for "Van" (truck)
+        query_zh = sanitize_search_query(query_zh, is_en=False)
+        query_en = sanitize_search_query(query_en, is_en=True)
+
         # xhs CLI 专用 query：中文为主
         xhs_query = query_zh or title or topic
 
@@ -808,12 +845,14 @@ async def deepsearch(
         tasks: dict[str, asyncio.Task] = {}
         if _xhs_logged_in:
             tasks["xhs"] = asyncio.create_task(asyncio.to_thread(_search_via_xhs, xhs_query, xhs_quota))
+        has_foreign = any(s not in _CN_SOURCES and s != "通用图片" for s in sources)
         if other_sources:
             tasks["ddgs"] = asyncio.create_task(asyncio.to_thread(
-                _search_images_multi_sources, query_zh, query_en, other_sources, per_source
+                _search_images_multi_sources, query_zh, query_en, other_sources, per_source, has_foreign
             ))
-        # exa 用英文 query 摘要更稳
-        tasks["exa"] = asyncio.create_task(asyncio.to_thread(_search_via_exa, query_en or query_zh, 2))
+        # 仅当包含国外平台时才使用 exa 语义抓取，防止中文字段被英文语义污染
+        if has_foreign:
+            tasks["exa"] = asyncio.create_task(asyncio.to_thread(_search_via_exa, query_en or query_zh, 2))
 
         results = await asyncio.gather(*tasks.values(), return_exceptions=True)
         result_map = dict(zip(tasks.keys(), results))
@@ -883,6 +922,48 @@ async def deepsearch(
     return refs
 
 
+def sanitize_search_query(q: str, is_en: bool) -> str:
+    if not q:
+        return q
+    if is_en:
+        # Use full specific names to completely eliminate search engine vehicle (van) confusion
+        q = re.sub(r'(?i)[\'"]?\bvan\s+gogh\b[\'"]?', '"Vincent van Gogh"', q)
+        q = re.sub(r'(?i)[\'"]?\bvan\s+eyck\b[\'"]?', '"Jan van Eyck"', q)
+        q = re.sub(r'(?i)[\'"]?\bvan\s+dyck\b[\'"]?', '"Anthony van Dyck"', q)
+    return q
+
+
+def sanitize_text_overlay(text: str) -> str:
+    if not text:
+        return ""
+    # Remove @ followed by characters up to space or slash
+    text = re.sub(r'@[^\s/]+', '', text)
+    # Remove ID: / 号: patterns and digits
+    text = re.sub(r'(?i)(id|号|账号|uid)\s*[:：]?\s*\d+', '', text)
+    # Remove pure numbers (which are often user IDs or dates/timestamps)
+    text = re.sub(r'\b\d{5,}\b', '', text)
+    
+    # Split by / and filter out segments containing platform names
+    segments = [s.strip() for s in text.split('/')]
+    filtered = []
+    forbidden_keywords = {
+        "小红书", "xiaohongshu", "xhs", "微博", "weibo", "抖音", "douyin", 
+        "快手", "kuaishou", "watermark", "logo", "水印", "标志", "图标", 
+        "wechat", "微信", "tiktok", "bilibili", "b站", "贴吧", "tieba"
+    }
+    for seg in segments:
+        seg_lower = seg.lower()
+        if any(kw in seg_lower for kw in forbidden_keywords):
+            continue
+        # If the segment is empty or just special characters, skip it
+        cleaned_seg = re.sub(r'[^\w\s\u4e00-\u9fa5]', '', seg).strip()
+        if not cleaned_seg:
+            continue
+        filtered.append(seg)
+    return " / ".join(filtered) if filtered else "none"
+
+
+
 # ─── Step 2: 反推 Prompt ──────────────────────────────────────────────────────
 
 _REVERSE_PROMPT = """你是「AI 绘画 prompt 反推专家」。
@@ -901,7 +982,7 @@ _REVERSE_PROMPT = """你是「AI 绘画 prompt 反推专家」。
 只输出英文 prompt 本身，不要其他解释。
 """
 
-_REVERSE_PROMPT_STRUCT = """你是「AI 绘画 prompt 反推专家」。请仔细观察图片并把视觉特征拆解为以下维度的关键词。
+_REVERSE_PROMPT_STRUCT = r"""你是「AI 绘画 prompt 反推专家」。请仔细观察图片并把视觉特征拆解为以下维度的关键词。
 严格用以下 JSON 格式返回（不要其他解释）：
 
 ```json
@@ -912,7 +993,7 @@ _REVERSE_PROMPT_STRUCT = """你是「AI 绘画 prompt 反推专家」。请仔�
   "palette": "dominant color palette, e.g. warm pastel beige and cream, cool teal-orange contrast (英文)",
   "composition": "composition / camera angle, e.g. centered eye-level close-up, rule of thirds (英文)",
   "mood": "mood and atmosphere, e.g. serene minimalist, energetic vibrant (英文)",
-  "text_overlay": "画面上出现的所有可读文字原文（中文/英文都原样输出）。例：\"头发上色 / 短发教程 / @procreate插画教程 / 自然棕色\"。没有文字填 \"none\"",
+  "text_overlay": "画面上出现的所有可读文字原文（中文/英文都原样输出）。注意：必须彻底忽略并剔除任何图片来源平台的水印、Logo、用户ID或签名（如“小红书”、“xiaohongshu”、“微博”、“weibo”、“ID:\d+”、“抖音”等）。例：\"头发上色 / 短发教程 / @procreate插画教程 / 自然棕色\"。没有文字填 \"none\"",
   "annotations": "画面中的教学标注元素，如：箭头/数字编号/色卡圈/步骤拆解/辅助线/圈出的区域。用英文描述。没有填 \"none\"",
   "layout": "画面布局：single subject / step-by-step grid / split panels / portrait with color swatches 等，英文一句话"
 }
@@ -920,7 +1001,7 @@ _REVERSE_PROMPT_STRUCT = """你是「AI 绘画 prompt 反推专家」。请仔�
 
 要求：
 - 前 6 个字段全部英文关键词，逗号分隔，每字段≤ 25 词
-- text_overlay 保留原始语言（中英文都不要翻译），并用斜杠 / 分隔各条文本
+- text_overlay 保留原始语言（中英文都不要翻译），并用斜杠 / 分隔各条文本，且绝对不能包含平台水印/Logo文字。
 - annotations 、layout 用英文
 - 不包含具体人名、品牌名
 - 9 个字段都必须填写，没有信息填 "none"
@@ -945,6 +1026,7 @@ def _compose_prompt(parts: dict) -> str:
     if annotations and annotations.lower() != "none":
         extras.append(f"tutorial annotations: {annotations}")
     text_overlay = str(parts.get("text_overlay", "") or "").strip().rstrip(".,;")
+    text_overlay = sanitize_text_overlay(text_overlay)
     if text_overlay and text_overlay.lower() != "none":
         # 明确告诉生图模型在画面上渲染这些文字
         extras.append(
@@ -1046,6 +1128,12 @@ async def regenerate_image(
     final_prompt = prompt
     if style_hint:
         final_prompt = f"{prompt}, style: {style_hint}"
+
+    # Append negative prompt criteria to ensure watermarks/logos are avoided
+    final_prompt = (
+        f"{final_prompt}, clean of any watermarks, logos, signatures, "
+        f"website links, username text, platform branding, or UI elements"
+    )
 
     svc = LLMImageService()
     url_or_data = await svc.generate(
@@ -1332,3 +1420,233 @@ async def smart_scrape(
         logger.exception("[smart_scrape] 总体失败")
 
     return result
+
+
+# ─── 多账号矩阵管理及定时保活 ──────────────────────────────────────────────────
+
+import threading
+
+_KEEPALIVE_THREAD = None
+_KEEPALIVE_STOP_EVENT = threading.Event()
+
+
+def get_xhs_accounts(username: str) -> list[dict]:
+    """获取指定系统用户下所有的小红书账号及其状态"""
+    proj_root = Path(__file__).resolve().parent.parent.parent
+    user_home = proj_root / "data" / "users" / username
+    xhs_config_dir = user_home / ".xiaohongshu-cli"
+    
+    if not xhs_config_dir.exists():
+        return []
+        
+    active_account = ""
+    active_file = xhs_config_dir / "active_account.txt"
+    if active_file.exists():
+        try:
+            active_account = active_file.read_text(encoding="utf-8").strip()
+        except Exception:
+            pass
+            
+    accounts = []
+    # 查找所有 cookies_*.json
+    for p in xhs_config_dir.glob("cookies_*.json"):
+        xhs_user = p.stem.replace("cookies_", "")
+        saved_at = 0
+        try:
+            cookie_data = json.loads(p.read_text(encoding="utf-8"))
+            saved_at = cookie_data.get("saved_at", 0)
+        except Exception:
+            pass
+            
+        accounts.append({
+            "xhs_username": xhs_user,
+            "saved_at": saved_at,
+            "active": (xhs_user == active_account)
+        })
+        
+    return sorted(accounts, key=lambda x: x["xhs_username"])
+
+
+def switch_xhs_account(username: str, xhs_username: str) -> bool:
+    """切换小红书激活账号"""
+    proj_root = Path(__file__).resolve().parent.parent.parent
+    user_home = proj_root / "data" / "users" / username
+    xhs_config_dir = user_home / ".xiaohongshu-cli"
+    
+    acc_cookie = xhs_config_dir / f"cookies_{xhs_username}.json"
+    if not acc_cookie.exists():
+        return False
+        
+    main_cookie = xhs_config_dir / "cookies.json"
+    try:
+        shutil.copy(acc_cookie, main_cookie)
+        (xhs_config_dir / "active_account.txt").write_text(xhs_username, encoding="utf-8")
+        logger.info(f"[xhs-matrix] Switched system user {username}'s active account to {xhs_username}")
+        return True
+    except Exception as e:
+        logger.error(f"[xhs-matrix] Failed to switch active account: {e}")
+        return False
+
+
+def delete_xhs_account(username: str, xhs_username: str) -> bool:
+    """删除指定小红书账号凭证"""
+    proj_root = Path(__file__).resolve().parent.parent.parent
+    user_home = proj_root / "data" / "users" / username
+    xhs_config_dir = user_home / ".xiaohongshu-cli"
+    
+    acc_cookie = xhs_config_dir / f"cookies_{xhs_username}.json"
+    if acc_cookie.exists():
+        try:
+            acc_cookie.unlink()
+        except Exception:
+            pass
+            
+    active_file = xhs_config_dir / "active_account.txt"
+    if active_file.exists():
+        try:
+            active_acc = active_file.read_text(encoding="utf-8").strip()
+            if active_acc == xhs_username:
+                active_file.unlink()
+                main_cookie = xhs_config_dir / "cookies.json"
+                if main_cookie.exists():
+                    main_cookie.unlink()
+        except Exception:
+            pass
+    return True
+
+
+def register_new_xhs_account(username: str) -> str:
+    """把最新登录成功的 cookies.json 归档注册为 cookies_{xhs_username}.json"""
+    proj_root = Path(__file__).resolve().parent.parent.parent
+    user_home = proj_root / "data" / "users" / username
+    xhs_config_dir = user_home / ".xiaohongshu-cli"
+    main_cookie = xhs_config_dir / "cookies.json"
+    
+    if not main_cookie.exists():
+        return ""
+        
+    # 运行 xhs status 获取当前登录的用户名
+    rc, out = _run_cli(["xhs", "status", "--json"], override_username=username)
+    xhs_username = ""
+    if rc == 0 and out.strip():
+        try:
+            data = json.loads(out)
+            xhs_username = (data.get("data", {}) or {}).get("username") or data.get("username") or ""
+        except Exception:
+            pass
+            
+    if not xhs_username:
+        # fallback: 用时间戳
+        xhs_username = f"user_{int(time.time())}"
+        
+    # 清理文件名中可能的不安全字符
+    xhs_username = re.sub(r'[\\/*?:"<>| ]', "_", xhs_username)
+    
+    try:
+        acc_cookie = xhs_config_dir / f"cookies_{xhs_username}.json"
+        shutil.copy(main_cookie, acc_cookie)
+        # 设为 active
+        (xhs_config_dir / "active_account.txt").write_text(xhs_username, encoding="utf-8")
+        logger.info(f"[xhs-matrix] Registered new xhs account {xhs_username} for user {username}")
+        return xhs_username
+    except Exception as e:
+        logger.error(f"[xhs-matrix] Failed to register account: {e}")
+        return ""
+
+
+def _cookie_keepalive_loop(interval_hours: float):
+    interval_seconds = interval_hours * 3600
+    # 启动 30 秒后先运行一次保活，确保可以立即对现有 Cookie 触发激活
+    time.sleep(30)
+    
+    while not _KEEPALIVE_STOP_EVENT.is_set():
+        try:
+            logger.info("[xhs-keepalive] Starting Cookie keepalive loop...")
+            proj_root = Path(__file__).resolve().parent.parent.parent
+            users_dir = proj_root / "data" / "users"
+            if users_dir.exists():
+                for user_home in users_dir.iterdir():
+                    if _KEEPALIVE_STOP_EVENT.is_set():
+                        break
+                    if not user_home.is_dir():
+                        continue
+                        
+                    username = user_home.name
+                    xhs_config_dir = user_home / ".xiaohongshu-cli"
+                    if xhs_config_dir.exists():
+                        cookie_files = list(xhs_config_dir.glob("cookies_*.json"))
+                        main_cookie = xhs_config_dir / "cookies.json"
+                        
+                        active_account = ""
+                        active_file = xhs_config_dir / "active_account.txt"
+                        if active_file.exists():
+                            try:
+                                active_account = active_file.read_text(encoding="utf-8").strip()
+                            except Exception:
+                                pass
+                                
+                        for cookie_file in cookie_files:
+                            if _KEEPALIVE_STOP_EVENT.is_set():
+                                break
+                                
+                            xhs_username = cookie_file.stem.replace("cookies_", "")
+                            logger.info(f"[xhs-keepalive] Keepalive checking for user={username}, xhs_account={xhs_username}")
+                            
+                            try:
+                                # 临时将此 Cookie 文件覆盖到 cookies.json
+                                shutil.copy(cookie_file, main_cookie)
+                                
+                                # 在该用户上下文下执行 xhs status --json 触发小红书 API 以刷新会话
+                                rc, out = _run_cli(["xhs", "status", "--json"], override_username=username)
+                                if rc == 0:
+                                    logger.info(f"[xhs-keepalive] Keepalive SUCCESS for {username} -> {xhs_username}")
+                                    if main_cookie.exists():
+                                        shutil.copy(main_cookie, cookie_file)
+                                else:
+                                    logger.warning(f"[xhs-keepalive] Keepalive FAILED or EXPIRED for {username} -> {xhs_username}")
+                            except Exception as e:
+                                logger.error(f"[xhs-keepalive] Keepalive error for {username} -> {xhs_username}: {e}")
+                                
+                        # 恢复原来 active 账号的 cookies.json
+                        if active_account:
+                            active_cookie = xhs_config_dir / f"cookies_{active_account}.json"
+                            if active_cookie.exists():
+                                try:
+                                    shutil.copy(active_cookie, main_cookie)
+                                except Exception:
+                                    pass
+                                    
+            logger.info("[xhs-keepalive] Cookie keepalive loop iteration finished.")
+        except Exception as e:
+            logger.error(f"[xhs-keepalive] Keepalive loop exception: {e}")
+            
+        sleep_slept = 0
+        while sleep_slept < interval_seconds and not _KEEPALIVE_STOP_EVENT.is_set():
+            time.sleep(10)
+            sleep_slept += 10
+
+
+def start_cookie_keepalive(interval_hours: float = 12.0):
+    global _KEEPALIVE_THREAD, _KEEPALIVE_STOP_EVENT
+    if _KEEPALIVE_THREAD is not None and _KEEPALIVE_THREAD.is_alive():
+        logger.info("[xhs-keepalive] Keepalive thread already running.")
+        return
+        
+    _KEEPALIVE_STOP_EVENT.clear()
+    _KEEPALIVE_THREAD = threading.Thread(
+        target=_cookie_keepalive_loop, 
+        args=(interval_hours,), 
+        daemon=True,
+        name="XHS-KeepAlive-Thread"
+    )
+    _KEEPALIVE_THREAD.start()
+    logger.info("[xhs-keepalive] Keepalive thread started successfully.")
+
+
+def stop_cookie_keepalive():
+    global _KEEPALIVE_THREAD, _KEEPALIVE_STOP_EVENT
+    if _KEEPALIVE_THREAD is not None:
+        _KEEPALIVE_STOP_EVENT.set()
+        _KEEPALIVE_THREAD.join(timeout=5)
+        _KEEPALIVE_THREAD = None
+        logger.info("[xhs-keepalive] Keepalive thread stopped.")

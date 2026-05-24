@@ -643,6 +643,19 @@ def _trigger_media_scan(device_path: str):
 # -------------------------------------------------------------------
 # 入口
 # -------------------------------------------------------------------
+_LAST_TUNNEL_URL = None
+
+def _keep_reporting_loop(token: str, pixelle_url: str):
+    """心跳自愈线程：每60秒重新上报一次URL给VPS，防止VPS覆盖配置/服务重启丢失连接"""
+    while True:
+        try:
+            if _LAST_TUNNEL_URL and pixelle_url:
+                _report_url_to_pixelle(_LAST_TUNNEL_URL, token, pixelle_url, retries=1)
+        except Exception:
+            pass
+        time.sleep(60)
+
+
 def _start_cloudflared_and_report(port: int, pixelle_url: str, token: str):
     """
     子线程：循环启动 cloudflared（守护模式）。
@@ -683,19 +696,26 @@ def _start_cloudflared_and_report(port: int, pixelle_url: str, token: str):
             if tunnel_url is None:
                 m = url_pattern.search(line)
                 if m:
-                    tunnel_url = m.group(0)
-                    print(f"[cloudflared] ✅ 隧道 URL: {tunnel_url}")
-                    # 写入本地文件
-                    url_file = os.path.expanduser("~/pixelle_agent_url.txt")
-                    try:
-                        with open(url_file, "w") as f:
-                            f.write(tunnel_url + "\n")
-                        print(f"[cloudflared] URL 已写入 {url_file}")
-                    except Exception as e:
-                        print(f"[cloudflared] 写入文件失败: {e}")
-                    # 上报给 Pixelle-Video
-                    if pixelle_url:
-                        _report_url_to_pixelle(tunnel_url, token, pixelle_url)
+                    temp_url = m.group(0)
+                    if "api.trycloudflare.com" not in temp_url:
+                        tunnel_url = temp_url
+                        print(f"[cloudflared] ✅ 隧道 URL: {tunnel_url}")
+                        
+                        # 更新全局变量供心跳上报使用
+                        global _LAST_TUNNEL_URL
+                        _LAST_TUNNEL_URL = tunnel_url
+
+                        # 写入本地文件
+                        url_file = os.path.expanduser("~/pixelle_agent_url.txt")
+                        try:
+                            with open(url_file, "w") as f:
+                                f.write(tunnel_url + "\n")
+                            print(f"[cloudflared] URL 已写入 {url_file}")
+                        except Exception as e:
+                            print(f"[cloudflared] 写入文件失败: {e}")
+                        # 上报给 Pixelle-Video
+                        if pixelle_url:
+                            _report_url_to_pixelle(tunnel_url, token, pixelle_url)
                 elif time.time() > url_deadline:
                     print("[cloudflared] ⚠ 超时未获得隧道 URL，请手动填写到 Pixelle-Video 设置页")
                     # 继续读取，但不再尝试解析 URL
@@ -736,16 +756,16 @@ def _report_url_to_pixelle(tunnel_url: str, agent_token: str, pixelle_url: str, 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Pixelle Phone HTTP Agent")
     parser.add_argument("--token", default=os.getenv("AGENT_TOKEN", ""),
-                        help="认证 Token（X-Token 请求头），留空则不验证")
+                         help="认证 Token（X-Token 请求头），留空则不验证")
     parser.add_argument("--port", type=int, default=int(os.getenv("AGENT_PORT", "7777")),
-                        help="监听端口（默认 7777）")
+                         help="监听端口（默认 7777）")
     parser.add_argument("--push-dir", default=os.getenv("AGENT_PUSH_DIR", "/sdcard/DCIM/PixelleVideo"),
-                        help="文件推送目标目录")
+                         help="文件推送目标目录")
     parser.add_argument("--auto-cloudflare", action="store_true",
-                        default=os.getenv("AGENT_AUTO_CLOUDFLARE", "").lower() in ("1", "true", "yes"),
-                        help="自动启动 cloudflared 并解析隧道 URL")
+                         default=os.getenv("AGENT_AUTO_CLOUDFLARE", "").lower() in ("1", "true", "yes"),
+                         help="自动启动 cloudflared 并解析隧道 URL")
     parser.add_argument("--pixelle-url", default=os.getenv("PIXELLE_SERVER_URL", ""),
-                        help="Pixelle-Video 服务器地址，用于自动上报隧道 URL")
+                         help="Pixelle-Video 服务器地址，用于自动上报隧道 URL")
     args = parser.parse_args()
 
     _TOKEN = args.token
@@ -767,6 +787,15 @@ if __name__ == "__main__":
             daemon=True,
         )
         cf_thread.start()
+        
+        # 启动周期心跳上报线程，守护 VPS 连接自愈
+        if args.pixelle_url:
+            heartbeat_thread = threading.Thread(
+                target=_keep_reporting_loop,
+                args=(args.token, args.pixelle_url),
+                daemon=True,
+            )
+            heartbeat_thread.start()
     else:
         print()
         print("提示：加 --auto-cloudflare 可自动启动 cloudflared 并上报 URL")

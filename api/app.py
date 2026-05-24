@@ -23,6 +23,8 @@ Or with custom settings:
 """
 
 import sys
+import os
+os.environ["IS_FASTAPI_PROCESS"] = "1"
 from pathlib import Path
 
 # Add project root to sys.path for module imports
@@ -75,14 +77,23 @@ async def lifespan(app: FastAPI):
     await task_manager.start()
     from pixelle_video.services.device_manager import device_manager
     from pixelle_video.services.publish_scheduler import publish_scheduler
+    from pixelle_video.services.smart_scraper import start_cookie_keepalive, stop_cookie_keepalive
+    
     device_manager.start_auto_sync(interval_seconds=8)
     publish_scheduler.start_scheduler()
+    start_cookie_keepalive(interval_hours=12.0)
     logger.info("✅ Pixelle-Video API started successfully\n")
     
     yield
     
     # Shutdown
     logger.info("🛑 Shutting down Pixelle-Video API...")
+    try:
+        from pixelle_video.services.smart_scraper import stop_cookie_keepalive
+        stop_cookie_keepalive()
+    except Exception as e:
+        logger.warning(f"Failed to stop cookie keepalive: {e}")
+        
     device_manager.stop_auto_sync()
     publish_scheduler.stop_scheduler()
     await task_manager.stop()

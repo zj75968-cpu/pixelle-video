@@ -152,7 +152,14 @@ class ImageTextPostPipeline:
             image_prompt = str(frame.get("image_prompt", "")).strip()
             caption = str(frame.get("caption", "")).strip()
             if not image_prompt:
-                raise ValueError(f"Frame {index + 1} missing image_prompt")
+                # 兜底：用 caption 或主题生成一个通用 prompt，避免因 LLM 漏字段而整体失败
+                if caption:
+                    image_prompt = f"An aesthetic photo illustration for: {caption}"
+                else:
+                    image_prompt = f"A beautiful aesthetic illustration related to {topic}, frame {index + 1}"
+                logger.warning(
+                    f"Frame {index + 1} missing image_prompt, using fallback: {image_prompt[:60]}..."
+                )
             post_frames.append(
                 PostFrame(
                     index=index,

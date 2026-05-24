@@ -56,7 +56,10 @@ class XHSQRLoginThread(threading.Thread):
                     }
                     
                     # 检查是否成功登录并包含关键 a1 与 web_session
+                    from loguru import logger as _log
+                    _log.info(f"[xhs-qr] Current cookies: {list(cookie_dict.keys())}")
                     if cookie_dict.get("a1") and cookie_dict.get("web_session"):
+                        _log.info("[xhs-qr] Successful login detected!")
                         self.cookies = cookie_dict
                         self.status = "logged_in"
                         break

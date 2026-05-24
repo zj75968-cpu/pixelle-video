@@ -130,8 +130,27 @@ def render_login_page():
             if st.button("登录平台", key="login_btn_submit", use_container_width=True):
                 from web.utils.auth import auth_service
                 if auth_service.authenticate(login_username, login_password):
+                    username = login_username.strip().lower()
                     st.session_state.authenticated = True
-                    st.session_state.username = login_username.strip().lower()
+                    st.session_state.username = username
+                    
+                    # 生成安全 Cookie 并写入浏览器 Context 使得刷新免登录
+                    user_data = auth_service._users.get(username)
+                    if user_data:
+                        import hashlib
+                        stored_hash = user_data["password_hash"]
+                        token = hashlib.sha256((username + stored_hash).encode()).hexdigest()
+                        st.components.v1.html(
+                            f"""
+                            <script>
+                            parent.document.cookie = "pixelle_username={username}; path=/; max-age=2592000; SameSite=Lax";
+                            parent.document.cookie = "pixelle_auth_token={token}; path=/; max-age=2592000; SameSite=Lax";
+                            </script>
+                            """,
+                            height=0,
+                            width=0
+                        )
+                    
                     st.success("🎉 登录成功，正在加载工作区...")
                     time.sleep(0.5)
                     st.rerun()
@@ -163,8 +182,34 @@ def main():
     if "username" not in st.session_state:
         st.session_state.username = None
 
+    # 尝试通过 Cookie 自动登录以解决刷新丢失登录态的问题
     if not st.session_state.authenticated:
-        render_login_page()
+        try:
+            cookies = st.context.cookies
+            username = cookies.get("pixelle_username")
+            auth_token = cookies.get("pixelle_auth_token")
+            if username and auth_token:
+                from web.utils.auth import auth_service
+                username_cleaned = username.strip().lower()
+                user_data = auth_service._users.get(username_cleaned)
+                if user_data:
+                    import hashlib
+                    stored_hash = user_data["password_hash"]
+                    expected_token = hashlib.sha256((username_cleaned + stored_hash).encode()).hexdigest()
+                    if auth_token == expected_token:
+                        st.session_state.authenticated = True
+                        st.session_state.username = username_cleaned
+        except Exception:
+            pass
+
+    if not st.session_state.authenticated:
+        login_page = st.Page(
+            render_login_page,
+            title="登录",
+            icon="🔑",
+        )
+        pg = st.navigation([login_page], position="hidden")
+        pg.run()
         return
 
     # Render User Info and Logout on Top Right
@@ -179,54 +224,66 @@ def main():
         if st.button("退出登录", key="app_logout_btn", use_container_width=True):
             st.session_state.authenticated = False
             st.session_state.username = None
+            # 清除浏览器端的持久登录 Cookie
+            st.components.v1.html(
+                """
+                <script>
+                parent.document.cookie = "pixelle_username=; path=/; max-age=0; SameSite=Lax";
+                parent.document.cookie = "pixelle_auth_token=; path=/; max-age=0; SameSite=Lax";
+                </script>
+                """,
+                height=0,
+                width=0
+            )
+            time.sleep(0.1)
             st.rerun()
 
     # Define pages using st.Page
     create_page = st.Page(
-        "pages/1_Create.py",
+        "views/1_Create.py",
         title="创作",
         icon="🎨",
         default=True,
     )
 
     history_page = st.Page(
-        "pages/2_History.py",
+        "views/2_History.py",
         title="历史记录",
         icon="📚",
     )
 
     traffic_page = st.Page(
-        "pages/3_Traffic.py",
+        "views/3_Traffic.py",
         title="引流",
         icon="🔥",
     )
 
     publish_page = st.Page(
-        "pages/4_Publish.py",
+        "views/4_Publish.py",
         title="发布管理",
         icon="📱",
     )
 
     agent_page = st.Page(
-        "pages/8_Agent.py",
+        "views/8_Agent.py",
         title="Agent 大脑",
         icon="🤖",
     )
 
     scraper_page = st.Page(
-        "pages/9_Scraper.py",
+        "views/9_Scraper.py",
         title="搬运",
         icon="🔄",
     )
 
     banned_page = st.Page(
-        "pages/7_Banned.py",
+        "views/7_Banned.py",
         title="违禁词",
         icon="🚫",
     )
 
     settings_page = st.Page(
-        "pages/9_Settings.py",
+        "views/9_Settings.py",
         title="设置",
         icon="⚙️",
         url_path="settings",

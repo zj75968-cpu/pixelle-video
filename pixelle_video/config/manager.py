@@ -42,6 +42,7 @@ class ConfigManager:
         
         self.base_config_path = Path(config_path)
         self._user_configs = {}
+        self._user_config_mtimes = {}  # Cache mtime of user config files
         self._initialized = True
 
     @property
@@ -65,8 +66,20 @@ class ConfigManager:
     def config(self) -> PixelleVideoConfig:
         from pixelle_video.utils.user_context import get_current_username
         username = get_current_username()
-        if username not in self._user_configs:
+        
+        path = self.config_path
+        current_mtime = 0
+        try:
+            if path.exists():
+                current_mtime = path.stat().st_mtime
+        except Exception:
+            pass
+            
+        if (username not in self._user_configs or 
+            self._user_config_mtimes.get(username, 0) != current_mtime):
             self._user_configs[username] = self._load()
+            self._user_config_mtimes[username] = current_mtime
+            
         return self._user_configs[username]
 
     @config.setter
@@ -74,6 +87,15 @@ class ConfigManager:
         from pixelle_video.utils.user_context import get_current_username
         username = get_current_username()
         self._user_configs[username] = value
+        
+        path = self.config_path
+        try:
+            if path.exists():
+                self._user_config_mtimes[username] = path.stat().st_mtime
+            else:
+                self._user_config_mtimes[username] = 0
+        except Exception:
+            self._user_config_mtimes[username] = 0
     
     def _load(self) -> PixelleVideoConfig:
         """Load configuration from file"""
@@ -101,12 +123,28 @@ class ConfigManager:
     
     def reload(self):
         """Reload configuration from file"""
-        self.config = self._load()
+        from pixelle_video.utils.user_context import get_current_username
+        username = get_current_username()
+        self._user_configs[username] = self._load()
+        path = self.config_path
+        try:
+            if path.exists():
+                self._user_config_mtimes[username] = path.stat().st_mtime
+        except Exception:
+            pass
         logger.info("Configuration reloaded")
     
     def save(self):
         """Save current configuration to file"""
-        save_config_dict(self.config.to_dict(), str(self.config_path))
+        from pixelle_video.utils.user_context import get_current_username
+        username = get_current_username()
+        path = self.config_path
+        save_config_dict(self.config.to_dict(), str(path))
+        try:
+            if path.exists():
+                self._user_config_mtimes[username] = path.stat().st_mtime
+        except Exception:
+            pass
     
     def update(self, updates: dict):
         """

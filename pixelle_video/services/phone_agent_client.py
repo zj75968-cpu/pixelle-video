@@ -40,6 +40,10 @@ DEFAULT_CHUNK_SIZE = 5 * 1024 * 1024
 def _make_session(token: str) -> requests.Session:
     """创建带认证头的 requests Session。"""
     s = requests.Session()
+    s.headers.update({
+        "Bypass-Tunnel-Reminder": "true",
+        "bypass-tunnel-reminder": "true"
+    })
     if token:
         s.headers.update({"X-Token": token})
     return s
@@ -290,6 +294,89 @@ def wait_for_publish(
                 return result
         except requests.RequestException as e:
             logger.warning(f"wait_for_publish poll error: {e}")
+        time.sleep(poll_interval)
+
+    return {"status": "failed", "message": "等待超时"}
+
+
+def comment_http(
+    title: str,
+    comment_text: str,
+    agent_url: str,
+    token: str = "",
+    timeout: int = 15,
+) -> dict:
+    """
+    调用手机 HTTP Agent 的 /comment 接口，在手机上发表评论。
+    """
+    try:
+        session = _make_session(token)
+        resp = session.post(
+            f"{agent_url.rstrip('/')}/comment",
+            json={
+                "title": title,
+                "comment_text": comment_text,
+            },
+            timeout=timeout,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except requests.RequestException as e:
+        logger.error(f"comment_http: {e}")
+        return {"ok": False, "error": str(e)}
+
+
+def delete_http(
+    title: str,
+    agent_url: str,
+    token: str = "",
+    timeout: int = 15,
+) -> dict:
+    """
+    调用手机 HTTP Agent 的 /delete 接口，在手机上删除帖子。
+    """
+    try:
+        session = _make_session(token)
+        resp = session.post(
+            f"{agent_url.rstrip('/')}/delete",
+            json={
+                "title": title,
+            },
+            timeout=timeout,
+        )
+        resp.raise_for_status()
+        return resp.json()
+    except requests.RequestException as e:
+        logger.error(f"delete_http: {e}")
+        return {"ok": False, "error": str(e)}
+
+
+def wait_for_status(
+    task_id: str,
+    agent_url: str,
+    token: str = "",
+    poll_interval: float = 3.0,
+    max_wait: float = 300.0,
+    success_states: tuple = ("success", "comment_success", "deleted"),
+) -> dict:
+    """
+    通用轮询 /publish-status/<task_id> 直到任务完成或超时。
+    """
+    deadline = time.time() + max_wait
+    session = _make_session(token)
+    url = f"{agent_url.rstrip('/')}/publish-status/{task_id}"
+
+    while time.time() < deadline:
+        try:
+            resp = session.get(url, timeout=10)
+            resp.raise_for_status()
+            result = resp.json()
+            status = result.get("status", "")
+            logger.debug(f"wait_for_status [{task_id[:8]}]: {status} — {result.get('message', '')}")
+            if status in success_states or status == "failed":
+                return result
+        except requests.RequestException as e:
+            logger.warning(f"wait_for_status poll error: {e}")
         time.sleep(poll_interval)
 
     return {"status": "failed", "message": "等待超时"}

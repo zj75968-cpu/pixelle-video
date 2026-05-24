@@ -979,6 +979,12 @@ class XHSPublisher:
                 logger.info(f"_check_success: ✅ tier-1 '{_t1}'")
                 return True
 
+        # Tier 1.5: sharing overlay sheet means definitive success
+        if d(text="分享至").exists(timeout=1):
+            logger.info("_check_success: ✅ tier-1.5 '分享至' sheet detected")
+            d.press("back")
+            return True
+
         # Tier 2: if still uploading/publishing, wait for completion
         # (video uploads can take 30-60 s after the publish tap)
         _upload_phrases = ("发布中", "上传中", "正在发布", "视频上传中")
@@ -1032,6 +1038,11 @@ class XHSPublisher:
                 if _t1 in xml:
                     logger.info(f"_check_success: ✅ tier-1 in XML '{_t1}'")
                     return True
+
+            if "分享至" in xml:
+                logger.info("_check_success: ✅ '分享至' sheet detected in XML hierarchy")
+                d.press("back")
+                return True
 
             # Note "发布中"/"上传中" still in XML after wait = unconfirmed (not success)
             for _p in ("发布中", "上传中"):
@@ -1304,25 +1315,34 @@ class XHSPublisher:
             time.sleep(3)
             self._dismiss_blocking_dialogs(d)
 
-            # 5. Click "编辑和权限设置" to open 笔记设置 bottom sheet
-            if not d(text="编辑和权限设置").exists(timeout=4):
-                self._screenshot(d, "delete_edit_button_not_found")
-                logger.warning(f"[{self.serial}] delete_post: '编辑和权限设置' not found")
+            # 5. Click top-right share/more button (three dots) to open sharing sheet
+            share_btn = d(description="分享")
+            if not share_btn.exists(timeout=3):
+                # Fallback coordinates
+                dots_x = int(w * 0.92)
+                dots_y = int(h * 0.08)
+                d.click(dots_x, dots_y)
+            else:
+                share_btn.click()
+            time.sleep(2.5)
+
+            # Wait for bottom sheet "分享至"
+            if not d(text="分享至").exists(timeout=4):
+                self._screenshot(d, "delete_share_sheet_not_found")
+                logger.warning(f"[{self.serial}] delete_post: share sheet '分享至' not found")
                 d.press("back")
                 return False
-            d(text="编辑和权限设置").click()
-            time.sleep(2)
 
-            # 6. Swipe LEFT in icon row to reveal "删除" (it's off-screen to the right).
-            # Icon row Y varies across screen sizes / nav-bar styles; try several Ys.
+            # 6. Swipe LEFT in Row 2 (actions row) to reveal "删除"
+            # Row 2 Y center is around h * 0.93
             delete_visible = False
-            for y_frac in (0.935, 0.91, 0.96, 0.89):
+            row2_y = int(h * 0.93)
+            for _ in range(3):
                 if d(text="删除").exists(timeout=0.5):
                     delete_visible = True
                     break
-                icon_y = int(h * y_frac)
-                d.swipe(int(w * 0.83), icon_y, int(w * 0.05), icon_y, duration=0.6)
-                time.sleep(0.8)
+                d.swipe(int(w * 0.90), row2_y, int(w * 0.10), row2_y, duration=0.6)
+                time.sleep(1.0)
 
             # 7. Tap "删除"
             if not (delete_visible or d(text="删除").exists(timeout=3)):
@@ -1333,14 +1353,14 @@ class XHSPublisher:
             d(text="删除").click()
             time.sleep(1.5)
 
-            # 8. Tap "删除笔记" (first confirmation, if a 2-step dialog appears)
+            # 8. Tap "删除笔记" (first confirmation)
             if d(text="删除笔记").exists(timeout=3):
                 d(text="删除笔记").click()
                 time.sleep(1.5)
 
-            # 9. Tap "确认删除" / "确认" / "确定" (final confirmation)
+            # 9. Tap "确认删除" / "确认" / "确定" / "删除" (final confirmation)
             final_tapped = False
-            for confirm_text in ("确认删除", "确认", "确定"):
+            for confirm_text in ("确认删除", "确认", "确定", "删除"):
                 if d(text=confirm_text).exists(timeout=2):
                     d(text=confirm_text).click()
                     final_tapped = True

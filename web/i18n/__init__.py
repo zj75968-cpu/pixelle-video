@@ -22,7 +22,7 @@ from typing import Dict, Optional
 from loguru import logger
 
 _locales: Dict[str, dict] = {}
-_current_language: str = "en_US"  # Default fallback to English
+_current_language: str = "zh_CN"  # Default fallback to Chinese
 
 
 def load_locales() -> Dict[str, dict]:
@@ -235,15 +235,15 @@ def detect_system_language() -> str:
     except Exception as e:
         logger.warning(f"Failed to detect system language: {e}")
     
-    # Fallback to English
-    return "en_US"
+    # Fallback to Chinese
+    return "zh_CN"
 
 
 # Auto-load locales on import
 load_locales()
 
-# Auto-detect and set system language
-_detected_language = detect_system_language()
+# Auto-detect and set system language (Default to Chinese for Xiaohongshu platform)
+_detected_language = "zh_CN"
 _current_language = _detected_language
 logger.info(f"Default language initialized to: {_current_language}")
 

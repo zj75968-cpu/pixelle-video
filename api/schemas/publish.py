@@ -31,6 +31,14 @@ class PublishJobRequest(BaseModel):
         default=None,
         description="ISO-8601 datetime string for scheduled publish. Null = immediate.",
     )
+    delete_after_hours: Optional[float] = Field(
+        default=None,
+        description="Auto-delete TTL in hours (e.g. 0.01 for ~36 seconds)",
+    )
+    auto_comment_text: Optional[str] = Field(
+        default=None,
+        description="Text content for auto comment after publish",
+    )
 
 
 class PublishJobResponse(BaseModel):
@@ -44,6 +52,8 @@ class PublishJobResponse(BaseModel):
     started_at: Optional[str]
     finished_at: Optional[str]
     error: Optional[str]
+    delete_after_hours: Optional[float] = None
+    auto_comment_text: Optional[str] = None
 
 
 class PublishJobListResponse(BaseModel):
