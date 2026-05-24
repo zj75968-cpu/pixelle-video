@@ -1,4 +1,4 @@
-﻿# Copyright (C) 2025 AIDC-AI
+# Copyright (C) 2025 AIDC-AI
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -411,7 +411,7 @@ def render_result(result):
         st.markdown("**发布到小红书？** 点击右侧按钮前往发布管理创建发布任务")
     with col_btn:
         if st.button("📱 前往发布管理", width="stretch"):
-            st.switch_page("pages/4_📱_Publish.py")
+            st.switch_page("pages/4_Publish.py")
 
     # Store result in session for publish page
     st.session_state["last_post_result"] = {

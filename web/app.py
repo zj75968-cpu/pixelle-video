@@ -34,7 +34,7 @@ st.set_page_config(
     page_title="AI Video Generator",
     page_icon="🎬",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 
@@ -61,9 +61,6 @@ _start_ttl_watcher_once()
 st.markdown(
     """
     <style>
-    [data-testid="stSidebar"] {
-        display: none !important;
-    }
     [data-testid="stMain"] {
         width: 100% !important;
         flex: 1 1 100% !important;
@@ -73,10 +70,6 @@ st.markdown(
         width: 100% !important;
         padding-left: 1rem !important;
         padding-right: 1rem !important;
-    }
-    /* 设置页导航入口隐藏，管理员通过 /settings?k=密鑰 访问 */
-    a[href*="settings"] {
-        display: none !important;
     }
     </style>
     """,
@@ -198,8 +191,14 @@ def main():
 
     history_page = st.Page(
         "pages/2_History.py",
-        title="History",
+        title="历史记录",
         icon="📚",
+    )
+
+    traffic_page = st.Page(
+        "pages/3_Traffic.py",
+        title="引流",
+        icon="🔥",
     )
 
     publish_page = st.Page(
@@ -234,10 +233,26 @@ def main():
     )
 
     pg = st.navigation(
-        [create_page, history_page, publish_page, agent_page, scraper_page, banned_page, settings_page],
-        position="top",
+        [
+            create_page,
+            history_page,
+            traffic_page,
+            publish_page,
+            agent_page,
+            scraper_page,
+            banned_page,
+            settings_page,
+        ],
+        position="sidebar",
     )
-    pg.run()
+
+    # Prevent StreamlitAPIException when subpages call st.set_page_config
+    _orig_set_page_config = st.set_page_config
+    st.set_page_config = lambda *args, **kwargs: None
+    try:
+        pg.run()
+    finally:
+        st.set_page_config = _orig_set_page_config
 
 
 if __name__ == "__main__":

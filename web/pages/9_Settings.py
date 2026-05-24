@@ -109,7 +109,7 @@ with col_logout:
     if st.button("退出", width="stretch"):
         st.session_state.is_admin = False
         st.session_state.reveal_keys = {}
-        st.switch_page("pages/1_🎨_创作.py")
+        st.switch_page("pages/1_Create.py")
 
 st.caption("修改完成后点击底部「💾 保存配置」生效。")
 
