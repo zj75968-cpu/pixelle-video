@@ -545,7 +545,8 @@ def _render_auto_refresh_device_list(dm):
                 "由于手机是用 USB 数据线插在您的**本地电脑**上，公网 VPS 无法跨越网络直接读取您本地电脑的 USB 接口，因此这里不会显示任何 USB 设备。\n\n"
                 "**💡 极简解决方案（推荐）：**\n"
                 "- **无需连接电脑**，请直接点击上方 **「📱 手机自治挂机 (免电脑)」** 选项卡。\n"
-                "- 按照说明在手机 Termux 中直接输入 `curl http://23.238.47.62/s | bash` 命令（仅 20 多个字符），即可直接无线一键配对上线，完全省去连电脑的步骤！\n\n"
+                f"- 按照说明在手机 Termux 中直接输入 `curl -sSL http://{host or '<你的VPS>'}/api/phone-agent/setup | bash` 命令，"
+                "脚本会自动安装环境、拉取 phone_agent、自动注册到 VPS 并立刻挂机上线。\n\n"
                 "**💻 如仍需使用电脑 USB 灌装：**\n"
                 "1. **请在您的本地电脑上运行本地服务**：双击本地目录下的 `start_web.bat`（启动本地网页端）。\n"
                 "2. 在本地电脑的浏览器中打开：[http://localhost:8501](http://localhost:8501)。\n"
@@ -608,6 +609,32 @@ def render_devices_tab():
                     st.rerun()
 
     _render_auto_refresh_device_list(dm)
+
+    # ── 客户端挂机小助手下载引导 ──
+    st.markdown("---")
+    st.subheader("🖥️ 挂机节点扩展助手")
+    st.info(
+        "💡 **分布式多电脑矩阵挂机**：\n"
+        "如果你想在其他 Windows 电脑上插手机并连接到本云端，只需在新电脑上运行本助手即可，一键双击直连，无需配置 Python 环境！\n\n"
+        "1. 点击下方按钮，下载挂机小助手程序到你的新电脑；\n"
+        "2. 将新电脑的手机开启 USB 调试并连入新电脑；\n"
+        "3. 双击运行小助手即可立刻在当前网页捕获新接入的设备！"
+    )
+    
+    from pathlib import Path
+    exe_path = Path(__file__).resolve().parent.parent.parent / "local_agent.exe"
+    if exe_path.exists():
+        with open(exe_path, "rb") as f:
+            st.download_button(
+                label="📥 点击一键下载 Windows 挂机助手 (.exe)",
+                data=f.read(),
+                file_name="local_agent.exe",
+                mime="application/octet-stream",
+                key="download_local_agent_exe",
+                use_container_width=True
+            )
+    else:
+        st.warning("⏳ 挂机小助手 .exe 后台程序正在云端编译中，稍后刷新页面即可点击下载。")
 
     # Add device section
     st.markdown("---")
@@ -942,293 +969,7 @@ def render_publish_tab():
     dm = get_device_manager()
     _init_publish_form_defaults()
 
-    # Auto-prefill post_type & delete_after_hours from <task>/post_params.json
-    # whenever the form's task_id changes. This honours the TTL set on the
-    # generation page so 引流帖 inherits "auto-delete after N hours" by default.
-    _current_task_id = str(st.session_state.get(PUBLISH_FORM_KEYS["task_id"], "")).strip()
-    if _current_task_id and st.session_state.get("_publish_prefill_task_id") != _current_task_id:
-        _params_path = _project_root / "output" / _current_task_id / "post_params.json"
-        _params = _safe_load_json(_params_path) if _params_path.exists() else None
-        if isinstance(_params, dict):
-            _pt = str(_params.get("post_type") or "content")
-            if _pt in ("content", "traffic"):
-                st.session_state["post_type_select"] = _pt
-            try:
-                _ttl = float(_params.get("traffic_ttl_hours") or 0.0)
-            except (TypeError, ValueError):
-                _ttl = 0.0
-            if _pt == "traffic" and _ttl > 0:
-                st.session_state["delete_after_hours_input"] = max(0.01, min(720.0, _ttl))
-        st.session_state["_publish_prefill_task_id"] = _current_task_id
 
-    # ── 每日定时计划配置（行内，无需跳转到设置页）──────────────
-    with st.expander("📅 每日发布计划", expanded=False):
-        st.caption("设置每天自动发布的时间段（24 小时制 HH:MM，每行一个）。\n选择「按计划自动安排」时，系统自动将任务分配到下一个未被占用的时间槽。")
-        _times_val = "\n".join(_xhs_cfg.daily_schedule_times)
-        _new_times_raw = st.text_area(
-            "发布时间段",
-            value=_times_val,
-            height=120,
-            key="inline_xhs_schedule_times",
-            placeholder="09:00\n12:00\n18:00",
-        )
-        if st.button("💾 保存时间段", key="save_inline_schedule"):
-            _parsed = [t.strip() for t in _new_times_raw.splitlines() if t.strip() and ":" in t.strip()]
-            if not _parsed:
-                st.error("请至少填写一个有效时间（格式 HH:MM）")
-            else:
-                try:
-                    _cm.update({"xhs_publish": {"daily_schedule_times": _parsed}})
-                    _cm.save()
-                    st.success(f"✅ 已保存 {len(_parsed)} 个时间段：{', '.join(_parsed)}")
-                    st.rerun()
-                except Exception as _e:
-                    st.error(f"保存失败：{_e}")
-
-    # New publish job form
-    with st.expander(
-        "➕ 新建发布任务 / 定时发布",
-        expanded=True,
-    ):
-        devices_all = [d for d in dm.get_all() if d.connected]
-        devices_sorted = sorted(devices_all, key=lambda d: 0 if d.serial == "phone_agent" else 1)
-        if "publish_suggested_serials" not in st.session_state:
-            has_phone_agent = any(d.serial == "phone_agent" for d in devices_sorted)
-            st.session_state["publish_suggested_serials"] = ["phone_agent"] if has_phone_agent else []
-        suggested_serials = st.session_state["publish_suggested_serials"]
-        all_connected_serials = [d.serial for d in devices_sorted]
-
-        with st.form("new_publish_job"):
-            devices = devices_sorted
-            if not devices:
-                st.warning("没有已连接的设备。请先在“设备管理”中连接手机。")
-                fallback_serial = st.text_input("设备 Serial（手动输入）", placeholder="192.168.1.100:5555")
-                selected_serials = [fallback_serial.strip()] if fallback_serial.strip() else []
-            else:
-                device_options = {f"{d.name or d.serial} ({d.serial})": d.serial for d in devices}
-                default_labels = [
-                    label for label, serial in device_options.items() if serial in suggested_serials
-                ]
-                selected_labels = st.multiselect(
-                    "选择目标设备（可多选）",
-                    options=list(device_options.keys()),
-                    default=default_labels,
-                    help="支持一次创建多台手机的发布任务",
-                )
-                selected_serials = [device_options[label] for label in selected_labels]
-
-            task_id = st.text_input(
-                "关联任务 ID",
-                key=PUBLISH_FORM_KEYS["task_id"],
-                placeholder="图文生成任务 ID",
-            )
-            topic = st.text_input("创作主题（用于自动推荐设备）", key=PUBLISH_FORM_KEYS["topic"])
-            title = st.text_input("帖子标题", key=PUBLISH_FORM_KEYS["title"])
-            body = st.text_area("帖子正文", key=PUBLISH_FORM_KEYS["body"], height=150)
-            hashtags_raw = st.text_input(
-                "话题标签（逗号分隔，不带 #）",
-                key=PUBLISH_FORM_KEYS["hashtags_raw"],
-            )
-            images_raw = st.text_area(
-                "图片路径（每行一条）",
-                key=PUBLISH_FORM_KEYS["images_raw"],
-                height=100,
-            )
-
-            # Post type & TTL
-            post_type_col1, post_type_col2 = st.columns([1, 2])
-            with post_type_col1:
-                post_type = st.selectbox(
-                    "帖子类型",
-                    options=["content", "traffic"],
-                    format_func=lambda x: "📚 干货帖（长期保留）" if x == "content" else "📢 引流帖（可自动删除）",
-                    key="post_type_select",
-                )
-            with post_type_col2:
-                delete_after_hours: float | None = None
-                if post_type == "traffic":
-                    delete_after_hours = st.number_input(
-                        "⏱️ 自动删除倒计时（小时）",
-                        min_value=0.01,
-                        max_value=720.0,
-                        value=24.0,
-                        step=0.01,
-                        help="发布成功后，经过指定小时数自动删除帖子（0 = 不自动删除）",
-                        key="delete_after_hours_input",
-                    )
-                    if delete_after_hours <= 0:
-                        delete_after_hours = None
-                else:
-                    st.caption("干货帖不设自动删除")
-
-            # Auto Comment Text
-            auto_comment_text = st.text_input(
-                "💬 发布成功后自动评论内容（留空则不自动评论）",
-                placeholder="例如：感谢关注！主页有更多精彩内容哦~",
-                key="auto_comment_text_input",
-            )
-
-            schedule_col1, schedule_col2 = st.columns([1, 2])
-            with schedule_col1:
-                schedule_mode = st.radio(
-                    "发布方式",
-                    options=["立即发布", "定时发布", "📅 按计划自动安排"],
-                    horizontal=False,
-                    key="schedule_mode_radio",
-                )
-            with schedule_col2:
-                scheduled_dt = None
-                if schedule_mode == "定时发布":
-                    default_dt = datetime.now() + timedelta(hours=1)
-                    scheduled_dt = st.datetime_input(
-                        "发布时间",
-                        value=default_dt,
-                        min_value=datetime.now(),
-                    )
-                elif schedule_mode == "📅 按计划自动安排":
-                    _preview_serial = selected_serials[0] if selected_serials else None
-                    if _preview_serial:
-                        _next_slot = scheduler.next_available_slot(_preview_serial)
-                        if _next_slot:
-                            st.info(
-                                f"**{_preview_serial}** 下一个可用时间：\n\n"
-                                f"🕐 {_next_slot.strftime('%m-%d %H:%M')}"
-                            )
-                        else:
-                            st.warning("未找到可用时间段，请在「⚙️ 设置」中配置每日发布计划。")
-                    else:
-                        _cfg_times = _xhs_cfg.daily_schedule_times
-                        if _cfg_times:
-                            st.caption(f"已配置时间段：{', '.join(_cfg_times)}")
-                        else:
-                            st.warning("请先在「⚙️ 设置」中配置每日发布时间段。")
-
-            action_col1, action_col2, action_col3, action_col4 = st.columns([1, 1, 1, 2])
-            with action_col1:
-                recommend_clicked = st.form_submit_button("🎯 按主题推荐设备")
-            with action_col2:
-                select_all_clicked = st.form_submit_button("✅ 全选在线设备")
-            with action_col3:
-                clear_selection_clicked = st.form_submit_button("🧹 清空选择")
-            with action_col4:
-                submit_clicked = st.form_submit_button("📤 提交并创建发布任务", type="primary")
-
-            if select_all_clicked:
-                st.session_state["publish_suggested_serials"] = all_connected_serials
-                st.rerun()
-
-            if clear_selection_clicked:
-                st.session_state["publish_suggested_serials"] = []
-                st.rerun()
-
-            if recommend_clicked:
-                if not topic.strip():
-                    st.warning("请先填写创作主题后再推荐设备")
-                else:
-                    ranked = dm.suggest_devices_by_topic(topic.strip(), connected_only=True)
-                    if not ranked:
-                        themed_online = [d for d in devices if d.theme]
-                        if not themed_online:
-                            st.info("当前在线设备都未设置默认主题，请先在设备管理中填写内容主题。")
-                        else:
-                            st.info("没有找到匹配主题的在线设备，请手动选择设备。")
-                        st.session_state["publish_suggested_serials"] = []
-                    else:
-                        st.session_state["publish_suggested_serials"] = [dev.serial for dev, _, _ in ranked]
-                        reasons = "、".join([
-                            f"{dev.name or dev.serial}({reason})"
-                            for dev, _, reason in ranked[:3]
-                        ])
-                        st.success(f"已推荐 {len(ranked)} 台设备：{reasons}")
-                    st.rerun()
-
-            if submit_clicked:
-                images = [p.strip() for p in images_raw.splitlines() if p.strip()]
-                hashtags = [t.strip().lstrip("#") for t in hashtags_raw.split(",") if t.strip()]
-
-                if not selected_serials:
-                    st.error("请至少选择一台目标设备")
-                elif not title.strip():
-                    st.error("请填写帖子标题")
-                elif not images:
-                    st.error("请填写至少一张图片路径")
-                elif schedule_mode == "📅 按计划自动安排" and not _xhs_cfg.daily_schedule_times:
-                    st.error("请先在「⚙️ 设置」→「小红书发布配置」中添加每日发布时间段。")
-                else:
-                    created_jobs = []
-                    failed_devices = []
-                    for serial in selected_serials:
-                        try:
-                            # Determine scheduled_at per device
-                            if schedule_mode == "📅 按计划自动安排":
-                                _slot = scheduler.next_available_slot(serial)
-                                _scheduled_at = _slot.isoformat() if _slot else None
-                            elif schedule_mode == "定时发布":
-                                _scheduled_at = scheduled_dt.isoformat() if scheduled_dt else None
-                            else:
-                                _scheduled_at = None  # 立即发布
-
-                            job = scheduler.add_job(
-                                serial=serial,
-                                task_id=task_id or "manual",
-                                title=title.strip(),
-                                body=body.strip(),
-                                hashtags=hashtags,
-                                images=images,
-                                scheduled_at=_scheduled_at,
-                                post_type=post_type,
-                                delete_after_hours=delete_after_hours,
-                                auto_comment_text=auto_comment_text.strip() if auto_comment_text.strip() else None,
-                            )
-                            created_jobs.append(job.job_id)
-                        except Exception as e:
-                            failed_devices.append(f"{serial}: {e}")
-
-                    if created_jobs:
-                        st.success(
-                            f"已为 {len(created_jobs)} 台设备创建任务。\n"
-                            f"Job IDs: {', '.join(created_jobs[:3])}"
-                            + (" ..." if len(created_jobs) > 3 else "")
-                        )
-                    if failed_devices:
-                        st.error("部分设备创建失败：" + " | ".join(failed_devices))
-                    st.rerun()
-
-    # ── 定时任务预览 ────────────────────────────────────────────
-    scheduled_jobs = [j for j in scheduler.list_jobs() if j.status == "scheduled"]
-    if scheduled_jobs:
-        st.markdown("---")
-        st.subheader("🕐 待执行的定时任务")
-        for sj in scheduled_jobs:
-            run_at_str = ""
-            if sj.scheduled_at:
-                try:
-                    run_at_str = datetime.fromisoformat(sj.scheduled_at).strftime("%m-%d %H:%M")
-                except Exception:
-                    run_at_str = sj.scheduled_at
-            kind_label = "视频" if sj.kind == "video" else "图文"
-            col_a, col_b, col_c = st.columns([3, 1, 1])
-            with col_a:
-                st.markdown(
-                    f"**{sj.title or '（无标题）'}**  "
-                    f"`{kind_label}` · 设备 `{sj.serial}` · 🕐 `{run_at_str}`"
-                )
-            with col_b:
-                if st.button("▶️ 立即执行", key=f"fire_now_{sj.job_id}"):
-                    import asyncio as _asyncio
-                    import threading as _th
-                    _th.Thread(
-                        target=lambda jid=sj.job_id: _asyncio.run(
-                            scheduler._execute_job(jid)
-                        ),
-                        daemon=True,
-                    ).start()
-                    st.toast(f"已触发任务 {sj.job_id[:8]}", icon="▶️")
-                    st.rerun()
-            with col_c:
-                if st.button("🗑️ 取消", key=f"cancel_sched_{sj.job_id}"):
-                    scheduler.cancel_job(sj.job_id)
-                    st.rerun()
 
     # Job list
     st.markdown("---")
@@ -1911,10 +1652,30 @@ def render_phone_agent_tab():
 
         short_cmd = f"curl http://{server_ip}/s | bash"
         st.code(short_cmd, language="bash")
-        st.caption("👉 **超极简命令（只需在手机上输入这行字并回车）**。脚本会自动下载并全自动安装环境。")
-        st.write("若上述命令无法使用，可使用备用长命令：")
-        setup_cmd = f"curl -sSL http://{server_ip}/static/setup_termux.sh | bash"
+        st.caption(
+            "👉 **超极简命令**（仅 20 多个字符，在手机 Termux 里粘贴回车即可）。"
+            "需要 VPS 的 nginx 把 `/s` 转发到 FastAPI（默认 8000 端口）。"
+        )
+        st.write("若 `/s` 短链尚未在 nginx 中配置，请使用下面的**等价长命令**，它走的是已经存在的 `/api/*` 反代路径，**开箱即用**：")
+        setup_cmd = f"curl -sSL http://{server_ip}/api/phone-agent/setup | bash"
         st.code(setup_cmd, language="bash")
+        st.caption(
+            "脚本会自动安装 python/flask/cloudflared、从本 VPS 拉取最新 `phone_agent.py`、"
+            "把你的 VPS 地址与 Token 写入 `~/.pixelle.env`，并立刻启动一次挂机（你会看到 `[report] ✅ URL 已上报到 Pixelle-Video`）。"
+        )
+
+        with st.expander("🔧 想用 20 字符的 `/s` 短链？给 nginx 加这一段即可"):
+            st.code(
+                f"""# /etc/nginx/conf.d/pixelle.conf 或站点 server 块内添加：
+location = /s {{
+    proxy_pass http://127.0.0.1:8000/s;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header X-Forwarded-Host  $host;
+}}
+# 然后： sudo nginx -t && sudo nginx -s reload""",
+                language="nginx",
+            )
 
     with col2:
         st.markdown("#### **第二步：脱线无线挂机（以后每次挂机）**")
@@ -1933,6 +1694,35 @@ def render_phone_agent_tab():
         "此时该手机在设备列表中会显示为：**`🟢 在线（手机自治挂机模式）`**。\n\n"
         "此后，当你发布帖子时，只需在目标设备中勾选这台手机，系统就会无视任何网络限制，将任务安全发送至对方手机上自动完成发帖操作！"
     )
+
+    if st.button("🔍 立即检测 Phone Agent 是否已注册并在线", key="phone_agent_probe"):
+        try:
+            from pixelle_video.config import config_manager
+            from pixelle_video.services.phone_agent_client import ping as _pa_ping
+
+            cfg = config_manager.config
+            url = (cfg.phone_agent.url or "").strip()
+            tok = (cfg.phone_agent.token or "").strip()
+            if not url:
+                st.error(
+                    "❌ `config.yaml` 中的 `phone_agent.url` 仍为空 —— 说明手机端**还没成功把隧道 URL 上报到 VPS**。\n\n"
+                    "排查：\n"
+                    "1. 手机 Termux 里再次运行 `start`，观察是否打印 `[report] ✅ URL 已上报到 Pixelle-Video`。\n"
+                    "2. 如果显示 `第 N/5 次上报失败`，多半是 VPS 防火墙拦了，或 `PIXELLE_URL` 不可达。\n"
+                    "3. 重新执行上面的一键命令，让脚本把正确的 `PIXELLE_URL` 写入 `~/.pixelle.env`。"
+                )
+            else:
+                ok = _pa_ping(url, token=tok, timeout=6)
+                if ok:
+                    st.success(f"✅ Phone Agent 在线！当前隧道：{url}")
+                else:
+                    st.warning(
+                        f"⚠️ 已登记 URL = `{url}`，但当前 ping 不通。\n\n"
+                        "可能原因：cloudflared 隧道断开 / 手机进入深度休眠 / Token 不一致。"
+                        "请在手机上重新运行 `start`。"
+                    )
+        except Exception as e:
+            st.exception(e)
 
 
 def main():

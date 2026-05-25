@@ -74,6 +74,54 @@ def _run_shell(*args: str, timeout: int = 30) -> tuple[int, str, str]:
     return result.returncode, result.stdout.strip(), result.stderr.strip()
 
 
+def _clean_agent_id(value: str) -> str:
+    cleaned = re.sub(r"[^A-Za-z0-9_.:-]+", "-", (value or "").strip()).strip("-")
+    return cleaned[:80]
+
+
+def _read_system_value(*cmd: str, timeout: int = 3) -> str:
+    try:
+        rc, out, _ = _run_shell(*cmd, timeout=timeout)
+        if rc == 0:
+            value = (out or "").strip()
+            if value and value.lower() not in {"unknown", "null", "none"}:
+                return value
+    except Exception:
+        pass
+    return ""
+
+
+def _get_agent_identity() -> dict:
+    agent_file = Path.home() / ".pixelle_agent_id"
+    agent_id = ""
+    try:
+        agent_id = _clean_agent_id(agent_file.read_text(encoding="utf-8"))
+    except Exception:
+        agent_id = ""
+
+    if not agent_id:
+        serial = _read_system_value("getprop", "ro.serialno")
+        android_id = _read_system_value("settings", "get", "secure", "android_id")
+        seed = _clean_agent_id(serial or android_id)
+        agent_id = seed or uuid.uuid4().hex
+        try:
+            agent_file.write_text(agent_id + "\n", encoding="utf-8")
+        except Exception:
+            pass
+
+    brand = _read_system_value("getprop", "ro.product.brand")
+    model = _read_system_value("getprop", "ro.product.model")
+    serial = _read_system_value("getprop", "ro.serialno")
+    android_id = _read_system_value("settings", "get", "secure", "android_id")
+    device_name = " ".join(part for part in [brand, model] if part).strip()
+
+    return {
+        "agent_id": agent_id,
+        "device_serial": serial or android_id or agent_id,
+        "device_name": device_name or "Termux Phone",
+    }
+
+
 # -------------------------------------------------------------------
 # 接口：健康检查
 # -------------------------------------------------------------------
@@ -733,7 +781,9 @@ def _report_url_to_pixelle(tunnel_url: str, agent_token: str, pixelle_url: str, 
         import json as _json
 
         endpoint = pixelle_url.rstrip("/") + "/api/phone-agent/register"
-        payload = _json.dumps({"url": tunnel_url, "token": agent_token}).encode()
+        data = {"url": tunnel_url, "token": agent_token}
+        data.update(_get_agent_identity())
+        payload = _json.dumps(data).encode()
         req = urllib.request.Request(
             endpoint,
             data=payload,

@@ -15,7 +15,7 @@ Configuration schema with Pydantic models
 
 Single source of truth for all configuration defaults and validation.
 """
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -121,6 +121,10 @@ class PhoneAgentConfig(BaseModel):
     timeout_push: int = Field(
         default=120,
         description="单文件推送超时秒数",
+    )
+    agents: Dict[str, Dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Registered phone-agent instances keyed by stable agent id.",
     )
 
 

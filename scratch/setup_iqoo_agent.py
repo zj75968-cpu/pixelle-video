@@ -14,7 +14,7 @@ if not os.path.exists(ADB_PATH):
     ADB_PATH = "adb"
 
 # 实时的局域网 IP 与安全 Token
-REAL_SERVER_URL = "http://23.238.47.62:8000"
+REAL_SERVER_URL = "http://23.238.47.62"
 REAL_TOKEN = "pixelle_secure_agent_token_2026"
 
 def _adb_run(*args, timeout=30):

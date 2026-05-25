@@ -188,9 +188,11 @@ class DeviceManager:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         path = self.devices_file
         try:
+            # Prevent triggering the _devices property getter during open("w") which resets the dict due to 0-byte file reload
+            devices_dict = self._user_devices.get(username, {})
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(
-                    {s: d.to_dict() for s, d in self._devices.items()},
+                    {s: d.to_dict() for s, d in devices_dict.items()},
                     f,
                     ensure_ascii=False,
                     indent=2,
@@ -471,18 +473,117 @@ class DeviceManager:
             from pixelle_video.services.phone_agent_client import ping
             cfg = config_manager.config
             agent_url = cfg.phone_agent.url.strip()
+            agent_token = cfg.phone_agent.token.strip()
+            if not agent_url:
+                try:
+                    import yaml
+
+                    root_cfg = DATA_DIR.parent / "config.yaml"
+                    root_data = yaml.safe_load(root_cfg.read_text(encoding="utf-8")) or {}
+                    root_phone_agent = root_data.get("phone_agent") or {}
+                    agent_url = str(root_phone_agent.get("url") or "").strip()
+                    if not agent_token:
+                        agent_token = str(root_phone_agent.get("token") or "").strip()
+                except Exception as e:
+                    logger.debug(f"Failed to read fallback phone_agent config: {e}")
             if agent_url:
                 # 检查是否在线
-                is_online = ping(agent_url, token=cfg.phone_agent.token.strip(), timeout=2)
+                is_online = ping(agent_url, token=agent_token, timeout=2)
                 if is_online:
                     serial_name = "phone_agent"
-                    if serial_name not in serials:
-                        serials.append(serial_name)
-                    # 自动将其注册进设备管理器，以防 get_all() 过滤掉
-                    if serial_name not in self._devices:
-                        self.add_device(serial=serial_name, name="手机 HTTP 代理", theme="默认主题")
+                    physical_devices = [
+                        s
+                        for s in self._devices.keys()
+                        if s != serial_name and not s.startswith("phone_agent")
+                    ]
+                    if len(physical_devices) == 1 and physical_devices[0] not in serials:
+                        serials.append(physical_devices[0])
+                    elif not physical_devices:
+                        if serial_name not in serials:
+                            serials.append(serial_name)
+                        if serial_name not in self._devices:
+                            self._devices[serial_name] = DeviceInfo(
+                                serial=serial_name,
+                                name="手机 HTTP 代理",
+                                theme="默认主题",
+                            )
         except Exception as e:
             logger.debug(f"Failed to check phone agent online status: {e}")
+
+        # 4. Registered Termux phone_agent instances. Each phone can have a
+        # stable virtual serial, so multiple phones show independently on VPS.
+        try:
+            from pixelle_video.config import config_manager
+            from pixelle_video.services.phone_agent_client import ping
+
+            cfg = config_manager.config
+            agent_token = cfg.phone_agent.token.strip()
+            agents = getattr(cfg.phone_agent, "agents", {}) or {}
+
+            if not agents:
+                try:
+                    import yaml
+
+                    root_cfg = DATA_DIR.parent / "config.yaml"
+                    root_data = yaml.safe_load(root_cfg.read_text(encoding="utf-8")) or {}
+                    root_phone_agent = root_data.get("phone_agent") or {}
+                    agents = root_phone_agent.get("agents") or {}
+                    if not agent_token:
+                        agent_token = str(root_phone_agent.get("token") or "").strip()
+                except Exception as e:
+                    logger.debug(f"Failed to read fallback phone_agent agents: {e}")
+
+            any_agent_online = False
+            if isinstance(agents, dict):
+                for agent in agents.values():
+                    if not isinstance(agent, dict):
+                        continue
+                    url = str(agent.get("url") or "").strip()
+                    virtual_serial = str(agent.get("serial") or "").strip()
+                    if not virtual_serial:
+                        agent_id = str(agent.get("agent_id") or "").strip() or "default"
+                        virtual_serial = f"phone_agent:{agent_id}"
+                    physical_serial = str(agent.get("device_serial") or "").strip()
+                    display_serial = (
+                        physical_serial
+                        if physical_serial
+                        and physical_serial in self._devices
+                        and not physical_serial.startswith("phone_agent:")
+                        else virtual_serial
+                    )
+                    if not url:
+                        continue
+                    recently_reported = False
+                    last_seen_raw = str(agent.get("last_seen") or "").strip()
+                    if last_seen_raw:
+                        try:
+                            last_seen = datetime.fromisoformat(last_seen_raw.replace("Z", "+00:00"))
+                            if last_seen.tzinfo is not None:
+                                last_seen = last_seen.astimezone().replace(tzinfo=None)
+                            recently_reported = (datetime.now() - last_seen).total_seconds() <= 180
+                        except Exception:
+                            recently_reported = False
+
+                    if recently_reported or ping(url, token=agent_token, timeout=2):
+                        any_agent_online = True
+                        if display_serial not in serials:
+                            serials.append(display_serial)
+                        if display_serial not in self._devices:
+                            self._devices[display_serial] = DeviceInfo(
+                                serial=display_serial,
+                                name=str(agent.get("name") or "手机 HTTP 代理"),
+                                theme="默认主题",
+                            )
+
+            if any_agent_online:
+                physical_devices = [
+                    s for s in self._devices.keys()
+                    if s != "phone_agent" and not s.startswith("phone_agent:")
+                ]
+                if len(physical_devices) == 1 and physical_devices[0] not in serials:
+                    serials.append(physical_devices[0])
+        except Exception as e:
+            logger.debug(f"Failed to check registered phone agents: {e}")
 
         if serials:
             logger.debug(f"Found connected devices: {serials}")
@@ -713,7 +814,15 @@ class DeviceManager:
         """Return all registered devices."""
         self.sync_connected()
         with self._lock:
-            return list(self._devices.values())
+            has_named_phone_agents = any(
+                serial.startswith("phone_agent:")
+                for serial in self._devices.keys()
+            )
+            return [
+                dev
+                for serial, dev in self._devices.items()
+                if serial != "phone_agent" or not has_named_phone_agents
+            ]
 
     def get(self, serial: str) -> Optional[DeviceInfo]:
         """Return device info by serial."""

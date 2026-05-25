@@ -60,6 +60,26 @@ def ping(agent_url: str, token: str = "", timeout: int = 10) -> bool:
         return False
 
 
+def resolve_agent_url(serial: str = "") -> str:
+    """Return the configured phone-agent URL for a selected virtual device."""
+    from pixelle_video.config import config_manager
+
+    cfg = config_manager.config
+    fallback = cfg.phone_agent.url.strip()
+    serial = (serial or "").strip()
+    agents = getattr(cfg.phone_agent, "agents", {}) or {}
+    if serial and isinstance(agents, dict):
+        for agent in agents.values():
+            if not isinstance(agent, dict):
+                continue
+            if str(agent.get("serial") or "").strip() == serial:
+                return str(agent.get("url") or "").strip() or fallback
+            agent_id = str(agent.get("agent_id") or "").strip()
+            if agent_id and serial == f"phone_agent:{agent_id}":
+                return str(agent.get("url") or "").strip() or fallback
+    return fallback
+
+
 def push_file_http(
     local_path: str,
     agent_url: str,
@@ -403,7 +423,7 @@ def push_images_auto(
     from pixelle_video.config import config_manager
 
     cfg = config_manager.config
-    agent_url = cfg.phone_agent.url.strip()
+    agent_url = resolve_agent_url(serial)
     agent_token = cfg.phone_agent.token.strip()
     chunk_size = cfg.phone_agent.chunk_size_mb * 1024 * 1024
     timeout = cfg.phone_agent.timeout_push

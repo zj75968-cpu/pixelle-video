@@ -814,11 +814,11 @@ class PublishScheduler:
             return False
             
         elif mode == "phone_agent":
-            from pixelle_video.services.phone_agent_client import delete_http, wait_for_status
+            from pixelle_video.services.phone_agent_client import delete_http, wait_for_status, resolve_agent_url
             from pixelle_video.config import config_manager
             
             cfg = config_manager.config
-            agent_url = cfg.phone_agent.url.strip()
+            agent_url = resolve_agent_url(getattr(job, "serial", ""))
             token = cfg.phone_agent.token.strip()
             
             if not agent_url:
@@ -932,11 +932,11 @@ class PublishScheduler:
             return False
             
         elif mode == "phone_agent":
-            from pixelle_video.services.phone_agent_client import comment_http, wait_for_status
+            from pixelle_video.services.phone_agent_client import comment_http, wait_for_status, resolve_agent_url
             from pixelle_video.config import config_manager
             
             cfg = config_manager.config
-            agent_url = cfg.phone_agent.url.strip()
+            agent_url = resolve_agent_url(getattr(job, "serial", ""))
             token = cfg.phone_agent.token.strip()
             
             if not agent_url:

@@ -973,25 +973,41 @@ class VideoService:
         if pad_duration <= 0:
             # No padding needed, return original
             return video
+            
+        has_audio = self.has_audio_stream(video)
         
         try:
             input_video = ffmpeg.input(video)
             video_stream = input_video.video
+            
+            # Pad audio stream with silence to match target duration if it exists
+            audio_stream = None
+            if has_audio:
+                audio_stream = input_video.audio.filter('apad', whole_dur=target_duration)
             
             if pad_strategy == "freeze":
                 # Freeze last frame using tpad filter
                 video_stream = video_stream.filter('tpad', stop_mode='clone', stop_duration=pad_duration)
                 
                 # Output with re-encoding (tpad requires it)
+                outputs = [video_stream]
+                if audio_stream:
+                    outputs.append(audio_stream)
+                
+                output_args = {
+                    'vcodec': 'libx264',
+                    'preset': 'fast',
+                    'crf': 23
+                }
+                if audio_stream:
+                    output_args.update({
+                        'acodec': 'aac',
+                        'audio_bitrate': '192k'
+                    })
+                
                 (
                     ffmpeg
-                    .output(
-                        video_stream,
-                        output,
-                        vcodec='libx264',
-                        preset='fast',
-                        crf=23
-                    )
+                    .output(*outputs, output, **output_args)
                     .overwrite_output()
                     .run(capture_stdout=True, capture_stderr=True, quiet=True)
                 )
@@ -1016,15 +1032,24 @@ class VideoService:
                 # Concatenate original video with black padding
                 video_stream = ffmpeg.concat(video_stream, black_input.video, v=1, a=0)
                 
+                outputs = [video_stream]
+                if audio_stream:
+                    outputs.append(audio_stream)
+                
+                output_args = {
+                    'vcodec': 'libx264',
+                    'preset': 'fast',
+                    'crf': 23
+                }
+                if audio_stream:
+                    output_args.update({
+                        'acodec': 'aac',
+                        'audio_bitrate': '192k'
+                    })
+                
                 (
                     ffmpeg
-                    .output(
-                        video_stream,
-                        output,
-                        vcodec='libx264',
-                        preset='fast',
-                        crf=23
-                    )
+                    .output(*outputs, output, **output_args)
                     .overwrite_output()
                     .run(capture_stdout=True, capture_stderr=True, quiet=True)
                 )

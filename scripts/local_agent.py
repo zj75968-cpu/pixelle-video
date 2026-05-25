@@ -69,6 +69,19 @@ _pvs.__package__ = "pixelle_video.services"
 sys.modules["pixelle_video.services"] = _pvs
 _pv.services = _pvs
 
+# 3b. stub pixelle_video.utils 包（避免导入 user_context 等工具）
+_pvu = _types.ModuleType("pixelle_video.utils")
+_pvu.__path__ = [str(_ROOT / "pixelle_video" / "utils")]
+_pvu.__package__ = "pixelle_video.utils"
+sys.modules["pixelle_video.utils"] = _pvu
+_pv.utils = _pvu
+
+# 3c. stub pixelle_video.utils.user_context 包
+_pvuc = _types.ModuleType("pixelle_video.utils.user_context")
+_pvuc.get_current_username = lambda: "default"
+sys.modules["pixelle_video.utils.user_context"] = _pvuc
+_pvu.user_context = _pvuc
+
 # 4. 预加载 xhs_publisher 的直接依赖子模块（config、device_manager 等）
 #    这些模块体积小且不依赖 comfykit
 def _load_submod(dotpath: str, filepath: Path):
@@ -260,8 +273,7 @@ def connect_wifi_devices(adb_exec: str):
 
 def auto_migrate_usb_to_wifi(adb_exec: str, serial: str):
     """【全自动迁移】若发现是通过 USB 连入的已授权设备，自动提取 IP 地址并开启 5555 无线端口"""
-    if ":" in serial or serial.startswith("192.168."):
-        return
+    return
         
     try:
         ip = ""

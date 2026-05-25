@@ -6,7 +6,7 @@ import time
 HOST = "23.238.47.62"
 PORT = 22
 USER = "root"
-PASS = "A5WwhvG117gvXrE00P"
+PASS = "z5Rd256n9tZ2wENTdB"
 
 def ssh_connect():
     try:

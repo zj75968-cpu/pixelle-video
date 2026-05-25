@@ -136,6 +136,12 @@ with st.expander("🎯 新建引流活动", expanded=True):
         for i, post in enumerate(pair):
             with cols[i]:
                 st.markdown(f"**📝 第 {i+1} 篇 · 人设：{post.get('persona','—')}**")
+                
+                # 如果有 AI 自动生成的萌系海报，直接展示
+                img_path = post.get("image_path")
+                if img_path and Path(img_path).exists():
+                    st.image(img_path, caption=f"🎨 AI 自动生成海报 {i+1}", use_container_width=True)
+                
                 t = st.text_input("标题", value=post["title"], key=f"dr_t_{i}")
                 b = st.text_area("正文", value=post["body"], height=240, key=f"dr_b_{i}")
                 tags_str = st.text_input(
@@ -144,7 +150,12 @@ with st.expander("🎯 新建引流活动", expanded=True):
                     key=f"dr_h_{i}",
                 )
                 tags = [s.strip().lstrip("#") for s in tags_str.split(",") if s.strip()]
-                edited_pair.append({"title": t.strip(), "body": b.strip(), "hashtags": tags})
+                edited_pair.append({
+                    "title": t.strip(),
+                    "body": b.strip(),
+                    "hashtags": tags,
+                    "image_path": img_path,
+                })
 
         st.markdown("---")
         if st.button(
@@ -169,13 +180,40 @@ with st.expander("🎯 新建引流活动", expanded=True):
             errors = []
             if not selected_serials:
                 errors.append("未选设备")
-            if not img_paths:
-                errors.append("图片池为空")
+            
+            # 如果图片池为空，但有自动生成的 AI 海报，这是完全允许的！
+            has_ai_posters = all(post.get("image_path") and Path(post["image_path"]).exists() for post in edited_pair)
+            if not img_paths and not has_ai_posters:
+                errors.append("图片池为空（请先生成 AI 文案/海报或手动上传图片）")
+                
             if not edited_pair or len(edited_pair) != 2:
                 errors.append("需要先生成 2 篇文案")
             if errors:
                 st.error("无法排期：" + "；".join(errors))
             else:
+                # 若图片池为空，我们在排期前，自动以用户修改后的最新标题重新渲染海报，保证文字100%同步！
+                if not img_paths:
+                    with st.spinner("正在根据最新标题同步渲染海报..."):
+                        for idx, post in enumerate(edited_pair):
+                            old_poster = pair[idx].get("image_path")
+                            if post["title"]:
+                                try:
+                                    from pixelle_video.services.poster_generator import generate_drainage_poster
+                                    if old_poster:
+                                        generate_drainage_poster(post["title"], old_poster)
+                                        post["image_path"] = old_poster
+                                    else:
+                                        p_dir = Path("output") / "drainage_posters"
+                                        p_dir.mkdir(parents=True, exist_ok=True)
+                                        import uuid
+                                        new_p = p_dir / f"poster_{uuid.uuid4().hex[:12]}.png"
+                                        generate_drainage_poster(post["title"], str(new_p.resolve()))
+                                        post["image_path"] = str(new_p.resolve())
+                                except Exception as exc:
+                                    st.warning(f"重新同步海报 {idx+1} 失败: {exc}")
+                                    if old_poster:
+                                        post["image_path"] = old_poster
+
                 try:
                     campaign = schedule_campaign(
                         serials=selected_serials,

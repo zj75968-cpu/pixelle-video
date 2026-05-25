@@ -109,9 +109,43 @@ class MediaService(ComfyBaseService):
         
         Override parent method to support multiple prefixes
         """
-        from pixelle_video.utils.os_util import list_resource_dirs, list_resource_files, get_resource_path
+        from pixelle_video.utils.os_util import list_resource_dirs, list_resource_files, get_resource_path, get_root_path, get_data_path
         from pathlib import Path
         
+        # ─── High Performance Mtime Caching ───
+        # Find all actual source directories
+        source_dir_paths = []
+        for base_dir in (get_root_path("workflows"), get_data_path("workflows")):
+            base_path = Path(base_dir)
+            if base_path.exists() and base_path.is_dir():
+                for item in base_path.iterdir():
+                    if item.is_dir():
+                        source_dir_paths.append(item)
+                        
+        mtimes = {}
+        for d in source_dir_paths:
+            try:
+                mtimes[str(d)] = d.stat().st_mtime
+                # Match image_*.json and video_*.json
+                for f in d.iterdir():
+                    if f.is_file() and (f.name.startswith("image_") or f.name.startswith("video_")) and f.name.endswith(".json"):
+                        mtimes[str(f)] = f.stat().st_mtime
+            except Exception:
+                pass
+                
+        # Also include RunningHub registry file mtime if it exists
+        try:
+            reg_path = Path(__file__).resolve().parent / "runninghub_lowprice_registry.json"
+            if reg_path.exists():
+                mtimes[str(reg_path)] = reg_path.stat().st_mtime
+        except Exception:
+            pass
+            
+        # If cache exists and matching mtimes, reuse the list
+        if (getattr(self, "_workflows_cache_mtimes", None) == mtimes and 
+                getattr(self, "_workflows_cache_data", None) is not None):
+            return self._workflows_cache_data
+            
         workflows = []
         
         # Get all workflow source directories
@@ -212,7 +246,13 @@ class MediaService(ComfyBaseService):
         except Exception as _e:
             logger.warning(f"加载 chatfire 模型失败: {_e}")
 
-        return sorted(workflows, key=lambda w: w["key"])
+        sorted_workflows = sorted(workflows, key=lambda w: w["key"])
+        
+        # Cache results
+        self._workflows_cache_mtimes = mtimes
+        self._workflows_cache_data = sorted_workflows
+        
+        return sorted_workflows
     
     async def __call__(
         self,

@@ -917,17 +917,26 @@ if not final_images:
 else:
     st.caption(f"将发布 **{len(final_images)}** 张 AI 重画图")
 
-    if not connected:
-        st.error("❌ 没有已连接的小红书设备。请到「📱 Publish」或「⚙️ Settings」配置设备。")
+    if not all_devices:
+        st.error("❌ 没有已注册的小红书设备。请到「📱 Publish」或「⚙️ Settings」配置设备。")
     else:
+        # 支持在线与离线设备并存展示与入队，确保发布按钮始终可见
         dev_opts = {
-            f"{d.serial} - {getattr(d, 'name', '') or '未命名'}": d.serial
-            for d in connected
+            f"{'🟢' if getattr(d, 'connected', False) else '🔴'} {getattr(d, 'name', '') or d.serial} ({d.serial})": d.serial
+            for d in all_devices
         }
+        
+        # 智能默认选项：优先默认勾选第一个在线设备，若无在线则勾选第一个离线设备
+        connected_options = [
+            lbl for lbl, serial in dev_opts.items()
+            if any(getattr(d, "connected", False) and d.serial == serial for d in all_devices)
+        ]
+        default_sel = [connected_options[0]] if connected_options else [list(dev_opts.keys())[0]]
+
         sel = st.multiselect(
-            "选择发布设备",
+            "选择发布设备（🟢在线，🔴离线，支持离线入队排队）",
             options=list(dev_opts.keys()),
-            default=list(dev_opts.keys())[:1],
+            default=default_sel,
             key="ss_devices",
         )
 

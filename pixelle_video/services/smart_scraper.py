@@ -561,8 +561,13 @@ def _search_via_xhs(query: str, n: int = 4) -> list[dict]:
     if not items:
         items = data.get("items") or data.get("notes") or []
     results: list[dict] = []
-    for it in items[:n]:
+    for it in items:
+        if len(results) >= n:
+            break
         if not isinstance(it, dict):
+            continue
+        # 过滤广告卡片/商业推广/推荐流噪音
+        if it.get("is_ads") or it.get("ads_card") or "ad" in it or "ads" in it or it.get("type") == "ad" or it.get("model_type") == "ad":
             continue
         card = it.get("note_card") if isinstance(it.get("note_card"), dict) else None
         src = card or it
@@ -833,6 +838,23 @@ async def deepsearch(
         # xhs CLI 专用 query：中文为主
         xhs_query = query_zh or title or topic
 
+        # —— 构建主题核心词库，用于防广告与不相关推荐的语义漏斗 ——
+        core_texts = [topic, title, query_zh]
+        core_keywords = set()
+        for t in core_texts:
+            if not t:
+                continue
+            # 2字及以上中文词组
+            for w in re.findall(r"[\u4e00-\u9fa5]{2,}", t):
+                core_keywords.add(w)
+                if len(w) > 3:
+                    core_keywords.add(w[:2])
+                    core_keywords.add(w[-2:])
+            # 3字及以上英文单词
+            for w in re.findall(r"\b[a-zA-Z]{3,}\b", t.lower()):
+                if w not in {"the", "and", "for", "with", "you", "are", "how", "step", "tutorial", "draw"}:
+                    core_keywords.add(w)
+
         source_url = ""
         urls: list[str] = []
 
@@ -861,14 +883,33 @@ async def deepsearch(
         xhs_imgs: list[str] = []
         xhs_hits = result_map.get("xhs")
         if isinstance(xhs_hits, list) and xhs_hits:
-            head = xhs_hits[0]
-            if head.get("title"):
-                title = head["title"]
-            if head.get("text"):
-                text_body = head["text"]
-            source_url = head.get("source_url", "")
+            filtered_hits = []
             for h in xhs_hits:
-                xhs_imgs.extend(h.get("image_urls") or [])
+                h_title = h.get("title", "")
+                h_text = h.get("text", "")
+                
+                # 计算关键字匹配度
+                content_lower = (h_title + " " + h_text).lower()
+                match_score = sum(1 for kw in core_keywords if kw.lower() in content_lower)
+                
+                # 若关键字库不为空且匹配得分极低，说明是广告或推广噪音，直接丢弃
+                if core_keywords and match_score < 1:
+                    logger.warning(
+                        f"[deepsearch] 语义过滤器已阻断并不相关推广/广告: "
+                        f"title={h_title[:25]}... (score={match_score})"
+                    )
+                    continue
+                filtered_hits.append(h)
+                
+            if filtered_hits:
+                head = filtered_hits[0]
+                if head.get("title"):
+                    title = head["title"]
+                if head.get("text"):
+                    text_body = head["text"]
+                source_url = head.get("source_url", "")
+                for h in filtered_hits:
+                    xhs_imgs.extend(h.get("image_urls") or [])
 
         # —— 多平台 ddgs 结果
         ddgs_urls = result_map.get("ddgs")

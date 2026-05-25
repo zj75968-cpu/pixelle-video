@@ -68,12 +68,13 @@ class DistributionAdapter:
             from pixelle_video.services.phone_agent_client import (
                 push_images_to_gallery_http,
                 publish_http,
-                wait_for_publish
+                wait_for_publish,
+                resolve_agent_url,
             )
             from pixelle_video.config import config_manager
             
             cfg = config_manager.config
-            agent_url = cfg.phone_agent.url.strip()
+            agent_url = resolve_agent_url(getattr(job, "serial", ""))
             token = cfg.phone_agent.token.strip()
             
             if not agent_url:

@@ -239,11 +239,27 @@ async def generate_drainage_pair(
         body = harmonize_text(body, seed=ssed)
         tags = harmonize_hashtags(tags, seed=ssed)
 
+        # AI 自动生成海报图片
+        poster_dir = Path(__file__).resolve().parent.parent.parent / "output" / "drainage_posters"
+        poster_dir.mkdir(parents=True, exist_ok=True)
+        poster_filename = f"poster_{uuid.uuid4().hex[:12]}.png"
+        poster_path = poster_dir / poster_filename
+        
+        try:
+            from pixelle_video.services.poster_generator import generate_drainage_poster
+            # 谐音化后完美字眼，直接用来生成引流图
+            generate_drainage_poster(title, str(poster_path.resolve()))
+            image_path_str = str(poster_path.resolve())
+        except Exception as e:
+            logger.error(f"[drainage] Failed to generate AI poster: {e}")
+            image_path_str = ""
+
         results.append({
             "title": title[:30],
             "body": body,
             "hashtags": tags[:8],
             "persona": label,
+            "image_path": image_path_str,
         })
     return results
 
@@ -254,7 +270,7 @@ def schedule_campaign(
     *,
     serials: List[str],
     image_pool: List[str],
-    posts: List[dict],         # [{title, body, hashtags}, {title, body, hashtags}] for round 1
+    posts: List[dict],         # [{title, body, hashtags, image_path}, ...] for round 1
     rounds: int,
     delete_minutes: int = 25,
     gap_min: int = 5,
@@ -277,8 +293,6 @@ def schedule_campaign(
         raise ValueError("rounds 至少为 1")
     if not serials:
         raise ValueError("serials 不能为空")
-    if not image_pool:
-        raise ValueError("image_pool 不能为空")
 
     campaign = DrainageCampaign(
         campaign_id=str(uuid.uuid4())[:8],
@@ -297,9 +311,16 @@ def schedule_campaign(
         for idx, post in enumerate(posts):
             # 每篇之间留 30s 缓冲，避免同时打 xhs CLI
             scheduled_at = (cursor + timedelta(seconds=idx * 30)).isoformat()
-            # 每篇随机抽 images_per_post 张图
-            k = min(images_per_post, len(image_pool))
-            imgs = rng.sample(image_pool, k=k) if k > 0 else []
+            
+            # 检查是否有专属 AI 自动生成海报
+            post_poster = post.get("image_path")
+            
+            if not image_pool and post_poster and Path(post_poster).exists():
+                imgs = [post_poster]
+            else:
+                # 否则，从全局图片池里随机抽
+                k = min(images_per_post, len(image_pool))
+                imgs = rng.sample(image_pool, k=k) if k > 0 else []
             # 不同轮次/不同篇 → 不同 seed，让谐音字也有差异
             seed = hash((campaign.campaign_id, r, idx)) & 0xFFFFFFFF
             title = harmonize_text(post["title"], seed=seed)[:30]

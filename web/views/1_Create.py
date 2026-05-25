@@ -25,6 +25,30 @@ st.set_page_config(page_title="创作", page_icon="🎨", layout="wide")
 init_session_state()
 init_i18n()
 
+# ── 🔍 挂机系统诊断 (Agent Diagnostic Panel) ──
+with st.expander("🔍 调试：发布管理模块加载诊断", expanded=True):
+    try:
+        views_dir = Path(__file__).resolve().parent
+        publish_file = views_dir / "4_Publish.py"
+        st.write(f"• `4_Publish.py` 物理文件存在: `{publish_file.exists()}` (大小: {publish_file.stat().st_size if publish_file.exists() else 0} 字节)")
+        
+        import runpy
+        # 临时做 mock 防止 set_page_config 报 API 错
+        _orig = st.set_page_config
+        st.set_page_config = lambda *a, **k: None
+        try:
+            runpy.run_path(str(publish_file))
+            st.success("✅ 4_Publish.py 在 Streamlit 运行时上下文加载成功！")
+        except Exception as e:
+            st.error(f"❌ 4_Publish.py 顶层代码执行失败: {e}")
+            import traceback
+            st.code(traceback.format_exc(), language="python")
+        finally:
+            st.set_page_config = _orig
+    except Exception as ex:
+        st.write(f"诊断面板自身运行出错: {ex}")
+
+
 
 def _run_subpage(path: Path) -> None:
     """Execute a legacy page script inside the current Streamlit container.

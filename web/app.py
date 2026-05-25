@@ -303,6 +303,35 @@ def main():
         position="sidebar",
     )
 
+    # ── 🔍 挂机系统诊断 (Agent Diagnostic Panel) ──
+    try:
+        st.sidebar.markdown("---")
+        st.sidebar.markdown("### 🔍 诊断工具 (Diagnostic)")
+        
+        # 1. 物理文件扫描
+        views_dir = Path(__file__).resolve().parent / "views"
+        if views_dir.exists():
+            for f in sorted(views_dir.glob("*.py")):
+                if not f.name.startswith("_"):
+                    st.sidebar.text(f"• {f.name}: {'✅' if f.exists() else '❌'} ({f.stat().st_size} bytes)")
+        
+        # 2. 导入与 Traceback 捕获
+        try:
+            import runpy
+            _orig = st.set_page_config
+            st.set_page_config = lambda *a, **k: None
+            try:
+                runpy.run_path(str(views_dir / "4_Publish.py"))
+                st.sidebar.success("✅ 4_Publish 加载正常")
+            finally:
+                st.set_page_config = _orig
+        except Exception as e:
+            st.sidebar.error(f"❌ 4_Publish 加载失败: {e}")
+            import traceback
+            st.sidebar.code(traceback.format_exc(), language="python")
+    except Exception as ex:
+        st.sidebar.text(f"Diagnostic failed: {ex}")
+
     # Prevent StreamlitAPIException when subpages call st.set_page_config
     _orig_set_page_config = st.set_page_config
     st.set_page_config = lambda *args, **kwargs: None

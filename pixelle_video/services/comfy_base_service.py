@@ -91,6 +91,33 @@ class ComfyBaseService:
                 }
             ]
         """
+        # Dynamic cache based on modification times to minimize disk I/O under Streamlit
+        import os
+        from pixelle_video.utils.os_util import get_root_path, get_data_path
+        
+        # Discover source directories in both default and custom locations
+        watch_dirs = []
+        for base_dir in (get_root_path("workflows"), get_data_path("workflows")):
+            base_path = Path(base_dir)
+            if base_path.exists() and base_path.is_dir():
+                for item in base_path.iterdir():
+                    if item.is_dir():
+                        watch_dirs.append(item)
+                        
+        mtimes = {}
+        for d in watch_dirs:
+            try:
+                mtimes[str(d)] = d.stat().st_mtime
+                for f in d.glob(f"{self.WORKFLOW_PREFIX}*.json"):
+                    mtimes[str(f)] = f.stat().st_mtime
+            except Exception:
+                pass
+                
+        # If cache exists and matching mtimes, reuse the list
+        if (getattr(self, "_workflows_cache_mtimes", None) == mtimes and 
+                getattr(self, "_workflows_cache_data", None) is not None):
+            return self._workflows_cache_data
+            
         workflows = []
         
         # Get all workflow source directories (merged from workflows/ and data/workflows/)
@@ -122,7 +149,13 @@ class ComfyBaseService:
                     logger.error(f"Failed to parse workflow {source_name}/{filename}: {e}")
         
         # Sort by key (source/name)
-        return sorted(workflows, key=lambda w: w["key"])
+        sorted_workflows = sorted(workflows, key=lambda w: w["key"])
+        
+        # Cache results
+        self._workflows_cache_mtimes = mtimes
+        self._workflows_cache_data = sorted_workflows
+        
+        return sorted_workflows
     
     def _parse_workflow_file(self, file_path: Path, source: str) -> Dict[str, Any]:
         """

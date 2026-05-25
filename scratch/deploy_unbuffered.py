@@ -74,7 +74,7 @@ def main():
             for root, dirs, files in os.walk(src_dir):
                 dirs[:] = [d for d in dirs if d not in exclude_dirs and not d.startswith('.')]
                 for file in files:
-                    if file.endswith(('.pyc', '.zip')) or file.startswith('.'):
+                    if file.endswith(('.pyc', '.zip', '.exe')) or file.startswith('.'):
                         continue
                     fp = os.path.join(root, file)
                     zipf.write(fp, os.path.relpath(fp, src_dir))
