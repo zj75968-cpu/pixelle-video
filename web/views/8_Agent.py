@@ -23,9 +23,8 @@ from pixelle_video.services.publish_scheduler import PublishScheduler as _Publis
 
 
 def get_publish_scheduler() -> _PublishScheduler:
-    if "publish_scheduler" not in st.session_state:
-        st.session_state["publish_scheduler"] = _PublishScheduler()
-    return st.session_state["publish_scheduler"]
+    from pixelle_video.services.publish_scheduler import publish_scheduler
+    return publish_scheduler
 
 _HISTORY_FILE = _project_root / "data" / "agent_history.json"
 _HISTORY_MAX = 50  # 最多保留条数
