@@ -799,88 +799,6 @@ def render_publish_settings():
                 st.rerun()
 
 
-# ---- Gallery Upload Tab ------------------------------------------------------
-
-def render_gallery_upload_tab():
-    """Upload image files directly to an Android device's gallery."""
-    st.subheader("📸 上传图片到手机相册")
-    st.caption("选择手机在线设备，上传图片后会通过 ADB 直接推送到手机相册，无需数据线反复插拔。")
-
-    dm = get_device_manager()
-    devices = [d for d in dm.get_all() if d.connected]
-
-    if not devices:
-        st.warning("没有已连接的设备。请先在“设备管理”中连接手机。")
-        return
-
-    device_options = {f"{d.name or d.serial} ({d.serial})": d.serial for d in devices}
-    selected_label = st.selectbox(
-        "选择目标设备",
-        options=list(device_options.keys()),
-        key="gallery_upload_device",
-    )
-    selected_serial = device_options[selected_label]
-
-    uploaded_files = st.file_uploader(
-        "选择图片文件",
-        type=["png", "jpg", "jpeg", "webp"],
-        accept_multiple_files=True,
-        key="gallery_upload_files",
-        help="支持 PNG / JPG / JPEG / WEBP，可多选。",
-    )
-
-    if uploaded_files:
-        st.info(f"已选择 {len(uploaded_files)} 个文件，点击下方按钮推送到手机相册。")
-
-    if st.button(
-        "📲 推送到手机相册",
-        disabled=not uploaded_files,
-        key="gallery_upload_btn",
-        type="primary",
-    ):
-        import tempfile
-        import os
-        from pixelle_video.services.device_manager import device_manager
-        from pixelle_video.config import config_manager
-
-        push_cfg = getattr(config_manager.config, "xhs_publish", None)
-        push_dir = (
-            getattr(push_cfg, "push_dir", "/sdcard/DCIM/PixelleVideo")
-            if push_cfg
-            else "/sdcard/DCIM/PixelleVideo"
-        )
-
-        tmp_paths = []
-        try:
-            with tempfile.TemporaryDirectory() as tmpdir:
-                for f in uploaded_files:
-                    tmp_path = os.path.join(tmpdir, f.name)
-                    with open(tmp_path, "wb") as fh:
-                        fh.write(f.getbuffer())
-                    tmp_paths.append(tmp_path)
-
-                with st.spinner(f"正在推送 {len(tmp_paths)} 张图片到 {selected_serial}..."):
-                    # Use ADB push directly
-                    success_count = 0
-                    failed_paths = []
-                    for img_path in tmp_paths:
-                        try:
-                            device_manager.push_file(selected_serial, img_path, push_dir)
-                            success_count += 1
-                        except Exception:
-                            failed_paths.append(img_path)
-
-            if success_count > 0:
-                st.success(f"✅ 成功推送 {success_count} 张图片到相册 ({push_dir})")
-            if failed_paths:
-                st.error(
-                    f"❌ {len(failed_paths)} 张推送失败："
-                    + ", ".join(Path(p).name for p in failed_paths)
-                )
-        except Exception as exc:
-            st.error(f"推送出错：{exc}")
-
-
 # ---- Publish Queue Tab -------------------------------------------------------
 
 def render_publish_tab():
@@ -1227,7 +1145,7 @@ def render_client_agent_tab():
     from pixelle_video.config import config_manager
     
     # 1. Distribution Mode Selector
-    current_mode = config_manager.config.distribution_mode or config_manager.config.distribution.mode
+    current_mode = "hardware"
     
     col1, col2 = st.columns([2, 1])
     with col1:
@@ -1237,27 +1155,7 @@ def render_client_agent_tab():
         else:
             st.warning(f"⚠️ 当前处于 `{current_mode}` 模式下，系统不会把发布任务派发给客户端代理。若要启用，请点击下方切换。")
             
-        # Selectbox to change mode
-        modes = {
-            "agent_pull": "💻 客户端代理模式 (推荐给跨电脑控制)",
-            "legacy": "🔌 服务端直接 ADB 模式 (手机接在当前服务器上)",
-            "mobile_tasker_ssh": "📡 Termux SSH 模式 (免 USB 长期连接)"
-        }
-        
-        selected_mode = st.selectbox(
-            "选择全局分发模式",
-            options=list(modes.keys()),
-            format_func=lambda x: modes[x],
-            index=list(modes.keys()).index(current_mode) if current_mode in modes else 0,
-            key="dist_mode_select"
-        )
-        
-        if selected_mode != current_mode:
-            if st.button("💾 应用分发模式"):
-                config_manager.update({"distribution_mode": selected_mode})
-                config_manager.save()
-                st.success(f"分发模式已成功保存并切换为: {selected_mode}")
-                st.rerun()
+        st.info("💡 系统已切换为固定的硬件直控模式（CH9329 物理串口控制）。暂不支持在线切换其他模式。")
                 
     with col2:
         st.info(
@@ -1571,11 +1469,10 @@ def main():
     st.title("📱 发布管理")
     st.caption("管理 Android 设备并将图文帖子发布到小红书")
 
-    tab_devices, tab_publish, tab_agent, tab_gallery = st.tabs([
+    tab_devices, tab_publish, tab_agent = st.tabs([
         "📱 设备管理",
         "📤 发布队列",
         "💻 客户端代理 (电脑)",
-        "📸 上传到相册"
     ])
 
     with tab_devices:
@@ -1586,9 +1483,6 @@ def main():
 
     with tab_agent:
         render_client_agent_tab()
-
-    with tab_gallery:
-        render_gallery_upload_tab()
 
 
 if __name__ == "__main__":
