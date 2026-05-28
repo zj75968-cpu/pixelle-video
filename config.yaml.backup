@@ -1,0 +1,95 @@
+project_name: Pixelle-Video
+admin_password: '5793'
+llm:
+  api_key: sk-cp-bqsZYHiiwx79rAXldpY58pYsY8lL1J81C6nm5udVjG_m0zbp5c8GmkAsAjgymOswY6hN6poRBmeIUun52ZreeRc6QuvxFE0ZLxDifOft5K_bUckLCRcm5s4
+  base_url: https://api.minimaxi.com/v1
+  model: MiniMax-M2.5
+post_model_presets:
+  post_content:
+    api_key: sk-cp-bqsZYHiiwx79rAXldpY58pYsY8lL1J81C6nm5udVjG_m0zbp5c8GmkAsAjgymOswY6hN6poRBmeIUun52ZreeRc6QuvxFE0ZLxDifOft5K_bUckLCRcm5s4
+    base_url: https://api.minimaxi.com/v1
+    model: MiniMax-M2.5
+  post_image:
+    api_key: sk-MXBjq1odMGod9tl808ZSZkfC08kMwtCVcK3uzhqDUUmjhWYF
+    base_url: https://api.chatfire.cn
+    model: gpt-image-2
+  post_vision:
+    api_key: sk-GExqJhdYBIhDFIqOC40mnokXXdnXp4HAlonoJOJmxXIXd2RP
+    base_url: https://cdn.12ai.org
+    model: gemini-3-pro-preview-c
+comfyui:
+  comfyui_url: http://127.0.0.1:8188
+  comfyui_api_key: ''
+  runninghub_api_key: 2bf633b86b5d4b3c8835ec85e8e87632
+  runninghub_consumer_api_key: 38026dc0af544256a980e462c793e6c6
+  runninghub_base_url: https://www.runninghub.cn
+  runninghub_concurrent_limit: 1
+  runninghub_instance_type: plus
+  show_unavailable_workflows: false
+  public_base_url: ''
+  tts:
+    inference_mode: local
+    local:
+      voice: zh-CN-YunjianNeural
+      speed: 1.2
+    comfyui:
+      default_workflow: null
+  image:
+    default_workflow: chatfire/gpt-image-2
+    prompt_prefix: Minimalist black-and-white matchstick figure style illustration,
+      clean lines, simple sketch style
+  video:
+    default_workflow: runninghub/video_wan2.2.json
+    prompt_prefix: ''
+template:
+  default_template: 1080x1920/default.html
+xhs_publish:
+  strict_mode: false
+  daily_schedule_times:
+  - 09:00
+  - '12:00'
+  - '18:00'
+  hardware:
+    com_port: COM3
+    baudrate: 9600
+    unlock_pin: ''
+  lsky_pro:
+    url: 'http://192.168.1.100/api/v1/upload'
+    token: 'Bearer <your-token>'
+    album_id: null
+  coordinates:
+    browser_address_bar_x: 0.5
+    browser_address_bar_y: 0.08
+    browser_image_x: 0.5
+    browser_image_y: 0.5
+    browser_save_btn_x: 0.5
+    browser_save_btn_y: 0.85
+    xhs_icon_x: 0.3
+    xhs_icon_y: 0.5
+    xhs_add_btn_x: 0.5
+    xhs_add_btn_y: 0.95
+    xhs_first_album_x: 0.25
+    xhs_first_album_y: 0.25
+    xhs_next_btn_x: 0.85
+    xhs_next_btn_y: 0.08
+    xhs_publish_btn_x: 0.5
+    xhs_publish_btn_y: 0.92
+phone_agent:
+  url: ''
+  token: pixelle_secure_agent_token_2026
+  chunk_size_mb: 5
+  timeout_push: 120
+distribution_mode: legacy
+distribution:
+  mode: phone_agent
+  result_wait_seconds: 240
+  result_poll_interval_seconds: 5
+  max_retry: 2
+  batch_size: 3
+  send_interval_seconds: 2
+  mobile_devices_config: config/devices.yaml
+  remote_paths:
+    job_dir: /sdcard/Tasker/jobs
+    image_dir: /sdcard/Pictures/TaskerUpload
+    video_dir: /sdcard/Movies/TaskerUpload
+    screenshot_dir: /sdcard/Tasker/jobs/screenshots
