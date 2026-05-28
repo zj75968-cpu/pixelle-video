@@ -61,7 +61,6 @@ from api.routers import (
     publish_router,
     runninghub_router,
     webhooks_router,
-    phone_agent_router,
 )
 
 
@@ -162,23 +161,6 @@ app.include_router(publish_router, prefix=api_config.api_prefix)
 app.include_router(runninghub_router, prefix=api_config.api_prefix)
 # Webhooks have no /api prefix so external services (e.g. RunningHub) can hit a stable URL.
 app.include_router(webhooks_router)
-app.include_router(phone_agent_router, prefix=api_config.api_prefix)
-
-
-# Top-level shortcut: /s -> phone-agent setup script
-# Lets the UI advertise an ultra-short command:
-#     curl http://<VPS>/s | bash
-# NOTE: Requires nginx to forward `/s` to this FastAPI service when the
-# Streamlit UI is the default upstream on port 80. See docs/PRD or the
-# Publish page for the nginx snippet.
-from fastapi import Request as _FA_Request  # noqa: E402
-
-
-@app.get("/s", include_in_schema=False)
-async def setup_shortcut(request: _FA_Request):
-    """短链：等价于 GET /api/phone-agent/setup，方便用户用更短的命令拉取安装脚本。"""
-    from api.routers.phone_agent import get_setup_script
-    return await get_setup_script(request)
 
 
 @app.get("/")

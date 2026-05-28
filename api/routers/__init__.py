@@ -29,7 +29,6 @@ from api.routers.devices import router as devices_router
 from api.routers.publish import router as publish_router
 from api.routers.runninghub import router as runninghub_router
 from api.routers.webhooks import router as webhooks_router
-from api.routers.phone_agent import router as phone_agent_router
 
 __all__ = [
     "health_router",
@@ -47,6 +46,5 @@ __all__ = [
     "publish_router",
     "runninghub_router",
     "webhooks_router",
-    "phone_agent_router",
 ]
 
