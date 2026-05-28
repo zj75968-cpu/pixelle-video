@@ -104,46 +104,42 @@ class TemplateConfig(BaseModel):
     )
 
 
-class PhoneAgentConfig(BaseModel):
-    """HTTP Agent configuration for phone control without USB ADB."""
-    url: str = Field(
-        default="",
-        description="手机 Agent 的访问地址（cloudflared 隧道 URL），如 https://xxx.trycloudflare.com",
-    )
-    token: str = Field(
-        default="",
-        description="认证 Token，与手机端 phone_agent.py --token 保持一致",
-    )
-    chunk_size_mb: int = Field(
-        default=5,
-        description="文件分块大小（MB），默认 5MB",
-    )
-    timeout_push: int = Field(
-        default=120,
-        description="单文件推送超时秒数",
-    )
-    agents: Dict[str, Dict[str, Any]] = Field(
-        default_factory=dict,
-        description="Registered phone-agent instances keyed by stable agent id.",
-    )
+class HardwareConfig(BaseModel):
+    com_port: str = Field(default="COM3", description="CH9329 serial port name")
+    baudrate: int = Field(default=9600, description="CH9329 baudrate")
+    unlock_pin: str = Field(default="", description="Unlock pin digits")
+
+
+class LskyProConfig(BaseModel):
+    url: str = Field(default="", description="Lsky Pro upload URL")
+    token: str = Field(default="", description="Lsky Pro Bearer token")
+    album_id: Optional[int] = Field(default=None, description="Optional album ID")
+
+
+class CoordinateConfig(BaseModel):
+    browser_address_bar_x: float = Field(default=0.5)
+    browser_address_bar_y: float = Field(default=0.08)
+    browser_image_x: float = Field(default=0.5)
+    browser_image_y: float = Field(default=0.5)
+    browser_save_btn_x: float = Field(default=0.5)
+    browser_save_btn_y: float = Field(default=0.85)
+    xhs_icon_x: float = Field(default=0.3)
+    xhs_icon_y: float = Field(default=0.5)
+    xhs_add_btn_x: float = Field(default=0.5)
+    xhs_add_btn_y: float = Field(default=0.95)
+    xhs_first_album_x: float = Field(default=0.25)
+    xhs_first_album_y: float = Field(default=0.25)
+    xhs_next_btn_x: float = Field(default=0.85)
+    xhs_next_btn_y: float = Field(default=0.08)
+    xhs_publish_btn_x: float = Field(default=0.5)
+    xhs_publish_btn_y: float = Field(default=0.92)
 
 
 class XHSPublishConfig(BaseModel):
     """Xiaohongshu publish automation configuration"""
     strict_mode: bool = Field(
-        default=True,
-        description=(
-            "Strict mode: raise an error when a UI element cannot be found instead of "
-            "falling back to coordinate taps. Set to false to enable compatible/fallback mode."
-        ),
-    )
-    push_dir: str = Field(
-        default="/sdcard/DCIM/PixelleVideo",
-        description="Device-side directory where images are pushed before publishing",
-    )
-    lock_pin: str = Field(
-        default="",
-        description="Device unlock PIN (digits only). If set, auto-unlocks the screen before publishing.",
+        default=False,
+        description="Strict mode setting (deprecated).",
     )
     daily_schedule_times: List[str] = Field(
         default_factory=lambda: ["09:00", "12:00", "18:00"],
@@ -152,38 +148,9 @@ class XHSPublishConfig(BaseModel):
             "自动分配到下一个未占用的时间段。留空则禁用自动排期。"
         ),
     )
-    adb_server_host: str = Field(
-        default="127.0.0.1",
-        description=(
-            "ADB Server 地址。默认 127.0.0.1（本机）。"
-            "若手机连在同网内其他主机上，填写那台主机的 IP（如 192.168.1.5），"
-            "并在那台主机运行 adb -a nodaemon server。"
-        ),
-    )
-    adb_server_port: int = Field(
-        default=5037,
-        description="ADB Server 端口，默认 5037。",
-    )
-
-
-class RemotePathsConfig(BaseModel):
-    """Remote directory paths on target phone"""
-    job_dir: str = Field(default="/sdcard/Tasker/jobs", description="Directory for job definition and trigger files")
-    image_dir: str = Field(default="/sdcard/Pictures/TaskerUpload", description="Directory for uploading image assets")
-    video_dir: str = Field(default="/sdcard/Movies/TaskerUpload", description="Directory for uploading video assets")
-    screenshot_dir: str = Field(default="/sdcard/Tasker/jobs/screenshots", description="Directory for screenshots")
-
-
-class DistributionConfig(BaseModel):
-    """Android Tasker SSH distribution configuration"""
-    mode: str = Field(default="legacy", description="Distribution mode: 'legacy' or 'mobile_tasker_ssh'")
-    result_wait_seconds: int = Field(default=60, description="Timeout waiting for job completion")
-    result_poll_interval_seconds: int = Field(default=5, description="Polling interval for result file")
-    max_retry: int = Field(default=2, description="Maximum number of retries")
-    batch_size: int = Field(default=3, description="Task batch size")
-    send_interval_seconds: int = Field(default=2, description="Interval between sending files")
-    mobile_devices_config: str = Field(default="config/devices.yaml", description="Path to devices config file")
-    remote_paths: RemotePathsConfig = Field(default_factory=RemotePathsConfig, description="Paths on target device")
+    hardware: HardwareConfig = Field(default_factory=HardwareConfig, description="Hardware CH9329 serial settings")
+    lsky_pro: LskyProConfig = Field(default_factory=LskyProConfig, description="Lsky Pro image hosting settings")
+    coordinates: CoordinateConfig = Field(default_factory=CoordinateConfig, description="Coordinates ratio configuration")
 
 
 class PixelleVideoConfig(BaseModel):
@@ -204,9 +171,6 @@ class PixelleVideoConfig(BaseModel):
     comfyui: ComfyUIConfig = Field(default_factory=ComfyUIConfig)
     template: TemplateConfig = Field(default_factory=TemplateConfig)
     xhs_publish: XHSPublishConfig = Field(default_factory=XHSPublishConfig)
-    phone_agent: PhoneAgentConfig = Field(default_factory=PhoneAgentConfig)
-    distribution_mode: Optional[str] = Field(default=None, description="Global distribution mode override")
-    distribution: DistributionConfig = Field(default_factory=DistributionConfig)
 
     def is_llm_configured(self) -> bool:
         """Check if LLM is properly configured"""
@@ -223,4 +187,3 @@ class PixelleVideoConfig(BaseModel):
     def to_dict(self) -> dict:
         """Convert to dictionary (for backward compatibility)"""
         return self.model_dump()
-
