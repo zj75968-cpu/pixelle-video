@@ -1,7 +1,6 @@
 # Copyright (C) 2025 AIDC-AI
 """Agent 大脑：使用者一句话指令，自动编排现有工具完成任务。"""
 
-import asyncio
 import json
 import sys
 from datetime import datetime
@@ -18,9 +17,8 @@ import streamlit as st
 from web.state.session import init_session_state, init_i18n, get_pixelle_video
 from web.utils.async_helpers import run_async
 
-from pixelle_video.agent import AgentBrain, TOOLS, enhance_instruction
+from pixelle_video.agent import AgentBrain, enhance_instruction
 from pixelle_video.agent.brain import _resolve_placeholders
-from pixelle_video.agent.tools import get_tool as _get_tool
 from pixelle_video.services.publish_scheduler import PublishScheduler as _PublishScheduler
 
 
@@ -280,7 +278,6 @@ def _run_brain(
     initial_prior_results: list | None = None,
 ) -> None:
     """Plan + execute via AgentBrain with live step-by-step progress."""
-    import time as _time
 
     brain = AgentBrain(llm=pixelle_video.llm)
 

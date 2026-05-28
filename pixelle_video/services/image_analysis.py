@@ -19,7 +19,6 @@ Uses Florence-2 or other vision models to analyze images and generate descriptio
 from typing import Optional, Literal
 from pathlib import Path
 
-from comfykit import ComfyKit
 from loguru import logger
 
 from pixelle_video.services.comfy_base_service import ComfyBaseService

@@ -14,12 +14,10 @@
 TTS (Text-to-Speech) Service - Supports both local and ComfyUI inference
 """
 
-import os
 import uuid
 from pathlib import Path
 from typing import Optional
 
-from comfykit import ComfyKit
 from loguru import logger
 
 from pixelle_video.services.comfy_base_service import ComfyBaseService

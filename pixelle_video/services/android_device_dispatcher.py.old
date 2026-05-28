@@ -1,18 +1,14 @@
 # -*- coding: utf-8 -*-
-"""
-硬件设备调度器（CH9329 串口控制）
-"""
-from typing import Callable
+import asyncio
+from typing import Callable, Optional
 from loguru import logger
 from pixelle_video.services.publish_scheduler import PublishJob
 from pixelle_video.services.xhs_publisher import XHSPublisher
 
-
 class DistributionAdapter:
     """
-    发帖分发器（CH9329 物理硬件串口控制）。
+    发帖分发器（已重构为 CH9329 物理硬件串口控制）。
     """
-
     @classmethod
     def get_mode(cls) -> str:
         """获取当前系统的发帖分发模式"""
@@ -24,19 +20,20 @@ class DistributionAdapter:
         progress_callback: Callable[[str], None]
     ) -> bool:
         """
-        使用硬件直控模式执行发帖任务。
-
+        根据硬件直控模式执行发帖任务。
+        
         Args:
             job: 待执行的任务实例，其中 job.serial 应为硬件 COM 口名（例如 "COM3"）
             progress_callback: 进度汇报回调
-
+            
         Returns:
             True 执行成功，False 失败
         """
         logger.info(f"Executing job {job.job_id} using hardware mode. COM port: {job.serial}")
-
+        
+        # 实例化 XHSPublisher（串口连接由 publisher 负责管理）
         publisher = XHSPublisher(serial=job.serial, job_id=job.job_id)
-
+        
         if job.kind == "video":
             success = await publisher.publish_video(
                 video_path=job.video_path or "",
@@ -53,5 +50,5 @@ class DistributionAdapter:
                 hashtags=job.hashtags,
                 progress_callback=progress_callback,
             )
-
+            
         return success

@@ -17,7 +17,6 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
-from urllib.parse import urlparse
 
 import httpx
 from loguru import logger

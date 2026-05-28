@@ -19,7 +19,6 @@ Uses ComfyUI workflows to analyze video content and generate descriptions.
 from typing import Optional, Literal
 from pathlib import Path
 
-from comfykit import ComfyKit
 from loguru import logger
 
 from pixelle_video.services.comfy_base_service import ComfyBaseService

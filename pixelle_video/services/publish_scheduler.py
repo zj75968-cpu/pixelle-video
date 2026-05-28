@@ -611,7 +611,7 @@ class PublishScheduler:
             await self._execute_job_impl(job)
 
     async def _execute_job_impl(self, job: PublishJob):
-        from pixelle_video.services.xhs_publisher import XHSPublisher, XHSPublishError
+        from pixelle_video.services.xhs_publisher import XHSPublisher
 
         # Acquire per-device lock to prevent concurrent execution on same device
         if job.serial not in self._device_locks:

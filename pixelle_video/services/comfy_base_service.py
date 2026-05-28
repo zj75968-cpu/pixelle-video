@@ -19,7 +19,6 @@ import os
 from pathlib import Path
 from typing import Optional, List, Dict, Any
 
-from comfykit import ComfyKit
 from loguru import logger
 
 from pixelle_video.utils.os_util import (
@@ -92,7 +91,6 @@ class ComfyBaseService:
             ]
         """
         # Dynamic cache based on modification times to minimize disk I/O under Streamlit
-        import os
         from pixelle_video.utils.os_util import get_root_path, get_data_path
         
         # Discover source directories in both default and custom locations

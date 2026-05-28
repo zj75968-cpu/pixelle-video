@@ -1,21 +1,15 @@
+# -*- coding: utf-8 -*-
 # Copyright (C) 2025 AIDC-AI
-#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #     http://www.apache.org/licenses/LICENSE-2.0
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
 """
-Device management endpoints.
+Device management endpoints (重构为 CH9329 硬件直控模式).
 """
 
 from fastapi import APIRouter, HTTPException, Response
-from loguru import logger
 
 from api.schemas.devices import (
     DeviceAddRequest,
@@ -24,6 +18,7 @@ from api.schemas.devices import (
     DeviceResponse,
 )
 from pixelle_video.services.device_manager import device_manager
+from pixelle_video.config import config_manager
 
 router = APIRouter(prefix="/devices", tags=["Device Management"])
 
@@ -47,7 +42,7 @@ async def list_devices():
     return DeviceListResponse(
         devices=[_device_to_response(d) for d in devices],
         total=len(devices),
-        adb_available=device_manager.check_adb_available(),
+        adb_available=False,
     )
 
 
@@ -74,31 +69,26 @@ async def remove_device(serial: str):
 
 @router.post("/connect-wifi", response_model=DeviceResponse)
 async def connect_wifi(body: DeviceConnectWiFiRequest):
-    """Connect to an Android device over WiFi via ADB."""
-    serial = f"{body.host}:{body.port}"
-    success, adb_msg = device_manager.connect_wifi(body.host, body.port)
-    if not success:
-        raise HTTPException(
-            status_code=502,
-            detail=f"Failed to connect to {serial}: {adb_msg}",
-        )
-    # Auto-register if not already in registry
-    dev = device_manager.get(serial) or device_manager.add_device(serial=serial)
-    device_manager.sync_connected()
-    return _device_to_response(device_manager.get(serial))
+    """Connect WiFi is not supported in hardware mode."""
+    raise HTTPException(
+        status_code=501,
+        detail="WiFi ADB connection is not supported in CH9329 hardware control mode."
+    )
 
 
 @router.get("/diagnose/status")
 async def diagnose_adb():
-    """Diagnose ADB and connected devices (for debugging)."""
-    adb_available = device_manager.check_adb_available()
-    live_serials = device_manager.list_connected_serials() if adb_available else []
-    registered_devices = device_manager.get_all()
+    """Diagnose serial status."""
+    com_port = "COM3"
+    try:
+        com_port = config_manager.config.xhs_publish.hardware.com_port
+    except Exception:
+        pass
 
     return {
-        "adb_available": adb_available,
-        "adb_command": device_manager.get_adb_command(),
-        "live_connected_serials": live_serials,
+        "adb_available": False,
+        "hardware_mode": True,
+        "com_port": com_port,
         "registered_devices": [
             {
                 "serial": d.serial,
@@ -106,19 +96,16 @@ async def diagnose_adb():
                 "connected": d.connected,
                 "last_seen": d.last_seen,
             }
-            for d in registered_devices
+            for d in device_manager.get_all()
         ],
-        "sync_active": device_manager._auto_sync_thread is not None and device_manager._auto_sync_thread.is_alive(),
+        "sync_active": False,
     }
 
 
 @router.get("/{serial}/screenshot")
 async def get_screenshot(serial: str):
-    """Capture a screenshot from the device and return it as PNG."""
-    dev = device_manager.get(serial)
-    if not dev:
-        raise HTTPException(status_code=404, detail=f"Device {serial} not found")
-    data = device_manager.screenshot(serial)
-    if data is None:
-        raise HTTPException(status_code=502, detail="Failed to capture screenshot")
-    return Response(content=data, media_type="image/png")
+    """Screenshot is not supported in hardware mode."""
+    raise HTTPException(
+        status_code=501,
+        detail="Screenshots are not supported in CH9329 hardware control mode."
+    )

@@ -23,7 +23,7 @@ import zipfile
 import io
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Any
+from typing import Dict, Any
 
 from api.schemas.publish import (
     PublishJobRequest,

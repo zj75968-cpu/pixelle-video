@@ -19,7 +19,6 @@ Automatically detects output type based on ExecuteResult.
 
 from typing import Optional
 
-from comfykit import ComfyKit
 from loguru import logger
 
 from pixelle_video.services.comfy_base_service import ComfyBaseService

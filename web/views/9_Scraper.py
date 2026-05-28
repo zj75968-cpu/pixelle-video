@@ -43,7 +43,6 @@ render_header()
 
 from pixelle_video.services.smart_scraper import (
     smart_scrape,
-    reverse_prompt as svc_reverse_prompt,
     reverse_prompt_structured as svc_reverse_structured,
     regenerate_image as svc_regenerate_image,
     generate_copy as svc_generate_copy,

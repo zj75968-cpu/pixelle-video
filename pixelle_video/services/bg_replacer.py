@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Union
 
 from loguru import logger
 
