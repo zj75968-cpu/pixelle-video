@@ -59,6 +59,9 @@ class CH9329Controller:
         try:
             self.ser.write(packet)
             self.ser.flush()
+            # Clear Rx buffer to prevent memory accumulate
+            if self.ser.in_waiting > 0:
+                self.ser.read_all()
             # 微量延时，避免命令发送过快导致硬件粘包
             time.sleep(0.01)
             return True
@@ -202,6 +205,10 @@ class CH9329Controller:
     def press_enter(self) -> bool:
         """发送回车键"""
         return self._send_keyboard(0x00, 0x28)
+
+    def press_space(self) -> bool:
+        """发送空格键"""
+        return self._send_keyboard(0x00, 0x2C)
 
     def press_home(self) -> bool:
         """发送 Home 键 (常用于返回桌面)"""
