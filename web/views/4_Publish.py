@@ -431,85 +431,6 @@ def _render_device_cards(dm, devices):
                         else:
                             st.error("截图失败")
 
-                st.markdown("<div style='margin-top:4px'></div>", unsafe_allow_html=True)
-                if st.button("🚀 初始化 Agent", key=f"init_agent_{dev.serial}",
-                             help="一键推送 phone_agent.py 到手机，无需 USB 长期连接"):
-                    from pixelle_video.services.phone_agent_setup import (
-                        is_termux_installed, push_agent_files, open_termux,
-                        try_run_setup_in_termux, _adb, install_termux_via_adb,
-                    )
-
-                    # ── 可视化进度 ──────────────────────────────
-                    def _step(icon: str, label: str, ok: bool, detail: str = ""):
-                        color = "#1a7a1a" if ok else "#a00000"
-                        bg = "#e8f5e9" if ok else "#ffebee"
-                        bd = "#4caf50" if ok else "#ef9a9a"
-                        st.markdown(
-                            f'<div style="border:1px solid {bd};border-radius:6px;'
-                            f'padding:7px 12px;background:{bg};margin:3px 0">'
-                            f'<b style="color:{color}">{icon} {label}</b>'
-                            + (f'<br><span style="font-size:.83em;color:#555">{detail}</span>' if detail else "")
-                            + "</div>",
-                            unsafe_allow_html=True,
-                        )
-
-                    steps = st.container()
-                    with steps:
-                        st.markdown("**初始化进度**")
-
-                        # Step 1: 设备连接
-                        rc, out, _ = _adb(dev.serial, "get-state")
-                        s1_ok = rc == 0 and "device" in out
-                        _step("1️⃣", "ADB 连接验证", s1_ok,
-                              "设备在线" if s1_ok else f"设备未连接或未授权（serial: {dev.serial}）")
-                        if not s1_ok:
-                            st.stop()
-
-                        # Step 2: Termux 检查 → 自动安装
-                        termux_ok = is_termux_installed(dev.serial)
-                        if not termux_ok:
-                            _step("2️⃣", "Termux 未安装 → 正在自动安装...", True,
-                                  "从 GitHub 下载 APK，约 30~60 秒...")
-                            install_msgs = []
-                            install_result = install_termux_via_adb(
-                                dev.serial,
-                                progress_callback=lambda m: install_msgs.append(m),
-                            )
-                            termux_ok = install_result["ok"]
-                            detail_msg = install_result["message"]
-                            if install_msgs:
-                                detail_msg = install_msgs[-1] + " | " + install_result["message"]
-                            _step("2️⃣", "Termux 自动安装", termux_ok, detail_msg)
-                            if not termux_ok:
-                                st.markdown(
-                                    "若自动安装失败，请手动在 **F-Droid** 安装：\n"
-                                    "👉 https://f-droid.org/packages/com.termux/"
-                                )
-                                st.stop()
-                        else:
-                            _step("2️⃣", "Termux 安装检查", True, "已安装")
-
-                        # Step 3: 推送文件
-                        push_result = push_agent_files(dev.serial)
-                        _step("3️⃣", "脚本文件推送", push_result["ok"],
-                              "已推送: " + ", ".join(push_result["pushed"])
-                              if push_result["ok"] else "失败: " + "; ".join(push_result["errors"]))
-
-                        # Step 4: 打开 Termux
-                        termux_opened = open_termux(dev.serial)
-                        _step("4️⃣", "打开 Termux", termux_opened,
-                              "Termux 已置于前台" if termux_opened else "打开失败，请手动打开 Termux")
-
-                        # Step 5: 自动注入并执行安装
-                        auto_ok = try_run_setup_in_termux(dev.serial)
-                        _step("5️⃣", "全自动注入执行指令", True,
-                              "已通过 USB 自动向手机 Termux 注入并运行了安装指令，完全免去手动打字！请看手机屏幕。")
-
-                        # Step 6: 拔线无线挂机指南
-                        _step("6️⃣", "无线脱线挂机指南", True,
-                              "灌装完成后，你便可立即拔掉 USB 数据线！以后每次在手机上输入 start 即可脱线在后台挂机运行。")
-
-                        st.success("🎉 一键灌装与指令注入已全部完成！现在您可以拔掉 USB 数据线，手机将以完全独立的无线状态在后台自治运行。")
 
                 if st.button("🗑️ 移除", key=f"del_{dev.serial}"):
                     dm.remove_device(dev.serial)
@@ -605,7 +526,7 @@ def render_devices_tab():
             with col_reg:
                 if st.button(f"⚡ 快速注册并启用 `{s}`", key=f"quick_reg_init_{s}"):
                     dm.add_device(serial=s, name="自动添加设备", theme="默认主题")
-                    st.success(f"设备 `{s}` 注册成功！请展开下方卡片点击「🚀 初始化 Agent」进行一键灌装。")
+                    st.success(f"设备 `{s}` 注册成功！")
                     st.rerun()
 
     _render_auto_refresh_device_list(dm)
@@ -919,7 +840,7 @@ def render_gallery_upload_tab():
     ):
         import tempfile
         import os
-        from pixelle_video.services.phone_agent_client import push_images_auto
+        from pixelle_video.services.device_manager import device_manager
         from pixelle_video.config import config_manager
 
         push_cfg = getattr(config_manager.config, "xhs_publish", None)
@@ -939,18 +860,22 @@ def render_gallery_upload_tab():
                     tmp_paths.append(tmp_path)
 
                 with st.spinner(f"正在推送 {len(tmp_paths)} 张图片到 {selected_serial}..."):
-                    result = push_images_auto(
-                        serial=selected_serial,
-                        local_paths=tmp_paths,
-                        push_dir=push_dir,
-                    )
+                    # Use ADB push directly
+                    success_count = 0
+                    failed_paths = []
+                    for img_path in tmp_paths:
+                        try:
+                            device_manager.push_file(selected_serial, img_path, push_dir)
+                            success_count += 1
+                        except Exception:
+                            failed_paths.append(img_path)
 
-            if result["success"] > 0:
-                st.success(f"✅ 成功推送 {result['success']} 张图片到相册 ({push_dir})")
-            if result["failed"]:
+            if success_count > 0:
+                st.success(f"✅ 成功推送 {success_count} 张图片到相册 ({push_dir})")
+            if failed_paths:
                 st.error(
-                    f"❌ {len(result['failed'])} 张推送失败："
-                    + ", ".join(Path(p).name for p in result["failed"])
+                    f"❌ {len(failed_paths)} 张推送失败："
+                    + ", ".join(Path(p).name for p in failed_paths)
                 )
         except Exception as exc:
             st.error(f"推送出错：{exc}")
@@ -1619,112 +1544,6 @@ python3 scripts/local_agent.py --server "$SERVER_URL"
 
 # ---- Main --------------------------------------------------------------------
 
-def render_phone_agent_tab():
-    """Render the simplified mobile-only Termux phone agent setup guide."""
-    st.subheader("📱 手机自治挂机模式 (免电脑插线)")
-    st.caption("适合团队成员或客户：只需手机上安装 Termux 即可，无需连接任何电脑数据线，即开即用。")
-
-    st.info(
-        "ℹ️ **什么是手机自治挂机模式？**\n\n"
-        "在这种模式下，使用者只需在手机 Termux 里运行一个快捷启动指令，"
-        "手机就会自动生成加密的公网隧道并注册到你的后台。VPS 控制塔可以直接安全地"
-        "通过公网隧道向手机分发帖子发布、自动评论和定时删除的任务！"
-    )
-
-    st.markdown("### 🚀 一键部署与挂机运行指南")
-
-    col1, col2 = st.columns(2)
-
-    with col1:
-        st.markdown("#### **第一步：一键在线灌装（仅需执行一次）**")
-        st.write("在手机上下载安装 Termux App。打开 Termux，完整复制并执行以下命令：")
-        
-        # 自动解析当前请求域名以获得正确的 IP 或是域名
-        server_ip = "23.238.47.62"
-        try:
-            from streamlit.web.server.websocket_headers import _get_websocket_headers
-            headers = _get_websocket_headers()
-            host = headers.get("Host") or ""
-            if host:
-                server_ip = host.split(":")[0]
-        except Exception:
-            pass
-
-        short_cmd = f"curl http://{server_ip}/s | bash"
-        st.code(short_cmd, language="bash")
-        st.caption(
-            "👉 **超极简命令**（仅 20 多个字符，在手机 Termux 里粘贴回车即可）。"
-            "需要 VPS 的 nginx 把 `/s` 转发到 FastAPI（默认 8000 端口）。"
-        )
-        st.write("若 `/s` 短链尚未在 nginx 中配置，请使用下面的**等价长命令**，它走的是已经存在的 `/api/*` 反代路径，**开箱即用**：")
-        setup_cmd = f"curl -sSL http://{server_ip}/api/phone-agent/setup | bash"
-        st.code(setup_cmd, language="bash")
-        st.caption(
-            "脚本会自动安装 python/flask/cloudflared、从本 VPS 拉取最新 `phone_agent.py`、"
-            "把你的 VPS 地址与 Token 写入 `~/.pixelle.env`，并立刻启动一次挂机（你会看到 `[report] ✅ URL 已上报到 Pixelle-Video`）。"
-        )
-
-        with st.expander("🔧 想用 20 字符的 `/s` 短链？给 nginx 加这一段即可"):
-            st.code(
-                f"""# /etc/nginx/conf.d/pixelle.conf 或站点 server 块内添加：
-location = /s {{
-    proxy_pass http://127.0.0.1:8000/s;
-    proxy_set_header Host $host;
-    proxy_set_header X-Forwarded-Proto $scheme;
-    proxy_set_header X-Forwarded-Host  $host;
-}}
-# 然后： sudo nginx -t && sudo nginx -s reload""",
-                language="nginx",
-            )
-
-    with col2:
-        st.markdown("#### **第二步：脱线无线挂机（以后每次挂机）**")
-        st.write("当一键灌装完成后，你就可以**拔掉 USB 数据线**了！")
-        st.write("以后每次需要挂机，只需在手机 Termux 中敲入一个单词并回车：")
-        st.code("start", language="bash")
-        
-        st.write("或者使用启动脚本：")
-        st.code("./start.sh", language="bash")
-        st.caption("👉 启动后手机会显示 `[report] ✅ URL 已成功上报！`。此时可直接关闭 Termux 界面但保持后台运行即可。")
-
-    st.markdown("---")
-    st.markdown("#### 🟢 挂机状态在线校验")
-    st.markdown(
-        "挂机服务在手机端运行成功后，请切换到本页面的 **「📱 设备管理」** 标签页。 "
-        "此时该手机在设备列表中会显示为：**`🟢 在线（手机自治挂机模式）`**。\n\n"
-        "此后，当你发布帖子时，只需在目标设备中勾选这台手机，系统就会无视任何网络限制，将任务安全发送至对方手机上自动完成发帖操作！"
-    )
-
-    if st.button("🔍 立即检测 Phone Agent 是否已注册并在线", key="phone_agent_probe"):
-        try:
-            from pixelle_video.config import config_manager
-            from pixelle_video.services.phone_agent_client import ping as _pa_ping
-
-            cfg = config_manager.config
-            url = (cfg.phone_agent.url or "").strip()
-            tok = (cfg.phone_agent.token or "").strip()
-            if not url:
-                st.error(
-                    "❌ `config.yaml` 中的 `phone_agent.url` 仍为空 —— 说明手机端**还没成功把隧道 URL 上报到 VPS**。\n\n"
-                    "排查：\n"
-                    "1. 手机 Termux 里再次运行 `start`，观察是否打印 `[report] ✅ URL 已上报到 Pixelle-Video`。\n"
-                    "2. 如果显示 `第 N/5 次上报失败`，多半是 VPS 防火墙拦了，或 `PIXELLE_URL` 不可达。\n"
-                    "3. 重新执行上面的一键命令，让脚本把正确的 `PIXELLE_URL` 写入 `~/.pixelle.env`。"
-                )
-            else:
-                ok = _pa_ping(url, token=tok, timeout=6)
-                if ok:
-                    st.success(f"✅ Phone Agent 在线！当前隧道：{url}")
-                else:
-                    st.warning(
-                        f"⚠️ 已登记 URL = `{url}`，但当前 ping 不通。\n\n"
-                        "可能原因：cloudflared 隧道断开 / 手机进入深度休眠 / Token 不一致。"
-                        "请在手机上重新运行 `start`。"
-                    )
-        except Exception as e:
-            st.exception(e)
-
-
 def main():
     init_session_state()
     init_i18n()
@@ -1752,11 +1571,10 @@ def main():
     st.title("📱 发布管理")
     st.caption("管理 Android 设备并将图文帖子发布到小红书")
 
-    tab_devices, tab_publish, tab_agent, tab_phone_agent, tab_gallery = st.tabs([
-        "📱 设备管理", 
-        "📤 发布队列", 
-        "💻 客户端代理 (电脑)", 
-        "📱 手机自治挂机 (免电脑)",
+    tab_devices, tab_publish, tab_agent, tab_gallery = st.tabs([
+        "📱 设备管理",
+        "📤 发布队列",
+        "💻 客户端代理 (电脑)",
         "📸 上传到相册"
     ])
 
@@ -1768,9 +1586,6 @@ def main():
 
     with tab_agent:
         render_client_agent_tab()
-
-    with tab_phone_agent:
-        render_phone_agent_tab()
 
     with tab_gallery:
         render_gallery_upload_tab()

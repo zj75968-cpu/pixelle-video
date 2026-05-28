@@ -336,7 +336,6 @@ def render_result(result):
     if images_dir.exists():
         img_files_to_push = sorted(images_dir.glob("*.png")) + sorted(images_dir.glob("*.jpg"))
 
-    from pixelle_video.services.phone_agent_client import push_images_auto
     from pixelle_video.services.device_manager import device_manager as dm
 
     if not source_topic or not img_files_to_push:
@@ -344,12 +343,12 @@ def render_result(result):
     else:
         # Suggest devices by topic
         suggested = dm.suggest_devices_by_topic(source_topic, connected_only=True, threshold=0.0)
-        
+
         if not suggested:
             st.info("💡 未找到相关主题的已连接设备，可在 📱 发布管理 里为设备添加主题标签。")
         else:
             col_device, col_auto = st.columns([3, 1])
-            
+
             with col_device:
                 # Show suggested devices with scores
                 suggestions_text = "\n".join(
@@ -357,26 +356,39 @@ def render_result(result):
                      for dev, score, reason in suggested[:3]]
                 )
                 st.markdown(f"**推荐设备：**\n{suggestions_text}")
-            
+
             with col_auto:
                 st.markdown("<br>", unsafe_allow_html=True)
                 if st.button("📤 推送到最优设备", key="auto_push_best", type="primary"):
                     best_device = suggested[0][0]  # Highest score
                     with st.spinner(f"正在推送 {len(img_files_to_push)} 张图片到 {best_device.name or best_device.serial}..."):
                         try:
-                            result = push_images_to_gallery(
-                                serial=best_device.serial,
-                                local_paths=[str(p) for p in img_files_to_push],
+                            # Use ADB push directly
+                            from pixelle_video.config import config_manager
+                            push_cfg = getattr(config_manager.config, "xhs_publish", None)
+                            push_dir = (
+                                getattr(push_cfg, "push_dir", "/sdcard/DCIM/PixelleVideo")
+                                if push_cfg
+                                else "/sdcard/DCIM/PixelleVideo"
                             )
-                            if result["success"] > 0:
+                            success_count = 0
+                            failed_count = 0
+                            for img_path in img_files_to_push:
+                                try:
+                                    dm.push_file(best_device.serial, str(img_path), push_dir)
+                                    success_count += 1
+                                except Exception:
+                                    failed_count += 1
+
+                            if success_count > 0:
                                 st.success(
-                                    f"成功推送 {result['success']} 张图片到 {best_device.name or best_device.serial} 相册"
+                                    f"成功推送 {success_count} 张图片到 {best_device.name or best_device.serial} 相册"
                                 )
-                            if result["failed"]:
-                                st.error(f"{len(result['failed'])} 张推送失败")
+                            if failed_count > 0:
+                                st.error(f"{failed_count} 张推送失败")
                         except Exception as e:
                             st.error(f"推送失败：{e}")
-            
+
             # Manual device selection
             with st.expander("🔧 手动选择设备推送"):
                 all_devices = [d for d in dm.get_all() if d.connected]
@@ -391,14 +403,26 @@ def render_result(result):
                         selected_serial = device_options[selected_label]
                         with st.spinner(f"正在推送 {len(img_files_to_push)} 张图片..."):
                             try:
-                                result = push_images_auto(
-                                    serial=selected_serial,
-                                    local_paths=[str(p) for p in img_files_to_push],
+                                from pixelle_video.config import config_manager
+                                push_cfg = getattr(config_manager.config, "xhs_publish", None)
+                                push_dir = (
+                                    getattr(push_cfg, "push_dir", "/sdcard/DCIM/PixelleVideo")
+                                    if push_cfg
+                                    else "/sdcard/DCIM/PixelleVideo"
                                 )
-                                if result["success"] > 0:
-                                    st.success(f"成功推送 {result['success']} 张图片")
-                                if result["failed"]:
-                                    st.error(f"{len(result['failed'])} 张推送失败")
+                                success_count = 0
+                                failed_count = 0
+                                for img_path in img_files_to_push:
+                                    try:
+                                        dm.push_file(selected_serial, str(img_path), push_dir)
+                                        success_count += 1
+                                    except Exception:
+                                        failed_count += 1
+
+                                if success_count > 0:
+                                    st.success(f"成功推送 {success_count} 张图片")
+                                if failed_count > 0:
+                                    st.error(f"{failed_count} 张推送失败")
                             except Exception as e:
                                 st.error(f"推送失败：{e}")
                 else:
