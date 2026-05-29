@@ -264,6 +264,12 @@ def main():
         icon="📱",
     )
 
+    monitor_page = st.Page(
+        "views/10_Monitor.py",
+        title="监控大屏",
+        icon="📺",
+    )
+
     agent_page = st.Page(
         "views/8_Agent.py",
         title="Agent 大脑",
@@ -295,6 +301,7 @@ def main():
             history_page,
             traffic_page,
             publish_page,
+            monitor_page,
             agent_page,
             scraper_page,
             banned_page,

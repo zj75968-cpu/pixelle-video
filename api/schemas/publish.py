@@ -27,6 +27,8 @@ class PublishJobRequest(BaseModel):
     body: str = Field(..., description="Post body text")
     hashtags: List[str] = Field(default_factory=list, description="Hashtag list (without #)")
     images: List[str] = Field(..., description="Absolute paths to generated images")
+    kind: str = Field(default="image_text", description="Job kind: 'image_text' or 'video'")
+    video_path: Optional[str] = Field(default=None, description="Path or URL to generated video file")
     scheduled_at: Optional[str] = Field(
         default=None,
         description="ISO-8601 datetime string for scheduled publish. Null = immediate.",

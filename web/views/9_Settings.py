@@ -204,13 +204,29 @@ with st.expander("☁️ RunningHub API（图片/视频生成）", expanded=True
                                key="input_rh_url",
                                placeholder="https://www.runninghub.cn  （国内）")
     new_rh_concurrent = st.number_input("最大并发数", value=cfg.comfyui.runninghub_concurrent_limit,
-                                        min_value=1, max_value=20, key="input_rh_concurrent")
+                                        min_value=1, max_value=10, key="input_rh_concurrent")
 
 # ── 3. ComfyUI 本地配置 ───────────────────────────────────────────
 with st.expander("🖥️ ComfyUI 本地（自托管，可选）"):
     new_comfy_url = st.text_input("ComfyUI URL", value=cfg.comfyui.comfyui_url or "",
                                   key="input_comfy_url", placeholder="http://127.0.0.1:8188")
     new_comfy_key = _key_field("ComfyUI API Key（可选）", "comfy_key", cfg.comfyui.comfyui_api_key or "")
+
+# ── 3.5 云端分发与中转设置 ───────────────────────────────────────────
+with st.expander("☁️ 云端分发与中转设置（可选）"):
+    dist_cfg = getattr(cfg, "distribution", None)
+    current_cloud_url = getattr(dist_cfg, "cloud_url", "") if dist_cfg else ""
+    current_dist_mode = getattr(dist_cfg, "mode", "hardware") if dist_cfg else "hardware"
+    current_agent_timeout = getattr(dist_cfg, "agent_timeout", 600) if dist_cfg else 600
+    current_agent_poll = getattr(dist_cfg, "agent_poll_interval", 3) if dist_cfg else 3
+
+    new_cloud_url = st.text_input("云端控制中心 API 地址", value=current_cloud_url,
+                                  key="input_cloud_url", placeholder="如：http://23.238.47.62:8000")
+    new_dist_mode = st.selectbox("发帖分发模式", options=["hardware", "agent_pull"],
+                                 index=0 if current_dist_mode == "hardware" else 1,
+                                 key="input_dist_mode")
+    new_agent_timeout = st.number_input("Agent 任务超时时间（秒）", value=current_agent_timeout, min_value=60, key="input_agent_timeout")
+    new_agent_poll = st.number_input("Agent 轮询间隔（秒）", value=current_agent_poll, min_value=1, key="input_agent_poll")
 
 # ── 4. 修改管理员密钥 ────────────────────────────────────────────
 with st.expander("🔑 修改管理员访问密钥"):
@@ -255,7 +271,7 @@ with st.expander("📲 小红书发布配置"):
     )
     new_xhs_lock_pin = st.text_input(
         "解锁 PIN（纯数字，留空则不自动解锁）",
-        value=_xhs.lock_pin,
+        value=_xhs.hardware.unlock_pin,
         type="password",
         key="input_xhs_lock_pin",
     )
@@ -295,11 +311,19 @@ if st.button("💾 保存配置", type="primary", width="stretch"):
         "xhs_publish": {
             "strict_mode": new_xhs_strict,
             "push_dir":    new_xhs_push_dir.strip() or "/sdcard/DCIM/PixelleVideo",
-            "lock_pin":    new_xhs_lock_pin or "",
+            "hardware": {
+                "unlock_pin": new_xhs_lock_pin or "",
+            },
             "daily_schedule_times": [
                 t.strip() for t in new_xhs_schedule_raw.splitlines()
                 if t.strip() and ":" in t.strip()
             ],
+        },
+        "distribution": {
+            "mode": new_dist_mode,
+            "cloud_url": new_cloud_url.strip(),
+            "agent_timeout": int(new_agent_timeout),
+            "agent_poll_interval": int(new_agent_poll),
         },
     }
 

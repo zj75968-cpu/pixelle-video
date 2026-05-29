@@ -223,7 +223,9 @@ def generate_drainage_poster(title: str, dest_path: str) -> str:
     _draw_cute_flower(draw, 900, 1250)
     
     # 7. 保存文件
-    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    parent_dir = os.path.dirname(dest_path)
+    if parent_dir:
+        os.makedirs(parent_dir, exist_ok=True)
     img.save(dest_path, "PNG")
     print(f"[+] 完美马卡龙海报成功渲染保存到: {dest_path}", flush=True)
     return dest_path

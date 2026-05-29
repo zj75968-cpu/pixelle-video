@@ -129,13 +129,13 @@ async def get_file(file_path: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-_ALLOWED_UPLOAD_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+_ALLOWED_UPLOAD_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif", "video/mp4"}
 
 
 @router.post("/upload")
 async def upload_image(request: Request, file: UploadFile = File(...)):
     """
-    Upload an image and return a public URL for use with external APIs (e.g. RunningHub).
+    Upload an image or video and return a public URL for use with external APIs.
 
     The file is saved under output/uploads/ and served via GET /api/files/output/uploads/{filename}.
     The public base URL is taken from comfyui.public_base_url in config.yaml.
@@ -150,7 +150,7 @@ async def upload_image(request: Request, file: UploadFile = File(...)):
     upload_dir.mkdir(parents=True, exist_ok=True)
 
     ext = Path(file.filename).suffix.lower() if file.filename else ".jpg"
-    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+    if ext not in {".jpg", ".jpeg", ".png", ".webp", ".gif", ".mp4"}:
         ext = ".jpg"
     filename = f"{uuid.uuid4().hex[:16]}{ext}"
     dest = upload_dir / filename

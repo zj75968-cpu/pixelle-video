@@ -14,6 +14,7 @@
 Publish queue management endpoints.
 """
 
+import asyncio
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Request, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from loguru import logger
@@ -113,6 +114,8 @@ async def create_job(body: PublishJobRequest):
                 body=body.body,
                 hashtags=body.hashtags,
                 images=body.images,
+                kind=body.kind,
+                video_path=body.video_path,
                 scheduled_at=body.scheduled_at,
                 delete_after_hours=body.delete_after_hours,
                 auto_comment_text=body.auto_comment_text,
@@ -174,34 +177,39 @@ async def get_pending_job_for_agent(serials: str, request: Request, agent_id: st
     """
     Poll for pending/running jobs matching client connected device serials.
     Also registers or updates the client agent's online status.
+
+    DEPRECATED: Use /agent/wait for event-driven job assignment (no polling).
     """
     client_ip = request.client.host if request.client else "unknown"
     if not agent_id:
         agent_id = client_ip
-    
+
     serial_list = [s.strip() for s in serials.split(",") if s.strip()]
-    
+
     # Update active agent registration
     ACTIVE_AGENTS[agent_id] = {
         "ip": client_ip,
         "serials": serial_list,
         "last_seen": datetime.now().isoformat()
     }
-    
+
     # Clean up old agents (older than 30s) while we are here
     now = datetime.now()
     stale_keys = [k for k, v in ACTIVE_AGENTS.items() if (now - datetime.fromisoformat(v["last_seen"])).total_seconds() > 30]
     for k in stale_keys:
         ACTIVE_AGENTS.pop(k, None)
-        
-    # Search the queue for a RUNNING job matching these serials
+
+    # Search the queue for a PENDING or RUNNING job matching these serials
     token = request.headers.get("X-Token", "")
     from pixelle_video.utils.user_context import find_username_by_token, set_current_user
     username = find_username_by_token(token)
-    
+
     with set_current_user(username):
+        pending_jobs = publish_scheduler.list_jobs(status_filter=JobStatus.PENDING)
         running_jobs = publish_scheduler.list_jobs(status_filter=JobStatus.RUNNING)
-    for job in running_jobs:
+
+    # Prioritize PENDING jobs first, then RUNNING
+    for job in pending_jobs + running_jobs:
         if job.serial in serial_list:
             # We found a job for this agent!
             # Format and return job details
@@ -220,6 +228,98 @@ async def get_pending_job_for_agent(serials: str, request: Request, agent_id: st
             }
             
     return {"job": None}
+
+
+@router.get("/agent/wait")
+async def wait_for_job_event_driven(serials: str, request: Request, agent_id: str = None, timeout: int = 600):
+    """
+    Event-driven job waiting for agents. Replaces polling with instant notification.
+
+    This endpoint blocks until a job matching the agent's serials becomes available,
+    or until the timeout is reached. This eliminates the need for frequent polling.
+
+    Args:
+        serials: Comma-separated list of device serials this agent can handle
+        agent_id: Optional unique agent identifier (defaults to client IP)
+        timeout: Maximum wait time in seconds (default 600 = 10 minutes)
+
+    Returns:
+        Job details if available, or {"status": "timeout"} if no job within timeout
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    if not agent_id:
+        agent_id = client_ip
+
+    serial_list = [s.strip() for s in serials.split(",") if s.strip()]
+
+    # Update active agent registration
+    ACTIVE_AGENTS[agent_id] = {
+        "ip": client_ip,
+        "serials": serial_list,
+        "last_seen": datetime.now().isoformat()
+    }
+
+    # First check if there's already a pending job
+    token = request.headers.get("X-Token", "")
+    from pixelle_video.utils.user_context import find_username_by_token, set_current_user
+    username = find_username_by_token(token)
+
+    with set_current_user(username):
+        pending_jobs = publish_scheduler.list_jobs(status_filter=JobStatus.PENDING)
+
+    # Check for immediate match
+    for job in pending_jobs:
+        if job.serial in serial_list:
+            return {
+                "job": {
+                    "job_id": job.job_id,
+                    "serial": job.serial,
+                    "kind": job.kind,
+                    "title": job.title,
+                    "body": job.body,
+                    "hashtags": job.hashtags,
+                    "images": [to_relative_path(img) for img in job.images],
+                    "video_path": to_relative_path(job.video_path) if job.video_path else None,
+                    "dry_run": job.dry_run,
+                    "auto_comment_text": job.auto_comment_text,
+                }
+            }
+
+    # No immediate job, wait for one to become available
+    # Use a simple polling with longer interval since we don't have per-serial queues yet
+    # TODO: Implement per-serial event queues for true zero-latency notification
+    start_time = datetime.now()
+    check_interval = 5  # Check every 5 seconds instead of 3
+
+    while (datetime.now() - start_time).total_seconds() < timeout:
+        await asyncio.sleep(check_interval)
+
+        # Update last seen
+        ACTIVE_AGENTS[agent_id]["last_seen"] = datetime.now().isoformat()
+
+        # Check for new jobs
+        with set_current_user(username):
+            pending_jobs = publish_scheduler.list_jobs(status_filter=JobStatus.PENDING)
+
+        for job in pending_jobs:
+            if job.serial in serial_list:
+                return {
+                    "job": {
+                        "job_id": job.job_id,
+                        "serial": job.serial,
+                        "kind": job.kind,
+                        "title": job.title,
+                        "body": job.body,
+                        "hashtags": job.hashtags,
+                        "images": [to_relative_path(img) for img in job.images],
+                        "video_path": to_relative_path(job.video_path) if job.video_path else None,
+                        "dry_run": job.dry_run,
+                        "auto_comment_text": job.auto_comment_text,
+                    }
+                }
+
+    # Timeout reached
+    return {"status": "timeout"}
 
 
 @router.get("/agent/list")
@@ -339,3 +439,219 @@ async def submit_agent_job_result(
         publish_scheduler._save()
         
         return {"status": "ok"}
+
+
+from fastapi.responses import HTMLResponse, FileResponse
+
+@router.get("/task-image", response_class=FileResponse)
+async def get_task_image(job_id: str, idx: int):
+    """直接读取任务对应的本地图片并返回"""
+    job = publish_scheduler.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    
+    if not job.images or idx >= len(job.images):
+        raise HTTPException(status_code=404, detail="Image index out of range")
+        
+    img_path = job.images[idx]
+    if not os.path.exists(img_path):
+        raise HTTPException(status_code=404, detail="Image file not found")
+        
+    return FileResponse(img_path)
+
+@router.get("/task-video", response_class=FileResponse)
+async def get_task_video(job_id: str):
+    """直接读取任务对应的本地视频并返回"""
+    job = publish_scheduler.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    video_path = job.video_path
+    if not video_path:
+        raise HTTPException(status_code=404, detail="Video path not set on job")
+        
+    path_obj = Path(video_path)
+    if not path_obj.is_absolute():
+        path_obj = Path.cwd() / path_obj
+        
+    if not path_obj.exists():
+        raise HTTPException(status_code=404, detail=f"Video file not found: {path_obj}")
+        
+    return FileResponse(path_obj)
+
+@router.get("/task-gateway", response_class=HTMLResponse)
+async def get_task_gateway(job_id: str):
+    """手机端网关任务页面：支持免图床局域网图片/视频加载与JS自动剪贴板复制"""
+    job = publish_scheduler.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    # 拼接标题、正文和标签作为全文本，物理键盘Ctrl+V一次粘贴搞定所有内容
+    full_body = ""
+    if job.title:
+        full_body += job.title + "\n\n"
+    full_body += job.body or ""
+    if job.hashtags:
+        full_body += "\n" + " ".join([f"#{t}" for t in job.hashtags])
+        
+    import json
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(('8.8.8.8', 80))
+        pc_ip = s.getsockname()[0]
+    except Exception:
+        pc_ip = '127.0.0.1'
+    finally:
+        s.close()
+        
+    is_video = job.kind == "video"
+    media_url = ""
+    img_urls = []
+    
+    if is_video:
+        media_url = f"http://{pc_ip}:8000/publish/task-video?job_id={job_id}"
+    else:
+        img_urls = [
+            f"http://{pc_ip}:8000/publish/task-image?job_id={job_id}&idx={i}"
+            for i in range(len(job.images))
+        ]
+        
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Task Gateway</title>
+<style>
+  body {{
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    background-color: #000;
+    font-family: sans-serif;
+    color: #fff;
+    overflow: hidden;
+  }}
+  #media-container {{
+    width: 90vw;
+    height: 60vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px dashed #444;
+    border-radius: 8px;
+    background-color: #111;
+  }}
+  img, video {{
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+  }}
+  #btn-next {{
+    margin-top: 30px;
+    width: 80vw;
+    height: 60px;
+    background-color: #ff2442;
+    color: white;
+    font-size: 20px;
+    font-weight: bold;
+    border: none;
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 10px rgba(255, 36, 66, 0.3);
+  }}
+  #status-txt {{
+    margin-top: 15px;
+    font-size: 14px;
+    color: #888;
+    text-align: center;
+    padding: 0 10px;
+  }}
+  #hidden-text {{
+    position: absolute;
+    left: -9999px;
+  }}
+</style>
+</head>
+<body>
+  <div id="media-container">
+    {f'<video id="task-media" controls autoplay muted loop src="{media_url}"></video>' if is_video else '<img id="task-media" src="" alt="Loading...">'}
+  </div>
+  <button id="btn-next">点击此处：自动复制文案并加载媒体</button>
+  <div id="status-txt">准备就绪，请先点击下方大红按钮</div>
+  <textarea id="hidden-text"></textarea>
+
+  <script>
+    const isVideo = {json.dumps(is_video)};
+    const images = {json.dumps(img_urls)};
+    let currentIdx = 0;
+    const mediaEl = document.getElementById("task-media");
+    const btnEl = document.getElementById("btn-next");
+    const statusEl = document.getElementById("status-txt");
+    const textEl = document.getElementById("hidden-text");
+    const textToCopy = {json.dumps(full_body)};
+
+    function showImage(idx) {{
+      if (idx < images.length) {{
+        mediaEl.src = images[idx];
+        btnEl.innerText = `长按上方图保存 (当前第 ${idx+1}/${images.length} 张)`;
+        statusEl.innerText = "长按上方图片并点击“保存”，完成后点本按钮切换下一张";
+      }} else {{
+        mediaEl.style.display = "none";
+        btnEl.style.backgroundColor = "#222";
+        btnEl.innerText = "全部图片下载完毕";
+        statusEl.innerText = "请在手机上执行下一步：返回桌面，打开小红书发帖！";
+      }}
+    }}
+
+    function copyToClipboard() {{
+      textEl.value = textToCopy;
+      textEl.select();
+      try {{
+        document.execCommand("copy");
+        statusEl.innerText = "【完整发布内容已写入系统剪贴板！】";
+      }} catch (err) {{
+        navigator.clipboard.writeText(textToCopy).then(() => {{
+          statusEl.innerText = "【完整发布内容已写入系统剪贴板！】";
+        }}).catch(e => {{
+          statusEl.innerText = "剪贴板写入失败，请重试";
+        }});
+      }}
+    }}
+
+    if (isVideo) {{
+      btnEl.innerText = "长按上方视频保存 (复制内容)";
+      statusEl.innerText = "长按上方视频并选择“保存视频”，完成后返回桌面发帖！";
+    }} else {{
+      showImage(0);
+    }}
+
+    btnEl.addEventListener("click", (e) => {{
+      e.stopPropagation();
+      copyToClipboard();
+      
+      if (!isVideo) {{
+        setTimeout(() => {{
+          if (mediaEl.src && mediaEl.style.display !== "none") {{
+            currentIdx++;
+            showImage(currentIdx);
+          }}
+        }}, 500);
+      }}
+    }});
+    
+    document.body.addEventListener("click", () => {{
+      copyToClipboard();
+    }});
+  </script>
+</body>
+</html>
+"""
+    return html_content

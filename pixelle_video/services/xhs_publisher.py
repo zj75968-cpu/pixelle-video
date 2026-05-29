@@ -204,37 +204,39 @@ class XHSPublisher:
             controller.click(coords.xhs_add_btn_x, coords.xhs_add_btn_y)
             time.sleep(3.0)
 
-            # 选中最近一张图片 (即刚刚下载到本地的第一张)
-            _log("Selecting the newly downloaded image...")
-            controller.click(coords.xhs_first_album_x, coords.xhs_first_album_y)
-            time.sleep(1.5)
+            if num_images == 1:
+                # 选中最近一张图片 (即刚刚下载到本地的第一张)
+                _log("Selecting the newly downloaded image...")
+                controller.click(coords.xhs_first_album_x, coords.xhs_first_album_y)
+                time.sleep(1.5)
+            else:
+                # 多图发布：从右到左依次勾选前 N 张图以保证发布顺序一致
+                _log(f"Selecting {num_images} images for multi-image post...")
+                for idx in range(num_images - 1, -1, -1):
+                    row = idx // 3
+                    col = idx % 3
+                    circle_x = round(0.281 + col * 0.336, 3)
+                    circle_y = round(0.180 + row * 0.151, 3)
+                    _log(f"Tapping image checkbox {num_images - idx}/{num_images} at ({circle_x}, {circle_y})")
+                    controller.click(circle_x, circle_y)
+                    time.sleep(0.8)
+                time.sleep(1.0)
 
             # 点击下一步
             _log("Confirming selection (Next)...")
             controller.click(coords.xhs_next_btn_x, coords.xhs_next_btn_y)
             time.sleep(2.0)
             
-            # 再点一次下一步（若有编辑步骤）
+            # 再点一次下一步（跳过滤镜/编辑页）
             controller.click(coords.xhs_next_btn_x, coords.xhs_next_btn_y)
             time.sleep(2.5)
 
-            # 输入标题
-            _log("Entering title and description...")
-            # 小红书标题坐标，通常可以通过稍微靠上的预留区域定位点击
-            title_y = 0.35
-            controller.click(0.3, title_y)
-            time.sleep(0.8)
-            controller.write_text(title)
-            time.sleep(1.0)
-
-            # 输入正文和 Hashtags
+            # 物理粘贴完整发布文案（利用局域网网关已复制到剪贴板，一键 Ctrl+V 搞定所有中文内容）
+            _log("Pasting combined text (title, body, hashtags) via Ctrl+V...")
             body_y = 0.45
             controller.click(0.3, body_y)
-            time.sleep(0.8)
-            full_body = body
-            if hashtags:
-                full_body += "\n" + " ".join([f"#{t}" for t in hashtags])
-            controller.write_text(full_body)
+            time.sleep(1.5)  # 等待输入框激活与软键盘弹起
+            controller.press_ctrl_v()
             time.sleep(1.5)
 
             # 点击发布
@@ -280,22 +282,31 @@ class XHSPublisher:
         temp_dir = Path("runtime/temp_publish")
         temp_dir.mkdir(parents=True, exist_ok=True)
         
-        # 视频不做 PIL 像素级消重，如果是远程视频先下载
+        # 如果是远程视频先下载到本地临时目录
         local_src = video_path
         if video_path.startswith("http://") or video_path.startswith("https://"):
             local_src = str(temp_dir / f"downloaded_video.mp4")
-            if not self._download_file(video_path, local_src):
+            if not await self._download_file(video_path, local_src):
                 raise XHSPublishError(f"Failed to download video: {video_path}")
 
-        # 上传到图床
-        lsky_url = self.cfg.lsky_pro.url
-        lsky_token = self.cfg.lsky_pro.token
-        lsky_album_id = self.cfg.lsky_pro.album_id
+        # 将视频路径更新到任务记录上，以便局域网服务进行路由获取
+        from pixelle_video.services.publish_scheduler import publish_scheduler
+        job = publish_scheduler.get_job(self.job_id)
+        if job:
+            job.video_path = local_src
 
-        _log(f"Uploading video file to Lsky Pro: {local_src}...")
-        direct_url = upload_to_lsky(local_src, lsky_url, lsky_token, lsky_album_id)
-        if not direct_url:
-            raise XHSPublishError("Failed to upload video to Lsky Pro.")
+        # 换算局域网网关 URL
+        import socket
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            s.connect(('8.8.8.8', 80))
+            pc_ip = s.getsockname()[0]
+        except Exception:
+            pc_ip = '127.0.0.1'
+        finally:
+            s.close()
+            
+        task_url = f"http://{pc_ip}:8000/publish/task-gateway?job_id={self.job_id}"
 
         # 硬件操作序列与图片类似，通过浏览器长按下载该视频，然后小红书发布
         controller = CH9329Controller(port=self.com_port, baudrate=self.baudrate)
@@ -306,7 +317,7 @@ class XHSPublisher:
             coords = self.cfg.coordinates
             
             # 1. 唤醒并解锁
-            _log("Waking up screen...")
+            _log("Waking up screen and unlocking...")
             controller.press_win()
             time.sleep(1.0)
             controller.press_space()
@@ -316,50 +327,46 @@ class XHSPublisher:
                 time.sleep(0.5)
                 controller.press_enter()
                 time.sleep(2.0)
-            controller.press_home()
-            time.sleep(1.5)
 
-            # 2. 唤醒浏览器输入直链
-            _log("Opening browser...")
-            controller.press_win()
-            time.sleep(1.0)
-            controller.write_text("browser")
-            time.sleep(1.0)
-            controller.press_enter()
-            time.sleep(3.0)
+            # 2. 唤醒手机浏览器并下载任务网关视频素材
+            _log("Opening browser via Win + B...")
+            controller._send_keyboard(0x08, 0x05) # Win + B 秒开浏览器
+            time.sleep(3.5)
 
-            # 点击地址栏，打字并进入
-            controller.click(coords.browser_address_bar_x, coords.browser_address_bar_y)
+            # 聚焦地址栏并全选清空
+            controller.press_ctrl_l()
             time.sleep(0.5)
-            controller.press_backspace(50)
+            controller.press_ctrl_a()
             time.sleep(0.5)
-            controller.write_text(direct_url)
+            controller.press_backspace(1)
+            time.sleep(0.5)
+            # 敲入网关链接并回车
+            controller.write_text(task_url)
             time.sleep(0.5)
             controller.press_enter()
-            time.sleep(5.0)  # 等待视频加载
+            time.sleep(5.0)  # 等待加载 (文案会自动写入系统剪贴板)
 
-            # 长按下载视频
-            _log("Long pressing video to download...")
+            # 长按保存视频至相册
+            _log("Long pressing video to save...")
             controller.long_press(coords.browser_image_x, coords.browser_image_y, duration=2.5)
-            time.sleep(1.0)
+            time.sleep(1.2)
             controller.click(coords.browser_save_btn_x, coords.browser_save_btn_y)
-            time.sleep(3.0)
+            time.sleep(5.0) # 视频写入较慢，增加延迟
 
             # 3. 唤醒小红书发布
-            _log("Opening Xiaohongshu...")
-            controller.press_home()
+            _log("Navigating to Xiaohongshu...")
+            controller.press_home() # 上滑返回桌面
             time.sleep(1.5)
-            controller.press_win()
-            time.sleep(1.0)
-            controller.write_text("xhs")
-            time.sleep(1.0)
-            controller.press_enter()
-            time.sleep(6.0)
+            
+            # 直接点击右下角的小红书快捷微件
+            _log("Launching Xiaohongshu via widget...")
+            controller.click(0.88, 0.92)
+            time.sleep(6.0)  # 等待小红书启动
 
             # 点击加号发布
             _log("Tapping create '+' button...")
             controller.click(coords.xhs_add_btn_x, coords.xhs_add_btn_y)
-            time.sleep(3.0)
+            time.sleep(3.5)
 
             # 选中最近相册格子的视频 (最新下载的那个)
             _log("Selecting the downloaded video...")
@@ -375,20 +382,12 @@ class XHSPublisher:
             controller.click(coords.xhs_next_btn_x, coords.xhs_next_btn_y)
             time.sleep(2.5)
 
-            # 输入文案
-            _log("Entering metadata...")
-            # 标题和正文输入
-            controller.click(0.3, 0.35)
-            time.sleep(0.8)
-            controller.write_text(title)
-            time.sleep(1.0)
-
-            controller.click(0.3, 0.45)
-            time.sleep(0.8)
-            full_body = body
-            if hashtags:
-                full_body += "\n" + " ".join([f"#{t}" for t in hashtags])
-            controller.write_text(full_body)
+            # 物理粘贴完整发布文案（利用局域网网关复制到剪贴板，一键 Ctrl+V 粘贴所有中文内容）
+            _log("Pasting combined text (title, body, hashtags) via Ctrl+V...")
+            body_y = 0.45
+            controller.click(0.3, body_y)
+            time.sleep(1.5)  # 等待输入法弹起
+            controller.press_ctrl_v()
             time.sleep(1.5)
 
             # 点击发布

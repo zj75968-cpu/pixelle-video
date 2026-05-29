@@ -73,6 +73,6 @@ class RunningHubVideoResponse(BaseModel):
 
     success: bool = Field(..., description="Whether the request succeeded")
     message: str = Field(..., description="Human-readable status message")
-    data: Optional[Dict[str, Any]] = Field(
-        None, description="Raw response data from RunningHub"
+    data: Optional[str] = Field(
+        None, description="Video URL returned by RunningHub"
     )

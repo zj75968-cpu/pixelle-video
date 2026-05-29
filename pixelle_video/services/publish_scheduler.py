@@ -26,6 +26,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
+import aiofiles
 from loguru import logger
 
 
@@ -184,6 +185,12 @@ class PublishScheduler:
         # is not running, e.g. in Streamlit)
         self._sched_poll_thread = None
         self._sched_poll_stop_event = None
+        # Async save debouncing
+        self._save_pending = False
+        self._save_lock = asyncio.Lock()
+        # Event-driven agent coordination
+        self._agent_waiters: Dict[str, asyncio.Queue] = {}
+        self._job_available_event = asyncio.Event()
         self._load()
         self._recover_orphaned_running_jobs()
         self._start_schedule_poll()
@@ -206,18 +213,49 @@ class PublishScheduler:
         """Re-read the queue file to pick up jobs added by external processes."""
         self._load()
 
-    def _save(self):
+    async def _save_async(self):
+        """Async version of _save using aiofiles."""
         DATA_DIR.mkdir(parents=True, exist_ok=True)
         try:
-            with open(QUEUE_FILE, "w", encoding="utf-8") as f:
-                json.dump(
-                    {jid: j.to_dict() for jid, j in self._jobs.items()},
-                    f,
-                    ensure_ascii=False,
-                    indent=2,
-                )
+            data = {jid: j.to_dict() for jid, j in self._jobs.items()}
+            json_str = json.dumps(data, ensure_ascii=False, indent=2)
+            async with aiofiles.open(QUEUE_FILE, "w", encoding="utf-8") as f:
+                await f.write(json_str)
         except Exception as e:
             logger.error(f"Failed to save publish queue: {e}")
+
+    async def _save_debounced(self):
+        """Debounced save - batches writes within 1 second to reduce I/O."""
+        async with self._save_lock:
+            if self._save_pending:
+                return
+            self._save_pending = True
+
+        await asyncio.sleep(1.0)
+        await self._save_async()
+
+        async with self._save_lock:
+            self._save_pending = False
+
+    def _save(self):
+        """Synchronous save for backward compatibility. Schedules async save if in async context."""
+        try:
+            loop = asyncio.get_running_loop()
+            # We're in an async context, schedule debounced save
+            asyncio.create_task(self._save_debounced())
+        except RuntimeError:
+            # No running loop, fall back to synchronous save
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            try:
+                with open(QUEUE_FILE, "w", encoding="utf-8") as f:
+                    json.dump(
+                        {jid: j.to_dict() for jid, j in self._jobs.items()},
+                        f,
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+            except Exception as e:
+                logger.error(f"Failed to save publish queue: {e}")
 
     def _recover_orphaned_running_jobs(self):
         """Recover stale RUNNING jobs after process restart."""
@@ -336,6 +374,126 @@ class PublishScheduler:
         except Exception as _exc:  # noqa: BLE001
             logger.warning(f"[banned_keywords] filter skipped: {_exc}")
 
+        # ── 拦截：如果配置了 cloud_url，且不是云端本身的 FastAPI 进程，则上传并同步到云端控制中心 ──
+        try:
+            import os
+            from pixelle_video.config import config_manager
+            dist_cfg = getattr(config_manager.config, "distribution", None)
+            cloud_url = (getattr(dist_cfg, "cloud_url", "") or "").strip().rstrip("/")
+            is_fastapi = os.environ.get("IS_FASTAPI_PROCESS") == "1"
+
+            if cloud_url and not is_fastapi:
+                logger.info(f"[CloudSync] 检测到云端控制中心: {cloud_url}，开始准备同步任务...")
+                from pixelle_video.utils.network_util import get_cloud_client
+                
+                # 1. 上传本地图片到云端
+                uploaded_images = []
+                for img_path in (images or []):
+                    if img_path and Path(img_path).exists():
+                        mime = "image/png" if img_path.lower().endswith(".png") else "image/jpeg"
+                        with open(img_path, "rb") as f:
+                            files = {"file": (Path(img_path).name, f, mime)}
+                            try:
+                                with get_cloud_client(timeout=60.0) as client:
+                                    r = client.post(f"{cloud_url}/api/files/upload", files=files)
+                                if r.status_code == 200:
+                                    url_val = r.json()["url"]
+                                    if "/api/files/" in url_val:
+                                        rel_p = url_val.split("/api/files/")[1]
+                                    else:
+                                        rel_p = "output/uploads/" + r.json()["filename"]
+                                    uploaded_images.append(rel_p)
+                                    logger.info(f"[CloudSync] 图片同步成功: {img_path} -> {rel_p}")
+                                else:
+                                    logger.warning(f"[CloudSync] 图片同步失败: {img_path}, status: {r.status_code}")
+                                    uploaded_images.append(img_path)
+                            except Exception as ex:
+                                logger.error(f"[CloudSync] 上传图片异常: {ex}")
+                                uploaded_images.append(img_path)
+                    else:
+                        uploaded_images.append(img_path)
+
+                # 2. 上传本地视频到云端
+                uploaded_video_path = None
+                if video_path and Path(video_path).exists():
+                    with open(video_path, "rb") as f:
+                        files = {"file": (Path(video_path).name, f, "video/mp4")}
+                        try:
+                            with get_cloud_client(timeout=120.0) as client:
+                                r = client.post(f"{cloud_url}/api/files/upload", files=files)
+                            if r.status_code == 200:
+                                url_val = r.json()["url"]
+                                if "/api/files/" in url_val:
+                                    rel_p = url_val.split("/api/files/")[1]
+                                else:
+                                    rel_p = "output/uploads/" + r.json()["filename"]
+                                uploaded_video_path = rel_p
+                                logger.info(f"[CloudSync] 视频同步成功: {video_path} -> {rel_p}")
+                            else:
+                                logger.warning(f"[CloudSync] 视频同步失败: {video_path}, status: {r.status_code}, response: {r.text}")
+                                uploaded_video_path = video_path
+                        except Exception as ex:
+                            logger.error(f"[CloudSync] 上传视频异常: {ex}")
+                            uploaded_video_path = video_path
+                elif video_path:
+                    uploaded_video_path = video_path
+
+                # 3. 将任务提交到云端 API
+                cloud_job_payload = {
+                    "serial": serial,
+                    "task_id": task_id,
+                    "title": title,
+                    "body": body,
+                    "hashtags": hashtags,
+                    "images": uploaded_images,
+                    "kind": kind,
+                    "video_path": uploaded_video_path,
+                    "scheduled_at": scheduled_at,
+                    "delete_after_hours": delete_after_hours,
+                    "auto_comment_text": auto_comment_text,
+                }
+                
+                logger.info(f"[CloudSync] 正在将发布任务提交至云端: {cloud_url}/api/publish/jobs")
+                try:
+                    with get_cloud_client(timeout=30.0) as client:
+                        r = client.post(f"{cloud_url}/api/publish/jobs", json=cloud_job_payload)
+                except Exception as ex:
+                    logger.error(f"[CloudSync] 提交任务网络异常: {ex}")
+                    r = None
+                
+                if r is not None and r.status_code == 201:
+                    logger.info(f"[CloudSync] 任务成功同步推送到云端控制中心！云端响应: {r.json()}")
+
+                    from pixelle_video.utils.user_context import get_current_username
+                    cloud_job_info = r.json()["created"][0] if r.json().get("created") else {}
+                    job = PublishJob(
+                        job_id=cloud_job_info.get("job_id", str(uuid.uuid4())),
+                        serial=serial,
+                        task_id=task_id,
+                        title=title,
+                        body=body,
+                        hashtags=hashtags,
+                        images=images,
+                        scheduled_at=scheduled_at,
+                        kind=kind,
+                        video_path=video_path,
+                        dry_run=dry_run,
+                        post_type=post_type,
+                        delete_after_hours=delete_after_hours,
+                        auto_comment_text=auto_comment_text,
+                        username=get_current_username(),
+                    )
+                    job.status = "success"
+                    job.progress_log = [f"[CloudSync] 任务已于 {datetime.now().strftime('%H:%M:%S')} 同步推送到云端控制中心"]
+                    self._jobs[job.job_id] = job
+                    self._save()
+                    return job
+                else:
+                    logger.error(f"[CloudSync] 推送云端失败，错误码: {r.status_code}, 内容: {r.text}")
+                    
+        except Exception as _sync_exc:
+            logger.error(f"[CloudSync] 同步推送逻辑异常: {_sync_exc}")
+
         from pixelle_video.utils.user_context import get_current_username
         job = PublishJob(
             job_id=str(uuid.uuid4()),
@@ -389,6 +547,12 @@ class PublishScheduler:
                     target=lambda jid=job.job_id: asyncio.run(self._execute_job(jid)),
                     daemon=True,
                 ).start()
+
+        # Notify waiting agents that a new job is available
+        try:
+            self._notify_job_available()
+        except Exception as e:
+            logger.warning(f"Failed to notify agents about new job: {e}")
 
         logger.info(f"Added publish job {job.job_id} for device {serial}")
         return job
@@ -527,6 +691,58 @@ class PublishScheduler:
     def get_job(self, job_id: str) -> Optional[PublishJob]:
         return self._jobs.get(job_id)
 
+    async def wait_for_job(self, agent_id: str, timeout: float = 600) -> Optional[PublishJob]:
+        """
+        Event-driven job waiting for agents. Replaces polling with instant notification.
+
+        Args:
+            agent_id: Unique identifier for the agent
+            timeout: Maximum wait time in seconds (default 600 = 10 minutes)
+
+        Returns:
+            PublishJob if available, None on timeout
+        """
+        # Create a queue for this agent if it doesn't exist
+        if agent_id not in self._agent_waiters:
+            self._agent_waiters[agent_id] = asyncio.Queue(maxsize=1)
+
+        queue = self._agent_waiters[agent_id]
+
+        try:
+            # Wait for a job to be assigned to this agent
+            job = await asyncio.wait_for(queue.get(), timeout=timeout)
+            return job
+        except asyncio.TimeoutError:
+            logger.info(f"Agent {agent_id} wait timeout after {timeout}s")
+            return None
+        finally:
+            # Clean up the queue if it's empty
+            if queue.empty() and agent_id in self._agent_waiters:
+                del self._agent_waiters[agent_id]
+
+    def _notify_agent(self, agent_id: str, job: PublishJob):
+        """
+        Notify a specific agent that a job is available.
+        Called internally when assigning a job to an agent.
+        """
+        if agent_id in self._agent_waiters:
+            try:
+                self._agent_waiters[agent_id].put_nowait(job)
+                logger.info(f"Notified agent {agent_id} about job {job.job_id}")
+            except asyncio.QueueFull:
+                logger.warning(f"Agent {agent_id} queue is full, skipping notification")
+
+    def _notify_job_available(self):
+        """Signal that a new job is available for any waiting agent."""
+        self._job_available_event.set()
+        # Reset the event after a short delay to allow multiple waiters to wake up
+        asyncio.create_task(self._reset_job_event())
+
+    async def _reset_job_event(self):
+        """Reset the job available event after a short delay."""
+        await asyncio.sleep(0.1)
+        self._job_available_event.clear()
+
     def list_jobs(self, status_filter: Optional[str] = None) -> List[PublishJob]:
         from pixelle_video.utils.user_context import get_current_username
         current_user = get_current_username()
@@ -603,7 +819,7 @@ class PublishScheduler:
     async def _execute_job(self, job_id: str):
         """Execute a publish job (serialized per device) with automatic retry."""
         job = self._jobs.get(job_id)
-        if not job or job.status == JobStatus.CANCELLED:
+        if not job or job.status not in (JobStatus.PENDING, JobStatus.SCHEDULED):
             return
 
         from pixelle_video.utils.user_context import set_current_user
@@ -619,8 +835,8 @@ class PublishScheduler:
         device_lock = self._device_locks[job.serial]
 
         async with device_lock:
-            # Re-check after acquiring lock (may have been cancelled while waiting)
-            if job.status == JobStatus.CANCELLED:
+            # Re-check after acquiring lock (may have been cancelled/completed while waiting)
+            if job.status not in (JobStatus.PENDING, JobStatus.SCHEDULED):
                 return
 
             job.status = JobStatus.RUNNING

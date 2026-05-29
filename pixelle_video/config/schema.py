@@ -148,9 +148,38 @@ class XHSPublishConfig(BaseModel):
             "自动分配到下一个未占用的时间段。留空则禁用自动排期。"
         ),
     )
+    push_dir: str = Field(default="/sdcard/DCIM/PixelleVideo", description="Device-side image push directory")
     hardware: HardwareConfig = Field(default_factory=HardwareConfig, description="Hardware CH9329 serial settings")
     lsky_pro: LskyProConfig = Field(default_factory=LskyProConfig, description="Lsky Pro image hosting settings")
     coordinates: CoordinateConfig = Field(default_factory=CoordinateConfig, description="Coordinates ratio configuration")
+
+
+class DistributionConfig(BaseModel):
+    """Distribution mode configuration for multi-device control"""
+    mode: str = Field(
+        default="hardware",
+        description="Distribution mode: 'hardware' (direct COM control) or 'agent_pull' (remote agents poll for jobs)"
+    )
+    cloud_url: str = Field(
+        default="",
+        description="Cloud API control center URL for forwarding jobs from local web interface"
+    )
+    local_bind_ip: str = Field(
+        default="",
+        description="Local physical IP address to bind for outgoing requests to bypass Clash TUN"
+    )
+    agent_timeout: int = Field(
+        default=600,
+        ge=60,
+        le=3600,
+        description="Timeout in seconds for agent_pull mode (60-3600)"
+    )
+    agent_poll_interval: int = Field(
+        default=3,
+        ge=1,
+        le=30,
+        description="Polling interval in seconds for checking agent job status (1-30)"
+    )
 
 
 class PixelleVideoConfig(BaseModel):
@@ -171,6 +200,7 @@ class PixelleVideoConfig(BaseModel):
     comfyui: ComfyUIConfig = Field(default_factory=ComfyUIConfig)
     template: TemplateConfig = Field(default_factory=TemplateConfig)
     xhs_publish: XHSPublishConfig = Field(default_factory=XHSPublishConfig)
+    distribution: Optional[DistributionConfig] = Field(default=None, description="Distribution mode configuration (optional)")
 
     def is_llm_configured(self) -> bool:
         """Check if LLM is properly configured"""

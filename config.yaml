@@ -50,7 +50,7 @@ xhs_publish:
   - '12:00'
   - '18:00'
   hardware:
-    com_port: COM3
+    com_port: COM5
     baudrate: 9600
     unlock_pin: ''
   lsky_pro:
@@ -59,7 +59,7 @@ xhs_publish:
     album_id: null
   coordinates:
     browser_address_bar_x: 0.5
-    browser_address_bar_y: 0.08
+    browser_address_bar_y: 0.132
     browser_image_x: 0.5
     browser_image_y: 0.5
     browser_save_btn_x: 0.5
@@ -67,10 +67,18 @@ xhs_publish:
     xhs_icon_x: 0.3
     xhs_icon_y: 0.5
     xhs_add_btn_x: 0.5
-    xhs_add_btn_y: 0.95
-    xhs_first_album_x: 0.25
-    xhs_first_album_y: 0.25
-    xhs_next_btn_x: 0.85
-    xhs_next_btn_y: 0.08
-    xhs_publish_btn_x: 0.5
-    xhs_publish_btn_y: 0.92
+    xhs_add_btn_y: 0.972
+    xhs_first_album_x: 0.164
+    xhs_first_album_y: 0.233
+    xhs_next_btn_x: 0.736
+    xhs_next_btn_y: 0.965
+    xhs_publish_btn_x: 0.662
+    xhs_publish_btn_y: 0.941
+
+distribution:
+  mode: local
+  cloud_url: http://23.238.47.62:8000
+  local_bind_ip: "192.168.1.2"
+  agent_timeout: 600
+  agent_poll_interval: 3
+

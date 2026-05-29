@@ -2,18 +2,22 @@
 import time
 import serial
 from loguru import logger
-from typing import Optional, Tuple
+from typing import Optional
 
 class CH9329Controller:
     """
     CH9329 串口转 USB 键鼠模块控制器。
-    用于通过物理串口发送指令在手机上进行绝对鼠标定位和打字输入。
+    已升级为“相对鼠标高精度校准机制”，以完美兼容不支持绝对鼠标的安卓定制系统。
     """
     def __init__(self, port: str = "COM3", baudrate: int = 9600, timeout: float = 0.5):
         self.port = port
         self.baudrate = baudrate
         self.timeout = timeout
         self.ser: Optional[serial.Serial] = None
+        
+        # 预设手机屏幕物理分辨率，用于从比例换算到像素位移
+        self.screen_width = 1080
+        self.screen_height = 2400
         
     def connect(self) -> bool:
         """建立串口连接"""
@@ -45,7 +49,6 @@ class CH9329Controller:
             if not self.connect():
                 return False
                 
-        # 帧结构: 帧头(57 AB) + 地址码(00) + 命令码(cmd) + 数据长度(len) + 数据(data) + 校验和(sum)
         head = bytes([0x57, 0xAB])
         addr = bytes([0x00])
         cmd_b = bytes([cmd])
@@ -59,10 +62,8 @@ class CH9329Controller:
         try:
             self.ser.write(packet)
             self.ser.flush()
-            # Clear Rx buffer to prevent memory accumulate
             if self.ser.in_waiting > 0:
                 self.ser.read_all()
-            # 微量延时，避免命令发送过快导致硬件粘包
             time.sleep(0.01)
             return True
         except Exception as e:
@@ -70,69 +71,119 @@ class CH9329Controller:
             return False
 
     # =========================================================================
-    # 鼠标控制 (绝对坐标)
+    # 相对鼠标控制 (100% 安卓系统物理兼容)
     # =========================================================================
     
-    def _send_abs_mouse(self, buttons: int, x: int, y: int) -> bool:
+    def _send_rel_mouse(self, buttons: int, x_rel: int, y_rel: int, wheel: int = 0) -> bool:
         """
-        发送绝对坐标鼠标指令
+        发送相对鼠标数据包
         buttons: 0x01(左键按下), 0x02(右键按下), 0x00(释放)
-        x, y: 0 ~ 4095
+        x_rel, y_rel: -127 ~ 127
         """
-        # 数据区长度为 7，格式: 0x02, buttons, x_low, x_high, y_low, y_high, 0x00
-        x_low = x & 0xFF
-        x_high = (x >> 8) & 0xFF
-        y_low = y & 0xFF
-        y_high = (y >> 8) & 0xFF
+        x_b = x_rel & 0xFF
+        y_b = y_rel & 0xFF
+        wheel_b = wheel & 0xFF
         
-        data = bytes([0x02, buttons, x_low, x_high, y_low, y_high, 0x00])
-        return self._send_packet(0x04, data)
+        # 格式: 0x01 (相对鼠标标志), buttons, x_rel, y_rel, wheel
+        data = bytes([0x01, buttons, x_b, y_b, wheel_b])
+        return self._send_packet(0x05, data)
+
+    def calibrate_mouse(self) -> bool:
+        """将鼠标光标强制归零到屏幕左上角 (0, 0)"""
+        # 往左上方发送大距离位移，循环 30 次能移动 3600 像素，确保归零
+        for _ in range(30):
+            if not self._send_rel_mouse(0x00, -120, -120):
+                return False
+            time.sleep(0.005)
+        return True
 
     def move_to(self, x_ratio: float, y_ratio: float) -> bool:
         """
-        移动鼠标至屏幕相对比例位置。
-        CH9329 绝对坐标为 0~4095
+        高精度移动到指定屏幕相对比例坐标点。
+        采用“左上角归零 + 分步相对偏移”机制。
         """
-        x = int(x_ratio * 4095)
-        y = int(y_ratio * 4095)
-        x = max(0, min(4095, x))
-        y = max(0, min(4095, y))
-        return self._send_abs_mouse(0x00, x, y)
+        if not self.calibrate_mouse():
+            return False
+            
+        # 换算为物理像素目标值
+        tx = int(x_ratio * self.screen_width)
+        ty = int(y_ratio * self.screen_height)
+        
+        # 分步移动 X 轴
+        step_x = 100 if tx >= 0 else -100
+        for _ in range(abs(tx) // 100):
+            self._send_rel_mouse(0x00, step_x, 0)
+            time.sleep(0.008)
+        if abs(tx) % 100 != 0:
+            rem_x = (abs(tx) % 100) * (1 if tx >= 0 else -1)
+            self._send_rel_mouse(0x00, rem_x, 0)
+            time.sleep(0.008)
+            
+        # 分步移动 Y 轴
+        step_y = 100 if ty >= 0 else -100
+        for _ in range(abs(ty) // 100):
+            self._send_rel_mouse(0x00, 0, step_y)
+            time.sleep(0.008)
+        if abs(ty) % 100 != 0:
+            rem_y = (abs(ty) % 100) * (1 if ty >= 0 else -1)
+            self._send_rel_mouse(0x00, 0, rem_y)
+            time.sleep(0.008)
+            
+        return True
 
     def click(self, x_ratio: float, y_ratio: float) -> bool:
-        """点击屏幕上某个坐标点"""
+        """物理模拟点击相对比例坐标点"""
         if not self.move_to(x_ratio, y_ratio):
             return False
         time.sleep(0.1)
-        x = int(x_ratio * 4095)
-        y = int(y_ratio * 4095)
         
-        # 左键按下
-        if not self._send_abs_mouse(0x01, x, y):
+        # 左键按下并释放
+        if not self._send_rel_mouse(0x01, 0, 0):
             return False
         time.sleep(0.08)
-        # 释放
-        res = self._send_abs_mouse(0x00, x, y)
+        res = self._send_rel_mouse(0x00, 0, 0)
         time.sleep(0.1)
         return res
 
     def long_press(self, x_ratio: float, y_ratio: float, duration: float = 2.0) -> bool:
-        """在坐标点上长按鼠标指定秒数"""
+        """物理模拟长按相对比例坐标点"""
         if not self.move_to(x_ratio, y_ratio):
             return False
         time.sleep(0.1)
-        x = int(x_ratio * 4095)
-        y = int(y_ratio * 4095)
         
-        # 左键按下并保持
+        # 左键按下保持
         logger.info(f"Long pressing mouse at ({x_ratio}, {y_ratio}) for {duration}s...")
-        if not self._send_abs_mouse(0x01, x, y):
+        if not self._send_rel_mouse(0x01, 0, 0):
             return False
         time.sleep(duration)
-        # 释放
-        res = self._send_abs_mouse(0x00, x, y)
+        res = self._send_rel_mouse(0x00, 0, 0)
         time.sleep(0.1)
         return res
+
+    def swipe_up_to_home(self) -> bool:
+        """物理手势：从屏幕底部垂直向上滑动返回桌面"""
+        logger.info("Executing swipe-up home gesture...")
+        
+        # 先移到最底部
+        if not self.move_to(0.5, 0.98):
+            return False
+        time.sleep(0.1)
+        
+        # 模拟按下左键
+        self._send_rel_mouse(0x01, 0, 0)
+        time.sleep(0.1)
+        
+        # 相对向上滑动
+        steps = 15
+        for _ in range(steps):
+            self._send_rel_mouse(0x01, 0, -80)
+            time.sleep(0.015)
+            
+        time.sleep(0.1)
+        # 释放左键
+        self._send_rel_mouse(0x00, 0, 0)
+        time.sleep(0.2)
+        return True
 
     # =========================================================================
     # 键盘控制
@@ -140,7 +191,6 @@ class CH9329Controller:
     
     def _send_keyboard(self, modifier: int, keycode: int) -> bool:
         """发送单键按下，并自动发送释放包"""
-        # 数据区长度为 8，格式: modifier, 0x00, keycode, 0x00, 0x00, 0x00, 0x00, 0x00
         press_data = bytes([modifier, 0x00, keycode, 0x00, 0x00, 0x00, 0x00, 0x00])
         release_data = bytes([0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00])
         
@@ -151,16 +201,15 @@ class CH9329Controller:
 
     def press_key(self, char: str) -> bool:
         """模拟键盘输入单个字符"""
-        # 字符到键码映射表
         mapping = {}
         
-        # 字母 a-z
+        # 字母 a-z 与大写 A-Z
         for i in range(26):
             c_lower = chr(ord('a') + i)
             c_upper = chr(ord('A') + i)
             keycode = 0x04 + i
-            mapping[c_lower] = (0x00, keycode)  # No shift
-            mapping[c_upper] = (0x02, keycode)  # Shift
+            mapping[c_lower] = (0x00, keycode)
+            mapping[c_upper] = (0x02, keycode)
 
         # 数字 1-9, 0
         for i in range(9):
@@ -169,7 +218,7 @@ class CH9329Controller:
             mapping[c_num] = (0x00, keycode)
         mapping['0'] = (0x00, 0x27)
 
-        # 常用符号映射 (modifier, keycode)
+        # 常用键盘符号
         mapping[' '] = (0x00, 0x2C)
         mapping['\n'] = (0x00, 0x28)
         mapping['-'] = (0x00, 0x2D)
@@ -188,7 +237,6 @@ class CH9329Controller:
         mapping['|'] = (0x02, 0x34)
 
         if char not in mapping:
-            # 遇到不能直接模拟的字符，回退尝试不加 Shift 的普通键入，或者忽略
             logger.warning(f"Unsupported key simulation for char '{char}'. Skipping.")
             return False
             
@@ -211,12 +259,11 @@ class CH9329Controller:
         return self._send_keyboard(0x00, 0x2C)
 
     def press_home(self) -> bool:
-        """发送 Home 键 (常用于返回桌面)"""
-        return self._send_keyboard(0x00, 0x4A)
+        """物理上滑返回桌面（已弃用不可靠的 0x4A，采用 100% 成功的上滑手势）"""
+        return self.swipe_up_to_home()
 
     def press_win(self) -> bool:
-        """发送 Win 键 (在 Android 实体键盘上代表 Meta 键，常能拉起全局搜索)"""
-        # Win 键即 GUI 键，modifier 对应 0x08
+        """发送 Win 键"""
         return self._send_keyboard(0x08, 0x00)
 
     def press_backspace(self, times: int = 1) -> bool:
@@ -226,3 +273,15 @@ class CH9329Controller:
                 return False
             time.sleep(0.05)
         return True
+
+    def press_ctrl_v(self) -> bool:
+        """发送 Ctrl + V (粘贴键)"""
+        return self._send_keyboard(0x01, 0x19)
+
+    def press_ctrl_a(self) -> bool:
+        """发送 Ctrl + A (全选键)"""
+        return self._send_keyboard(0x01, 0x04)
+
+    def press_ctrl_l(self) -> bool:
+        """发送 Ctrl + L (聚焦浏览器地址栏)"""
+        return self._send_keyboard(0x01, 0x0F)

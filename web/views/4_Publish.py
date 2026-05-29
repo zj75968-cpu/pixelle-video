@@ -1145,17 +1145,18 @@ def render_client_agent_tab():
     from pixelle_video.config import config_manager
     
     # 1. Distribution Mode Selector
-    current_mode = "hardware"
+    from pixelle_video.services.android_device_dispatcher import DistributionAdapter
+    current_mode = DistributionAdapter.get_mode()
     
     col1, col2 = st.columns([2, 1])
     with col1:
         st.markdown(f"当前系统分发模式：**`{current_mode}`**")
         if current_mode == "agent_pull":
-            st.success("🟢 客户端代理模式已启用。任务将放入队列，等待局域网/公网的客户端代理拉取。")
+            st.success("🟢 客户端代理模式已启用。任务已加入云端队列，等待局域网/公网的客户端代理拉取。")
         else:
-            st.warning(f"⚠️ 当前处于 `{current_mode}` 模式下，系统不会把发布任务派发给客户端代理。若要启用，请点击下方切换。")
+            st.warning(f"⚠️ 当前处于 `{current_mode}` 模式下，系统不会把发布任务派发给客户端代理。")
             
-        st.info("💡 系统已切换为固定的硬件直控模式（CH9329 物理串口控制）。暂不支持在线切换其他模式。")
+        st.info("💡 如果要切换为 agent_pull 模式或配置云端中转，请前往「⚙️ 系统设置」页面。")
                 
     with col2:
         st.info(

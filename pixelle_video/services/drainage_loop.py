@@ -23,6 +23,7 @@ import json
 import random
 import re
 import uuid
+import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -247,8 +248,8 @@ async def generate_drainage_pair(
         
         try:
             from pixelle_video.services.poster_generator import generate_drainage_poster
-            # 谐音化后完美字眼，直接用来生成引流图
-            generate_drainage_poster(title, str(poster_path.resolve()))
+            # 谐音化后完美字眼，直接用来生成引流图（在线程池中执行）
+            await asyncio.to_thread(generate_drainage_poster, title, str(poster_path.resolve()))
             image_path_str = str(poster_path.resolve())
         except Exception as e:
             logger.error(f"[drainage] Failed to generate AI poster: {e}")

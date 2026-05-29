@@ -36,7 +36,7 @@ router = APIRouter(prefix="/runninghub", tags=["RunningHub Cloud API"])
 async def image_to_video(request: RunningHubI2VRequest) -> RunningHubVideoResponse:
     try:
         svc = RunningHubAPIService()
-        data = await svc.image_to_video(
+        data = await svc.image_to_video_and_wait(
             prompt=request.prompt,
             image_urls=request.image_urls,
             aspect_ratio=request.aspect_ratio,
@@ -79,7 +79,7 @@ async def image_to_video(request: RunningHubI2VRequest) -> RunningHubVideoRespon
 async def text_to_video(request: RunningHubT2VRequest) -> RunningHubVideoResponse:
     try:
         svc = RunningHubAPIService()
-        data = await svc.text_to_video(
+        data = await svc.text_to_video_and_wait(
             prompt=request.prompt,
             aspect_ratio=request.aspect_ratio,
             duration=request.duration,
