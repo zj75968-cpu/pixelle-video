@@ -56,13 +56,13 @@ async def start_app_lifecycle(profile: RunProfile | str = RunProfile.API_SERVER)
     if _started_profile is not None:
         return LifecycleState(profile=_started_profile, started=True)
 
+    _started_profile = coerced
     await task_manager.start()
     device_manager.start_auto_sync(interval_seconds=8)
     if hasattr(publish_scheduler, "start_background_polling"):
         publish_scheduler.start_background_polling()
     publish_scheduler.start_scheduler()
     start_cookie_keepalive(interval_hours=12.0)
-    _started_profile = coerced
     return LifecycleState(profile=coerced, started=True)
 
 

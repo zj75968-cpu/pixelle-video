@@ -145,3 +145,71 @@ def test_lifecycle_start_stop_are_idempotent(monkeypatch):
         "task_manager.stop",
         "shutdown_pixelle_video",
     ]
+
+
+def test_partial_startup_failure_is_tracked_for_cleanup_and_restart_idempotency(monkeypatch):
+    import pytest
+
+    import api.lifecycle as lifecycle
+
+    lifecycle.reset_lifecycle_state_for_tests()
+    calls = []
+
+    class FakeTaskManager:
+        async def start(self):
+            calls.append("task_manager.start")
+
+        async def stop(self):
+            calls.append("task_manager.stop")
+
+    class FakeDeviceManager:
+        def start_auto_sync(self, interval_seconds):
+            calls.append(("device_manager.start_auto_sync", interval_seconds))
+
+        def stop_auto_sync(self):
+            calls.append("device_manager.stop_auto_sync")
+
+    class FakePublishScheduler:
+        def start_background_polling(self):
+            calls.append("publish_scheduler.start_background_polling")
+
+        def start_scheduler(self):
+            calls.append("publish_scheduler.start_scheduler")
+            raise RuntimeError("scheduler failed")
+
+        def stop_scheduler(self):
+            calls.append("publish_scheduler.stop_scheduler")
+
+        def stop_background_polling(self):
+            calls.append("publish_scheduler.stop_background_polling")
+
+    async def fake_shutdown_pixelle_video():
+        calls.append("shutdown_pixelle_video")
+
+    monkeypatch.setattr(lifecycle, "task_manager", FakeTaskManager())
+    monkeypatch.setattr(lifecycle, "device_manager", FakeDeviceManager())
+    monkeypatch.setattr(lifecycle, "publish_scheduler", FakePublishScheduler())
+    monkeypatch.setattr(lifecycle, "start_cookie_keepalive", lambda interval_hours: calls.append(("start_cookie_keepalive", interval_hours)))
+    monkeypatch.setattr(lifecycle, "stop_cookie_keepalive", lambda: calls.append("stop_cookie_keepalive"))
+    monkeypatch.setattr(lifecycle, "shutdown_pixelle_video", fake_shutdown_pixelle_video)
+
+    with pytest.raises(RuntimeError, match="scheduler failed"):
+        asyncio.run(lifecycle.start_app_lifecycle(lifecycle.RunProfile.API_SERVER))
+
+    repeated_start_state = asyncio.run(lifecycle.start_app_lifecycle(lifecycle.RunProfile.API_SERVER))
+    stopped_state = asyncio.run(lifecycle.stop_app_lifecycle(lifecycle.RunProfile.API_SERVER))
+
+    assert repeated_start_state == lifecycle.LifecycleState(profile=lifecycle.RunProfile.API_SERVER, started=True)
+    assert stopped_state == lifecycle.LifecycleState(profile=lifecycle.RunProfile.API_SERVER, started=False)
+    assert calls == [
+        "task_manager.start",
+        ("device_manager.start_auto_sync", 8),
+        "publish_scheduler.start_background_polling",
+        "publish_scheduler.start_scheduler",
+        "stop_cookie_keepalive",
+        "device_manager.stop_auto_sync",
+        "publish_scheduler.stop_scheduler",
+        "publish_scheduler.stop_background_polling",
+        "task_manager.stop",
+        "shutdown_pixelle_video",
+    ]
