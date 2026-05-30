@@ -22,8 +22,9 @@ Or with custom settings:
     uv run python api/app.py --host 0.0.0.0 --port 8080 --reload
 """
 
-import sys
 import os
+import sys
+
 os.environ["IS_FASTAPI_PROCESS"] = "1"
 from pathlib import Path
 
@@ -34,35 +35,35 @@ _project_root = _script_dir.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-import argparse
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from loguru import logger
+import argparse  # noqa: E402
+from contextlib import asynccontextmanager  # noqa: E402
 
-from api.config import api_config
-from api.lifecycle import RunProfile, start_app_lifecycle, stop_app_lifecycle
+from fastapi import FastAPI  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from loguru import logger  # noqa: E402
+
+from api.config import api_config  # noqa: E402
+from api.lifecycle import RunProfile, start_app_lifecycle, stop_app_lifecycle  # noqa: E402
 
 # Import routers
-from api.routers import (
-    health_router,
-    llm_router,
-    tts_router,
-    image_router,
+from api.routers import (  # noqa: E402
     content_router,
-    video_router,
-    tasks_router,
-    files_router,
-    resources_router,
-    frame_router,
-    post_router,
     devices_router,
-    publish_router,
-    runninghub_router,
-    webhooks_router,
+    files_router,
+    frame_router,
+    health_router,
+    image_router,
+    llm_router,
     phone_agent_router,
+    post_router,
+    publish_router,
+    resources_router,
+    runninghub_router,
+    tasks_router,
+    tts_router,
+    video_router,
+    webhooks_router,
 )
-
 
 API_DESCRIPTION = """
     ## Pixelle-Video - AI Video Generation Platform API

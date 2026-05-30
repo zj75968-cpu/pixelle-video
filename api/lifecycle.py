@@ -7,7 +7,6 @@ from loguru import logger
 
 from pixelle_video.app.profiles import RunProfile
 
-
 task_manager: Any | None = None
 device_manager: Any | None = None
 publish_scheduler: Any | None = None
@@ -44,7 +43,9 @@ def _device_manager() -> Any:
 def _publish_scheduler() -> Any:
     if publish_scheduler is not None:
         return publish_scheduler
-    from pixelle_video.services.publish_scheduler import publish_scheduler as imported_publish_scheduler
+    from pixelle_video.services.publish_scheduler import (
+        publish_scheduler as imported_publish_scheduler,
+    )
 
     return imported_publish_scheduler
 
@@ -52,7 +53,9 @@ def _publish_scheduler() -> Any:
 def _start_cookie_keepalive() -> Callable[..., Any]:
     if start_cookie_keepalive is not None:
         return start_cookie_keepalive
-    from pixelle_video.services.smart_scraper import start_cookie_keepalive as imported_start_cookie_keepalive
+    from pixelle_video.services.smart_scraper import (
+        start_cookie_keepalive as imported_start_cookie_keepalive,
+    )
 
     return imported_start_cookie_keepalive
 
@@ -60,7 +63,9 @@ def _start_cookie_keepalive() -> Callable[..., Any]:
 def _stop_cookie_keepalive() -> Callable[..., Any]:
     if stop_cookie_keepalive is not None:
         return stop_cookie_keepalive
-    from pixelle_video.services.smart_scraper import stop_cookie_keepalive as imported_stop_cookie_keepalive
+    from pixelle_video.services.smart_scraper import (
+        stop_cookie_keepalive as imported_stop_cookie_keepalive,
+    )
 
     return imported_stop_cookie_keepalive
 

@@ -28,7 +28,6 @@ from typing import Dict, List, Optional
 
 from loguru import logger
 
-
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 QUEUE_FILE = DATA_DIR / "publish_queue.json"
 PUBLISH_TIMEOUT_SECONDS = 30 * 60
@@ -651,7 +650,7 @@ class PublishScheduler:
             await self._execute_job_impl(job)
 
     async def _execute_job_impl(self, job: PublishJob):
-        from pixelle_video.services.xhs_publisher import XHSPublisher, XHSPublishError
+        from pixelle_video.services.xhs_publisher import XHSPublisher
 
         # Acquire per-device lock to prevent concurrent execution on same device
         if job.serial not in self._device_locks:
@@ -854,8 +853,12 @@ class PublishScheduler:
             return False
             
         elif mode == "phone_agent":
-            from pixelle_video.services.phone_agent_client import delete_http, wait_for_status, resolve_agent_url
             from pixelle_video.config import config_manager
+            from pixelle_video.services.phone_agent_client import (
+                delete_http,
+                resolve_agent_url,
+                wait_for_status,
+            )
             
             cfg = config_manager.config
             agent_url = resolve_agent_url(getattr(job, "serial", ""))
@@ -972,8 +975,12 @@ class PublishScheduler:
             return False
             
         elif mode == "phone_agent":
-            from pixelle_video.services.phone_agent_client import comment_http, wait_for_status, resolve_agent_url
             from pixelle_video.config import config_manager
+            from pixelle_video.services.phone_agent_client import (
+                comment_http,
+                resolve_agent_url,
+                wait_for_status,
+            )
             
             cfg = config_manager.config
             agent_url = resolve_agent_url(getattr(job, "serial", ""))

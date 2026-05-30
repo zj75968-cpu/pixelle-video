@@ -1,6 +1,6 @@
-from pathlib import Path
 
-from pixelle_video import PixelleVideoCore, config_manager as package_config_manager, pixelle_video
+from pixelle_video import PixelleVideoCore, pixelle_video
+from pixelle_video import config_manager as package_config_manager
 from pixelle_video.config import (
     ConfigManager,
     PixelleVideoConfig,
