@@ -100,7 +100,11 @@ def create_lifespan(profile):
         Handles startup and shutdown events.
         """
         logger.info("🚀 Starting Pixelle-Video API...")
-        await start_app_lifecycle(coerced_profile)
+        try:
+            await start_app_lifecycle(coerced_profile)
+        except Exception:
+            await stop_app_lifecycle(coerced_profile)
+            raise
         logger.info("✅ Pixelle-Video API started successfully\n")
 
         try:

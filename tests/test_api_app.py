@@ -73,6 +73,35 @@ def test_create_lifespan_returns_none_for_test_profile():
 
     assert create_lifespan("test") is None
 
+def test_create_lifespan_stops_lifecycle_when_startup_raises(monkeypatch):
+    import api.app as app_module
+    from api.app import create_lifespan
+    from api.lifecycle import RunProfile
+
+    calls = []
+
+    async def fake_start(profile):
+        calls.append(("start", profile))
+        raise RuntimeError("startup boom")
+
+    async def fake_stop(profile):
+        calls.append(("stop", profile))
+
+    monkeypatch.setattr(app_module, "start_app_lifecycle", fake_start)
+    monkeypatch.setattr(app_module, "stop_app_lifecycle", fake_stop)
+
+    async def run_lifespan_with_startup_error():
+        lifespan = create_lifespan(RunProfile.API_SERVER)
+        with pytest.raises(RuntimeError, match="startup boom"):
+            async with lifespan(app=None):
+                pass
+
+    asyncio.run(run_lifespan_with_startup_error())
+
+    assert calls == [
+        ("start", RunProfile.API_SERVER),
+        ("stop", RunProfile.API_SERVER),
+    ]
 
 
 def test_create_lifespan_stops_lifecycle_when_context_body_raises(monkeypatch):
