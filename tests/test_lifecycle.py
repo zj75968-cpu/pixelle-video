@@ -3,6 +3,105 @@ import importlib
 import sys
 
 
+def test_publish_scheduler_constructor_does_not_start_schedule_poll(monkeypatch):
+    scheduler_module = importlib.import_module("pixelle_video.services.publish_scheduler")
+
+    calls = []
+
+    class FakeDataDir:
+        def mkdir(self, *args, **kwargs):
+            calls.append("DATA_DIR.mkdir")
+
+    monkeypatch.setattr(scheduler_module, "DATA_DIR", FakeDataDir())
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_load", lambda self: None)
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_recover_orphaned_running_jobs", lambda self: None)
+    monkeypatch.setattr(
+        scheduler_module.PublishScheduler,
+        "_start_schedule_poll",
+        lambda self: calls.append("_start_schedule_poll"),
+    )
+
+    scheduler_module.PublishScheduler()
+
+    assert calls == ["DATA_DIR.mkdir"]
+
+
+def test_publish_scheduler_background_polling_methods_are_idempotent(monkeypatch):
+    scheduler_module = importlib.import_module("pixelle_video.services.publish_scheduler")
+
+    calls = []
+
+    class FakeDataDir:
+        def mkdir(self, *args, **kwargs):
+            calls.append("DATA_DIR.mkdir")
+
+    monkeypatch.setattr(scheduler_module, "DATA_DIR", FakeDataDir())
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_load", lambda self: None)
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_recover_orphaned_running_jobs", lambda self: None)
+    monkeypatch.setattr(
+        scheduler_module.PublishScheduler,
+        "_start_schedule_poll",
+        lambda self: calls.append("_start_schedule_poll"),
+    )
+
+    scheduler = scheduler_module.PublishScheduler()
+    scheduler._sched_poll_stop_event = type(
+        "FakeStopEvent",
+        (),
+        {"set": lambda self: calls.append("stop_event.set")},
+    )()
+
+    scheduler.start_background_polling()
+    scheduler.start_background_polling()
+    scheduler.stop_background_polling()
+    scheduler.stop_background_polling()
+
+    assert calls == ["DATA_DIR.mkdir", "_start_schedule_poll", "stop_event.set"]
+
+
+def test_publish_scheduler_start_scheduler_is_idempotent(monkeypatch):
+    scheduler_module = importlib.import_module("pixelle_video.services.publish_scheduler")
+
+    calls = []
+
+    class FakeDataDir:
+        def mkdir(self, *args, **kwargs):
+            calls.append("DATA_DIR.mkdir")
+
+    class FakeAsyncIOScheduler:
+        def __init__(self, timezone):
+            calls.append(("AsyncIOScheduler", timezone))
+            self.running = False
+
+        def start(self):
+            calls.append("scheduler.start")
+            self.running = True
+
+        def add_job(self, *args, **kwargs):
+            calls.append("scheduler.add_job")
+
+    monkeypatch.setattr(scheduler_module, "DATA_DIR", FakeDataDir())
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_load", lambda self: None)
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_recover_orphaned_running_jobs", lambda self: None)
+
+    scheduler = scheduler_module.PublishScheduler()
+    monkeypatch.setitem(
+        sys.modules,
+        "apscheduler.schedulers.asyncio",
+        type("FakeApschedulerAsyncioModule", (), {"AsyncIOScheduler": FakeAsyncIOScheduler}),
+    )
+
+    scheduler.start_scheduler()
+    scheduler.start_scheduler()
+
+    assert calls == [
+        "DATA_DIR.mkdir",
+        ("AsyncIOScheduler", "Asia/Shanghai"),
+        "scheduler.start",
+        "scheduler.add_job",
+    ]
+
+
 def test_test_profile_lifecycle_is_noop(monkeypatch):
     import api.lifecycle as lifecycle
 

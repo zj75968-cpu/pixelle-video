@@ -184,9 +184,9 @@ class PublishScheduler:
         # is not running, e.g. in Streamlit)
         self._sched_poll_thread = None
         self._sched_poll_stop_event = None
+        self._background_polling_started = False
         self._load()
         self._recover_orphaned_running_jobs()
-        self._start_schedule_poll()
 
     # -------------------------------------------------------------------------
     # Persistence
@@ -300,6 +300,21 @@ class PublishScheduler:
         self._sched_poll_thread = _threading.Thread(target=_poll, daemon=True, name="sched-poll")
         self._sched_poll_thread.start()
         logger.debug("[SchedulePoll] background polling thread started")
+
+    def start_background_polling(self):
+        """Start the scheduled-job polling thread once."""
+        if self._background_polling_started:
+            return
+        self._start_schedule_poll()
+        self._background_polling_started = True
+
+    def stop_background_polling(self):
+        """Stop the scheduled-job polling thread safely."""
+        if not self._background_polling_started:
+            return
+        if self._sched_poll_stop_event is not None:
+            self._sched_poll_stop_event.set()
+        self._background_polling_started = False
 
     # -------------------------------------------------------------------------
     # Queue Management
@@ -542,6 +557,8 @@ class PublishScheduler:
 
     def start_scheduler(self):
         """Start the APScheduler background scheduler."""
+        if self._scheduler and self._scheduler.running:
+            return
         try:
             from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore
         except ImportError:
