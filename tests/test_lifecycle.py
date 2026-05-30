@@ -249,7 +249,7 @@ def test_lifecycle_import_keeps_heavy_services_lazy(monkeypatch):
     assert lifecycle.publish_scheduler is None
 
 
-def test_cleanup_failure_clears_started_profile_and_allows_restart(monkeypatch):
+def test_cleanup_failure_attempts_all_steps_then_raises_first_error(monkeypatch):
     import pytest
 
     import api.lifecycle as lifecycle
@@ -263,6 +263,7 @@ def test_cleanup_failure_clears_started_profile_and_allows_restart(monkeypatch):
 
         async def stop(self):
             calls.append("task_manager.stop")
+            raise RuntimeError("task cleanup failed")
 
     class FakeDeviceManager:
         def start_auto_sync(self, interval_seconds):
@@ -281,18 +282,25 @@ def test_cleanup_failure_clears_started_profile_and_allows_restart(monkeypatch):
 
         def stop_scheduler(self):
             calls.append("publish_scheduler.stop_scheduler")
+            raise RuntimeError("scheduler cleanup failed")
 
         def stop_background_polling(self):
             calls.append("publish_scheduler.stop_background_polling")
 
     async def fake_shutdown_pixelle_video():
         calls.append("shutdown_pixelle_video")
+        raise RuntimeError("pixelle cleanup failed")
 
     monkeypatch.setattr(lifecycle, "task_manager", FakeTaskManager())
     monkeypatch.setattr(lifecycle, "device_manager", FakeDeviceManager())
     monkeypatch.setattr(lifecycle, "publish_scheduler", FakePublishScheduler())
     monkeypatch.setattr(lifecycle, "start_cookie_keepalive", lambda interval_hours: calls.append(("start_cookie_keepalive", interval_hours)))
-    monkeypatch.setattr(lifecycle, "stop_cookie_keepalive", lambda: calls.append("stop_cookie_keepalive"))
+
+    def fail_cookie_stop():
+        calls.append("stop_cookie_keepalive")
+        raise RuntimeError("cookie cleanup failed")
+
+    monkeypatch.setattr(lifecycle, "stop_cookie_keepalive", fail_cookie_stop)
     monkeypatch.setattr(lifecycle, "shutdown_pixelle_video", fake_shutdown_pixelle_video)
 
     asyncio.run(lifecycle.start_app_lifecycle(lifecycle.RunProfile.API_SERVER))
@@ -308,6 +316,10 @@ def test_cleanup_failure_clears_started_profile_and_allows_restart(monkeypatch):
         ("start_cookie_keepalive", 12.0),
         "stop_cookie_keepalive",
         "device_manager.stop_auto_sync",
+        "publish_scheduler.stop_scheduler",
+        "publish_scheduler.stop_background_polling",
+        "task_manager.stop",
+        "shutdown_pixelle_video",
         "task_manager.start",
         ("device_manager.start_auto_sync", 8),
         "publish_scheduler.start_background_polling",

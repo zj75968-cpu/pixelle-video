@@ -129,6 +129,13 @@ async def stop_app_lifecycle(profile: RunProfile | str = RunProfile.API_SERVER) 
         return LifecycleState(profile=coerced, started=False)
 
     active_profile = _started_profile
+    first_cleanup_error: Exception | None = None
+
+    def record_cleanup_error(exc: Exception) -> None:
+        nonlocal first_cleanup_error
+        if first_cleanup_error is None:
+            first_cleanup_error = exc
+
     try:
         try:
             _stop_cookie_keepalive()()
@@ -139,12 +146,34 @@ async def stop_app_lifecycle(profile: RunProfile | str = RunProfile.API_SERVER) 
         publish_scheduler_service = _publish_scheduler()
         task_manager_service = _task_manager()
 
-        device_manager_service.stop_auto_sync()
-        publish_scheduler_service.stop_scheduler()
+        try:
+            device_manager_service.stop_auto_sync()
+        except Exception as exc:
+            record_cleanup_error(exc)
+
+        try:
+            publish_scheduler_service.stop_scheduler()
+        except Exception as exc:
+            record_cleanup_error(exc)
+
         if hasattr(publish_scheduler_service, "stop_background_polling"):
-            publish_scheduler_service.stop_background_polling()
-        await task_manager_service.stop()
-        await _shutdown_pixelle_video()()
+            try:
+                publish_scheduler_service.stop_background_polling()
+            except Exception as exc:
+                record_cleanup_error(exc)
+
+        try:
+            await task_manager_service.stop()
+        except Exception as exc:
+            record_cleanup_error(exc)
+
+        try:
+            await _shutdown_pixelle_video()()
+        except Exception as exc:
+            record_cleanup_error(exc)
     finally:
         _started_profile = None
+
+    if first_cleanup_error is not None:
+        raise first_cleanup_error
     return LifecycleState(profile=active_profile, started=False)
