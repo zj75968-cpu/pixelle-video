@@ -1,0 +1,2340 @@
+
+<!doctype html>
+<html lang="zh" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI Video Creator - Generate a short video in 3 minutes">
+      
+      
+        <meta name="author" content="Pixelle.AI">
+      
+      
+        <link rel="canonical" href="https://AIDC-AI.github.io/Pixelle-Video/zh/superpowers/plans/2026-05-28-ch9329-refactor/">
+      
+      
+      
+      
+        
+          <link rel="alternate" href="../../../../superpowers/plans/2026-05-28-ch9329-refactor/" hreflang="en">
+        
+          <link rel="alternate" href="./" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>CH9329 硬件模式纯净化重构实施计划 - Pixelle-Video</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#ch9329" class="md-skip">
+          跳转至
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="页眉">
+    <a href="../../../" title="Pixelle-Video" class="md-header__button md-logo" aria-label="Pixelle-Video" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Pixelle-Video
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              CH9329 硬件模式纯净化重构实施计划
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="选择当前语言">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="../../../../superpowers/plans/2026-05-28-ch9329-refactor/" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="zh" class="md-select__link">
+              中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="搜索" placeholder="搜索" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="查找">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="分享" aria-label="分享" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="清空当前内容" aria-label="清空当前内容" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            正在初始化搜索引擎
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/AIDC-AI/Pixelle-Video" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AIDC-AI/Pixelle-Video
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="标签" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../" class="md-tabs__link">
+        
+  
+  
+    
+  
+  首页
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  快速开始
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../user-guide/web-ui/" class="md-tabs__link">
+          
+  
+  
+  用户指南
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../gallery/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  示例库
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../tutorials/your-first-video/" class="md-tabs__link">
+          
+  
+  
+  教程
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../reference/api-overview/" class="md-tabs__link">
+          
+  
+  
+  参考
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../development/architecture/" class="md-tabs__link">
+          
+  
+  
+  开发指南
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  常见问题
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../troubleshooting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  故障排查
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="导航栏" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../../" title="Pixelle-Video" class="md-nav__button md-logo" aria-label="Pixelle-Video" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Pixelle-Video
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/AIDC-AI/Pixelle-Video" title="前往仓库" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AIDC-AI/Pixelle-Video
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    首页
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快速开始
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    快速开始
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    安装
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    快速入门
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    配置
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    用户指南
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    用户指南
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/web-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web 界面
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API 使用
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    工作流定制
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    模板开发
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../gallery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    示例库
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    教程
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    教程
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/your-first-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    生成你的第一个视频
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/custom-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    自定义视觉风格
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/voice-cloning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    声音克隆
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    参考
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    参考
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/api-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API 概览
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/config-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    配置文件详解
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    开发指南
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    开发指南
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    架构设计
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    贡献指南
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    常见问题
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    故障排查
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="目录">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      目录
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        文件结构规划
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="文件结构规划">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#40" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        删除的文件（40+ 个）
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        修改的文件
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 1: 准备工作和分支创建
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-2-phone-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 2: 删除 Phone Agent 相关文件
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-3-adb-scratch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 3: 删除 ADB 和 Scratch 测试脚本
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-4-schema" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 4: 简化配置 Schema
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-5-configyaml" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 5: 更新 config.yaml
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-6-android_device_dispatcherpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 6: 简化 android_device_dispatcher.py
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-7-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 7: 清理 API 路由引用
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-8-web-ui-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 8: 清理 Web UI Settings 页面
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-9-web-ui-publish-post" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 9: 清理 Web UI Publish 和 Post 页面
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 10: 清理未使用的导入
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 11: 验证和测试
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-12" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 12: 更新文档
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Task 12: 更新文档">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        设备数据迁移
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phone-agent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        恢复 Phone Agent（如需要）
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#task-13" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Task 13: 最终验证和合并
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        验证清单
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        回滚计划
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="ch9329">CH9329 硬件模式纯净化重构实施计划<a class="headerlink" href="#ch9329" title="Permanent link">&para;</a></h1>
+<blockquote>
+<p><strong>For agentic workers:</strong> REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (<code>- [ ]</code>) syntax for tracking.</p>
+</blockquote>
+<p><strong>Goal:</strong> 移除所有非 CH9329 的设备控制代码，简化配置和架构，保留纯净的硬件串口控制方案。</p>
+<p><strong>Architecture:</strong> 删除 Phone Agent HTTP 控制和 ADB 控制相关的所有文件（约 40 个），简化配置 schema 和服务层，清理 Web UI 中的废弃功能。</p>
+<p><strong>Tech Stack:</strong> Python 3.11+, FastAPI, Streamlit, Pydantic, CH9329 串口控制</p>
+<hr />
+<h2 id="_1">文件结构规划<a class="headerlink" href="#_1" title="Permanent link">&para;</a></h2>
+<h3 id="40">删除的文件（40+ 个）<a class="headerlink" href="#40" title="Permanent link">&para;</a></h3>
+<p><strong>Phone Agent 相关</strong>:
+- <code>api/routers/phone_agent.py</code>
+- <code>pixelle_video/services/phone_agent_client.py</code>
+- <code>pixelle_video/services/phone_agent_setup.py</code>
+- <code>scripts/phone_agent.py</code>
+- <code>scripts/local_agent.py</code>
+- <code>scripts/setup_termux.sh</code>
+- <code>scripts/install_termux_boot.sh</code>
+- <code>scripts/termux_boot_start_agent.sh</code>
+- <code>scripts/smoke_agent_repair.py</code></p>
+<p><strong>ADB 相关</strong>:
+- <code>check_adb.py</code></p>
+<p><strong>Scratch 测试脚本</strong>（删除 30 个，保留 5 个）:
+- 保留: <code>check_publish_err.py</code>, <code>mvp_publish.py</code>, <code>test_hardware_flow.py</code>, <code>check_vps_details.py</code>, <code>diag.sh</code>
+- 删除: 其余 30 个测试脚本</p>
+<h3 id="_2">修改的文件<a class="headerlink" href="#_2" title="Permanent link">&para;</a></h3>
+<p><strong>配置层</strong>:
+- <code>pixelle_video/config/schema.py</code> - 删除 PhoneAgentConfig、DistributionConfig、RemotePathsConfig
+- <code>config.yaml</code> - 删除 phone_agent、distribution、distribution_mode 配置</p>
+<p><strong>服务层</strong>:
+- <code>pixelle_video/services/android_device_dispatcher.py</code> - 简化为纯硬件模式
+- <code>pixelle_video/services/device_manager.py</code> - 删除 ADB 相关方法</p>
+<p><strong>API 层</strong>:
+- <code>api/routers/__init__.py</code> - 删除 phone_agent_router 引用
+- <code>api/app.py</code> - 删除 phone_agent_router 注册</p>
+<p><strong>Web UI</strong>:
+- <code>web/views/9_Settings.py</code> - 删除 Phone Agent 配置区域
+- <code>web/views/4_Publish.py</code> - 删除 Phone Agent 设备选择
+- <code>web/views/_post.py</code> - 删除 Phone Agent 发布选项</p>
+<hr />
+<h2 id="task-1">Task 1: 准备工作和分支创建<a class="headerlink" href="#task-1" title="Permanent link">&para;</a></h2>
+<p><strong>Files:</strong>
+- Create: <code>config.yaml.backup</code>
+- Modify: <code>.git/</code> (创建新分支)</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 1: 创建新分支</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>git<span class="w"> </span>checkout<span class="w"> </span>-b<span class="w"> </span>refactor/ch9329-cleanup
+</span></code></pre></div>
+<p>Expected: <code>Switched to a new branch 'refactor/ch9329-cleanup'</code></p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 2: 备份当前配置文件</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>cp<span class="w"> </span>config.yaml<span class="w"> </span>config.yaml.backup
+</span></code></pre></div>
+<p>Expected: 备份文件创建成功</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 3: 记录当前文件统计</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>find<span class="w"> </span>.<span class="w"> </span>-name<span class="w"> </span><span class="s2">&quot;*.py&quot;</span><span class="w"> </span>-type<span class="w"> </span>f<span class="w"> </span><span class="p">|</span><span class="w"> </span>wc<span class="w"> </span>-l
+</span></code></pre></div>
+<p>Expected: 显示当前 Python 文件总数（约 150 个）</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 4: Commit 准备工作</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>git<span class="w"> </span>add<span class="w"> </span>config.yaml.backup
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;chore: backup config before refactoring&quot;</span>
+</span></code></pre></div>
+<hr />
+<h2 id="task-2-phone-agent">Task 2: 删除 Phone Agent 相关文件<a class="headerlink" href="#task-2-phone-agent" title="Permanent link">&para;</a></h2>
+<p><strong>Files:</strong>
+- Delete: <code>api/routers/phone_agent.py</code>
+- Delete: <code>pixelle_video/services/phone_agent_client.py</code>
+- Delete: <code>pixelle_video/services/phone_agent_setup.py</code>
+- Delete: <code>scripts/phone_agent.py</code>
+- Delete: <code>scripts/local_agent.py</code>
+- Delete: <code>scripts/setup_termux.sh</code>
+- Delete: <code>scripts/install_termux_boot.sh</code>
+- Delete: <code>scripts/termux_boot_start_agent.sh</code>
+- Delete: <code>scripts/smoke_agent_repair.py</code></p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 1: 删除 API 路由文件</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>git<span class="w"> </span>rm<span class="w"> </span>api/routers/phone_agent.py
+</span></code></pre></div>
+<p>Expected: <code>rm 'api/routers/phone_agent.py'</code></p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 2: 删除服务层文件</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>git<span class="w"> </span>rm<span class="w"> </span>pixelle_video/services/phone_agent_client.py
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>git<span class="w"> </span>rm<span class="w"> </span>pixelle_video/services/phone_agent_setup.py
+</span></code></pre></div>
+<p>Expected: 两个文件被删除</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 3: 删除脚本文件</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>git<span class="w"> </span>rm<span class="w"> </span>scripts/phone_agent.py
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>git<span class="w"> </span>rm<span class="w"> </span>scripts/local_agent.py
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>git<span class="w"> </span>rm<span class="w"> </span>scripts/setup_termux.sh
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>git<span class="w"> </span>rm<span class="w"> </span>scripts/install_termux_boot.sh
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>git<span class="w"> </span>rm<span class="w"> </span>scripts/termux_boot_start_agent.sh
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>git<span class="w"> </span>rm<span class="w"> </span>scripts/smoke_agent_repair.py
+</span></code></pre></div>
+<p>Expected: 6 个脚本文件被删除</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 4: Commit Phone Agent 文件删除</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;refactor: remove phone agent related files&quot;</span>
+</span></code></pre></div>
+<hr />
+<h2 id="task-3-adb-scratch">Task 3: 删除 ADB 和 Scratch 测试脚本<a class="headerlink" href="#task-3-adb-scratch" title="Permanent link">&para;</a></h2>
+<p><strong>Files:</strong>
+- Delete: <code>check_adb.py</code>
+- Delete: <code>scratch/</code> 中 30 个测试脚本</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 1: 删除 ADB 文件</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>git<span class="w"> </span>rm<span class="w"> </span>check_adb.py
+</span></code></pre></div>
+<p>Expected: <code>rm 'check_adb.py'</code></p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 2: 删除 Scratch 测试脚本（保留 5 个）</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="nb">cd</span><span class="w"> </span>scratch
+</span><span id="__span-9-2"><a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="c1"># 保留这 5 个文件</span>
+</span><span id="__span-9-3"><a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="c1"># check_publish_err.py, mvp_publish.py, test_hardware_flow.py, check_vps_details.py, diag.sh</span>
+</span><span id="__span-9-4"><a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+</span><span id="__span-9-5"><a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="c1"># 删除其他所有文件</span>
+</span><span id="__span-9-6"><a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>git<span class="w"> </span>rm<span class="w"> </span>local_publish_test.py<span class="w"> </span>download_and_push_cf.py<span class="w"> </span>download_win_cf.py
+</span><span id="__span-9-7"><a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>git<span class="w"> </span>rm<span class="w"> </span>test_agent_dispatch.py<span class="w"> </span>publish_xhs_demo.py<span class="w"> </span>test_comment_and_delete.py
+</span><span id="__span-9-8"><a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>git<span class="w"> </span>rm<span class="w"> </span>dump_detail_hierarchy.py<span class="w"> </span>test_dots_menu.py<span class="w"> </span>test_grafted_pipeline.py
+</span><span id="__span-9-9"><a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>git<span class="w"> </span>rm<span class="w"> </span>search_xml.py<span class="w"> </span>test_e2e_grafted.py<span class="w"> </span>view_last_lines.py
+</span><span id="__span-9-10"><a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>git<span class="w"> </span>rm<span class="w"> </span>check_running_processes.py<span class="w"> </span>clear_test_jobs.py<span class="w"> </span>print_queue.py
+</span><span id="__span-9-11"><a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>git<span class="w"> </span>rm<span class="w"> </span>check_vps_services.py<span class="w"> </span>test_vps_http.py<span class="w"> </span>test_vps_ports.py
+</span><span id="__span-9-12"><a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>git<span class="w"> </span>rm<span class="w"> </span>diagnose_quick.py<span class="w"> </span>check_registered_url.py<span class="w"> </span>check_agent_registration.py
+</span><span id="__span-9-13"><a id="__codelineno-9-13" name="__codelineno-9-13" href="#__codelineno-9-13"></a>git<span class="w"> </span>rm<span class="w"> </span>check_phone_processes.py<span class="w"> </span>vps_diagnose.py<span class="w"> </span>debug_phone_termux.py
+</span><span id="__span-9-14"><a id="__codelineno-9-14" name="__codelineno-9-14" href="#__codelineno-9-14"></a>git<span class="w"> </span>rm<span class="w"> </span>phone_force_wake.py<span class="w"> </span>setup_iqoo_agent.py<span class="w"> </span>deploy_and_clear.py
+</span><span id="__span-9-15"><a id="__codelineno-9-15" name="__codelineno-9-15" href="#__codelineno-9-15"></a>git<span class="w"> </span>rm<span class="w"> </span>check_vps_network.py<span class="w"> </span>check_vps_nginx_config.py<span class="w"> </span>diagnose_vps_nginx.py
+</span><span id="__span-9-16"><a id="__codelineno-9-16" name="__codelineno-9-16" href="#__codelineno-9-16"></a>git<span class="w"> </span>rm<span class="w"> </span>deploy_unbuffered.py
+</span><span id="__span-9-17"><a id="__codelineno-9-17" name="__codelineno-9-17" href="#__codelineno-9-17"></a><span class="nb">cd</span><span class="w"> </span>..
+</span></code></pre></div>
+<p>Expected: 30 个测试脚本被删除</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 3: Commit 测试脚本删除</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;refactor: remove ADB and obsolete scratch test scripts&quot;</span>
+</span></code></pre></div>
+<hr />
+<h2 id="task-4-schema">Task 4: 简化配置 Schema<a class="headerlink" href="#task-4-schema" title="Permanent link">&para;</a></h2>
+<p><strong>Files:</strong>
+- Modify: <code>pixelle_video/config/schema.py:107-129</code> (删除 PhoneAgentConfig)
+- Modify: <code>pixelle_video/config/schema.py:180-186</code> (删除 RemotePathsConfig)
+- Modify: <code>pixelle_video/config/schema.py:188-197</code> (删除 DistributionConfig)
+- Modify: <code>pixelle_video/config/schema.py:200-220</code> (删除 PixelleVideoConfig 中的字段)</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 1: 读取当前 schema 文件</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>cat<span class="w"> </span>pixelle_video/config/schema.py<span class="w"> </span><span class="p">|</span><span class="w"> </span>head<span class="w"> </span>-220
+</span></code></pre></div>
+<p>Expected: 查看当前配置结构</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 2: 删除 PhoneAgentConfig 类（107-129 行）</strong></li>
+</ul>
+<p>在 <code>pixelle_video/config/schema.py</code> 中删除:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">PhoneAgentConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;HTTP Agent configuration for phone control without USB ADB.&quot;&quot;&quot;</span>
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>    <span class="n">url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>        <span class="n">default</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;手机 Agent 的访问地址（cloudflared 隧道 URL），如 https://xxx.trycloudflare.com&quot;</span><span class="p">,</span>
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="p">)</span>
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    <span class="n">token</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+</span><span id="__span-12-8"><a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>        <span class="n">default</span><span class="o">=</span><span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span id="__span-12-9"><a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;认证 Token，与手机端 phone_agent.py --token 保持一致&quot;</span><span class="p">,</span>
+</span><span id="__span-12-10"><a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a>    <span class="p">)</span>
+</span><span id="__span-12-11"><a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>    <span class="n">chunk_size_mb</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+</span><span id="__span-12-12"><a id="__codelineno-12-12" name="__codelineno-12-12" href="#__codelineno-12-12"></a>        <span class="n">default</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
+</span><span id="__span-12-13"><a id="__codelineno-12-13" name="__codelineno-12-13" href="#__codelineno-12-13"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;文件分块大小（MB），默认 5MB&quot;</span><span class="p">,</span>
+</span><span id="__span-12-14"><a id="__codelineno-12-14" name="__codelineno-12-14" href="#__codelineno-12-14"></a>    <span class="p">)</span>
+</span><span id="__span-12-15"><a id="__codelineno-12-15" name="__codelineno-12-15" href="#__codelineno-12-15"></a>    <span class="n">timeout_push</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+</span><span id="__span-12-16"><a id="__codelineno-12-16" name="__codelineno-12-16" href="#__codelineno-12-16"></a>        <span class="n">default</span><span class="o">=</span><span class="mi">120</span><span class="p">,</span>
+</span><span id="__span-12-17"><a id="__codelineno-12-17" name="__codelineno-12-17" href="#__codelineno-12-17"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;单文件推送超时秒数&quot;</span><span class="p">,</span>
+</span><span id="__span-12-18"><a id="__codelineno-12-18" name="__codelineno-12-18" href="#__codelineno-12-18"></a>    <span class="p">)</span>
+</span><span id="__span-12-19"><a id="__codelineno-12-19" name="__codelineno-12-19" href="#__codelineno-12-19"></a>    <span class="n">agents</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span>
+</span><span id="__span-12-20"><a id="__codelineno-12-20" name="__codelineno-12-20" href="#__codelineno-12-20"></a>        <span class="n">default_factory</span><span class="o">=</span><span class="nb">dict</span><span class="p">,</span>
+</span><span id="__span-12-21"><a id="__codelineno-12-21" name="__codelineno-12-21" href="#__codelineno-12-21"></a>        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Registered phone-agent instances keyed by stable agent id.&quot;</span><span class="p">,</span>
+</span><span id="__span-12-22"><a id="__codelineno-12-22" name="__codelineno-12-22" href="#__codelineno-12-22"></a>    <span class="p">)</span>
+</span></code></pre></div>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 3: 删除 RemotePathsConfig 类（180-186 行）</strong></li>
+</ul>
+<p>删除:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">RemotePathsConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Remote directory paths on target phone&quot;&quot;&quot;</span>
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>    <span class="n">job_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;/sdcard/Tasker/jobs&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Directory for job definition and trigger files&quot;</span><span class="p">)</span>
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>    <span class="n">image_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;/sdcard/Pictures/TaskerUpload&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Directory for uploading image assets&quot;</span><span class="p">)</span>
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>    <span class="n">video_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;/sdcard/Movies/TaskerUpload&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Directory for uploading video assets&quot;</span><span class="p">)</span>
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>    <span class="n">screenshot_dir</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;/sdcard/Tasker/jobs/screenshots&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Directory for screenshots&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 4: 删除 DistributionConfig 类（188-197 行）</strong></li>
+</ul>
+<p>删除:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">DistributionConfig</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Android Tasker SSH distribution configuration&quot;&quot;&quot;</span>
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>    <span class="n">mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;legacy&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Distribution mode: &#39;legacy&#39; or &#39;mobile_tasker_ssh&#39;&quot;</span><span class="p">)</span>
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>    <span class="n">result_wait_seconds</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Timeout waiting for job completion&quot;</span><span class="p">)</span>
+</span><span id="__span-14-5"><a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>    <span class="n">result_poll_interval_seconds</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Polling interval for result file&quot;</span><span class="p">)</span>
+</span><span id="__span-14-6"><a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>    <span class="n">max_retry</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Maximum number of retries&quot;</span><span class="p">)</span>
+</span><span id="__span-14-7"><a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>    <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Task batch size&quot;</span><span class="p">)</span>
+</span><span id="__span-14-8"><a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>    <span class="n">send_interval_seconds</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Interval between sending files&quot;</span><span class="p">)</span>
+</span><span id="__span-14-9"><a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>    <span class="n">mobile_devices_config</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;config/devices.yaml&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Path to devices config file&quot;</span><span class="p">)</span>
+</span><span id="__span-14-10"><a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>    <span class="n">remote_paths</span><span class="p">:</span> <span class="n">RemotePathsConfig</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">RemotePathsConfig</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Paths on target device&quot;</span><span class="p">)</span>
+</span></code></pre></div>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 5: 从 PixelleVideoConfig 删除字段</strong></li>
+</ul>
+<p>在 <code>PixelleVideoConfig</code> 类中删除这些字段:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="n">distribution_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default</span><span class="o">=</span><span class="s2">&quot;legacy&quot;</span><span class="p">,</span> <span class="n">description</span><span class="o">=</span><span class="s2">&quot;Distribution mode&quot;</span><span class="p">)</span>
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="n">phone_agent</span><span class="p">:</span> <span class="n">PhoneAgentConfig</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">PhoneAgentConfig</span><span class="p">)</span>
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="n">distribution</span><span class="p">:</span> <span class="n">DistributionConfig</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="n">default_factory</span><span class="o">=</span><span class="n">DistributionConfig</span><span class="p">)</span>
+</span></code></pre></div>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 6: 验证语法正确</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>python<span class="w"> </span>-m<span class="w"> </span>py_compile<span class="w"> </span>pixelle_video/config/schema.py
+</span></code></pre></div>
+<p>Expected: 无输出表示语法正确</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 7: Commit 配置 schema 简化</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>git<span class="w"> </span>add<span class="w"> </span>pixelle_video/config/schema.py
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;refactor: remove phone_agent and distribution config classes from schema&quot;</span>
+</span></code></pre></div>
+<hr />
+<h2 id="task-5-configyaml">Task 5: 更新 config.yaml<a class="headerlink" href="#task-5-configyaml" title="Permanent link">&para;</a></h2>
+<p><strong>Files:</strong>
+- Modify: <code>config.yaml</code> (删除 phone_agent、distribution、distribution_mode)</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 1: 删除 phone_agent 配置块</strong></li>
+</ul>
+<p>从 <code>config.yaml</code> 删除:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-18-1"><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="nt">phone_agent</span><span class="p">:</span>
+</span><span id="__span-18-2"><a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">  </span><span class="nt">url</span><span class="p">:</span><span class="w"> </span><span class="s">&#39;&#39;</span>
+</span><span id="__span-18-3"><a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="w">  </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">pixelle_secure_agent_token_2026</span>
+</span><span id="__span-18-4"><a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="w">  </span><span class="nt">chunk_size_mb</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+</span><span id="__span-18-5"><a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="w">  </span><span class="nt">timeout_push</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">120</span>
+</span></code></pre></div>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 2: 删除 distribution_mode 字段</strong></li>
+</ul>
+<p>删除:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-19-1"><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="nt">distribution_mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">legacy</span>
+</span></code></pre></div>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 3: 删除 distribution 配置块</strong></li>
+</ul>
+<p>删除:</p>
+<div class="language-yaml highlight"><pre><span></span><code><span id="__span-20-1"><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="nt">distribution</span><span class="p">:</span>
+</span><span id="__span-20-2"><a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">  </span><span class="nt">mode</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">phone_agent</span>
+</span><span id="__span-20-3"><a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">  </span><span class="nt">result_wait_seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">240</span>
+</span><span id="__span-20-4"><a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="w">  </span><span class="nt">result_poll_interval_seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">5</span>
+</span><span id="__span-20-5"><a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="w">  </span><span class="nt">max_retry</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+</span><span id="__span-20-6"><a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="w">  </span><span class="nt">batch_size</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">3</span>
+</span><span id="__span-20-7"><a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="w">  </span><span class="nt">send_interval_seconds</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">2</span>
+</span><span id="__span-20-8"><a id="__codelineno-20-8" name="__codelineno-20-8" href="#__codelineno-20-8"></a><span class="w">  </span><span class="nt">mobile_devices_config</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">config/devices.yaml</span>
+</span><span id="__span-20-9"><a id="__codelineno-20-9" name="__codelineno-20-9" href="#__codelineno-20-9"></a><span class="w">  </span><span class="nt">remote_paths</span><span class="p">:</span>
+</span><span id="__span-20-10"><a id="__codelineno-20-10" name="__codelineno-20-10" href="#__codelineno-20-10"></a><span class="w">    </span><span class="nt">job_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/sdcard/Tasker/jobs</span>
+</span><span id="__span-20-11"><a id="__codelineno-20-11" name="__codelineno-20-11" href="#__codelineno-20-11"></a><span class="w">    </span><span class="nt">image_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/sdcard/Pictures/TaskerUpload</span>
+</span><span id="__span-20-12"><a id="__codelineno-20-12" name="__codelineno-20-12" href="#__codelineno-20-12"></a><span class="w">    </span><span class="nt">video_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/sdcard/Movies/TaskerUpload</span>
+</span><span id="__span-20-13"><a id="__codelineno-20-13" name="__codelineno-20-13" href="#__codelineno-20-13"></a><span class="w">    </span><span class="nt">screenshot_dir</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">/sdcard/Tasker/jobs/screenshots</span>
+</span></code></pre></div>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 4: 验证 YAML 语法</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-21-1"><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;import yaml; yaml.safe_load(open(&#39;config.yaml&#39;))&quot;</span>
+</span></code></pre></div>
+<p>Expected: 无输出表示 YAML 语法正确</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 5: Commit 配置文件更新</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-22-1"><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>git<span class="w"> </span>add<span class="w"> </span>config.yaml
+</span><span id="__span-22-2"><a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;refactor: remove phone_agent and distribution config from config.yaml&quot;</span>
+</span></code></pre></div>
+<hr />
+<h2 id="task-6-android_device_dispatcherpy">Task 6: 简化 android_device_dispatcher.py<a class="headerlink" href="#task-6-android_device_dispatcherpy" title="Permanent link">&para;</a></h2>
+<p><strong>Files:</strong>
+- Modify: <code>pixelle_video/services/android_device_dispatcher.py</code> (完全重写为纯硬件模式)</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 1: 备份当前文件</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-23-1"><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a>cp<span class="w"> </span>pixelle_video/services/android_device_dispatcher.py<span class="w"> </span>pixelle_video/services/android_device_dispatcher.py.old
+</span></code></pre></div>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 2: 重写为纯硬件模式</strong></li>
+</ul>
+<p>完全替换 <code>pixelle_video/services/android_device_dispatcher.py</code> 内容:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-24-1"><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># -*- coding: utf-8 -*-</span>
+</span><span id="__span-24-2"><a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-24-3"><a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="sd">硬件设备调度器（CH9329 串口控制）</span>
+</span><span id="__span-24-4"><a id="__codelineno-24-4" name="__codelineno-24-4" href="#__codelineno-24-4"></a><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-24-5"><a id="__codelineno-24-5" name="__codelineno-24-5" href="#__codelineno-24-5"></a><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+</span><span id="__span-24-6"><a id="__codelineno-24-6" name="__codelineno-24-6" href="#__codelineno-24-6"></a><span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
+</span><span id="__span-24-7"><a id="__codelineno-24-7" name="__codelineno-24-7" href="#__codelineno-24-7"></a><span class="kn">from</span><span class="w"> </span><span class="nn">loguru</span><span class="w"> </span><span class="kn">import</span> <span class="n">logger</span>
+</span><span id="__span-24-8"><a id="__codelineno-24-8" name="__codelineno-24-8" href="#__codelineno-24-8"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pixelle_video.services.publish_scheduler</span><span class="w"> </span><span class="kn">import</span> <span class="n">PublishJob</span>
+</span><span id="__span-24-9"><a id="__codelineno-24-9" name="__codelineno-24-9" href="#__codelineno-24-9"></a><span class="kn">from</span><span class="w"> </span><span class="nn">pixelle_video.services.xhs_publisher</span><span class="w"> </span><span class="kn">import</span> <span class="n">XHSPublisher</span>
+</span><span id="__span-24-10"><a id="__codelineno-24-10" name="__codelineno-24-10" href="#__codelineno-24-10"></a>
+</span><span id="__span-24-11"><a id="__codelineno-24-11" name="__codelineno-24-11" href="#__codelineno-24-11"></a>
+</span><span id="__span-24-12"><a id="__codelineno-24-12" name="__codelineno-24-12" href="#__codelineno-24-12"></a><span class="k">class</span><span class="w"> </span><span class="nc">DistributionAdapter</span><span class="p">:</span>
+</span><span id="__span-24-13"><a id="__codelineno-24-13" name="__codelineno-24-13" href="#__codelineno-24-13"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-24-14"><a id="__codelineno-24-14" name="__codelineno-24-14" href="#__codelineno-24-14"></a><span class="sd">    发帖分发器（CH9329 物理硬件串口控制）。</span>
+</span><span id="__span-24-15"><a id="__codelineno-24-15" name="__codelineno-24-15" href="#__codelineno-24-15"></a><span class="sd">    &quot;&quot;&quot;</span>
+</span><span id="__span-24-16"><a id="__codelineno-24-16" name="__codelineno-24-16" href="#__codelineno-24-16"></a>
+</span><span id="__span-24-17"><a id="__codelineno-24-17" name="__codelineno-24-17" href="#__codelineno-24-17"></a>    <span class="nd">@classmethod</span>
+</span><span id="__span-24-18"><a id="__codelineno-24-18" name="__codelineno-24-18" href="#__codelineno-24-18"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_mode</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+</span><span id="__span-24-19"><a id="__codelineno-24-19" name="__codelineno-24-19" href="#__codelineno-24-19"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;获取当前系统的发帖分发模式&quot;&quot;&quot;</span>
+</span><span id="__span-24-20"><a id="__codelineno-24-20" name="__codelineno-24-20" href="#__codelineno-24-20"></a>        <span class="k">return</span> <span class="s2">&quot;hardware&quot;</span>
+</span><span id="__span-24-21"><a id="__codelineno-24-21" name="__codelineno-24-21" href="#__codelineno-24-21"></a>
+</span><span id="__span-24-22"><a id="__codelineno-24-22" name="__codelineno-24-22" href="#__codelineno-24-22"></a>    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">execute_job</span><span class="p">(</span>
+</span><span id="__span-24-23"><a id="__codelineno-24-23" name="__codelineno-24-23" href="#__codelineno-24-23"></a>        <span class="bp">self</span><span class="p">,</span>
+</span><span id="__span-24-24"><a id="__codelineno-24-24" name="__codelineno-24-24" href="#__codelineno-24-24"></a>        <span class="n">job</span><span class="p">:</span> <span class="n">PublishJob</span><span class="p">,</span>
+</span><span id="__span-24-25"><a id="__codelineno-24-25" name="__codelineno-24-25" href="#__codelineno-24-25"></a>        <span class="n">progress_callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span>
+</span><span id="__span-24-26"><a id="__codelineno-24-26" name="__codelineno-24-26" href="#__codelineno-24-26"></a>    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+</span><span id="__span-24-27"><a id="__codelineno-24-27" name="__codelineno-24-27" href="#__codelineno-24-27"></a><span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+</span><span id="__span-24-28"><a id="__codelineno-24-28" name="__codelineno-24-28" href="#__codelineno-24-28"></a><span class="sd">        使用硬件直控模式执行发帖任务。</span>
+</span><span id="__span-24-29"><a id="__codelineno-24-29" name="__codelineno-24-29" href="#__codelineno-24-29"></a>
+</span><span id="__span-24-30"><a id="__codelineno-24-30" name="__codelineno-24-30" href="#__codelineno-24-30"></a><span class="sd">        Args:</span>
+</span><span id="__span-24-31"><a id="__codelineno-24-31" name="__codelineno-24-31" href="#__codelineno-24-31"></a><span class="sd">            job: 待执行的任务实例，其中 job.serial 应为硬件 COM 口名（例如 &quot;COM3&quot;）</span>
+</span><span id="__span-24-32"><a id="__codelineno-24-32" name="__codelineno-24-32" href="#__codelineno-24-32"></a><span class="sd">            progress_callback: 进度汇报回调</span>
+</span><span id="__span-24-33"><a id="__codelineno-24-33" name="__codelineno-24-33" href="#__codelineno-24-33"></a>
+</span><span id="__span-24-34"><a id="__codelineno-24-34" name="__codelineno-24-34" href="#__codelineno-24-34"></a><span class="sd">        Returns:</span>
+</span><span id="__span-24-35"><a id="__codelineno-24-35" name="__codelineno-24-35" href="#__codelineno-24-35"></a><span class="sd">            True 执行成功，False 失败</span>
+</span><span id="__span-24-36"><a id="__codelineno-24-36" name="__codelineno-24-36" href="#__codelineno-24-36"></a><span class="sd">        &quot;&quot;&quot;</span>
+</span><span id="__span-24-37"><a id="__codelineno-24-37" name="__codelineno-24-37" href="#__codelineno-24-37"></a>        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Executing job </span><span class="si">{</span><span class="n">job</span><span class="o">.</span><span class="n">job_id</span><span class="si">}</span><span class="s2"> using hardware mode. COM port: </span><span class="si">{</span><span class="n">job</span><span class="o">.</span><span class="n">serial</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</span><span id="__span-24-38"><a id="__codelineno-24-38" name="__codelineno-24-38" href="#__codelineno-24-38"></a>
+</span><span id="__span-24-39"><a id="__codelineno-24-39" name="__codelineno-24-39" href="#__codelineno-24-39"></a>        <span class="n">publisher</span> <span class="o">=</span> <span class="n">XHSPublisher</span><span class="p">(</span><span class="n">serial</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">serial</span><span class="p">,</span> <span class="n">job_id</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">job_id</span><span class="p">)</span>
+</span><span id="__span-24-40"><a id="__codelineno-24-40" name="__codelineno-24-40" href="#__codelineno-24-40"></a>
+</span><span id="__span-24-41"><a id="__codelineno-24-41" name="__codelineno-24-41" href="#__codelineno-24-41"></a>        <span class="k">if</span> <span class="n">job</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="s2">&quot;video&quot;</span><span class="p">:</span>
+</span><span id="__span-24-42"><a id="__codelineno-24-42" name="__codelineno-24-42" href="#__codelineno-24-42"></a>            <span class="n">success</span> <span class="o">=</span> <span class="k">await</span> <span class="n">publisher</span><span class="o">.</span><span class="n">publish_video</span><span class="p">(</span>
+</span><span id="__span-24-43"><a id="__codelineno-24-43" name="__codelineno-24-43" href="#__codelineno-24-43"></a>                <span class="n">video_path</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">video_path</span> <span class="ow">or</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+</span><span id="__span-24-44"><a id="__codelineno-24-44" name="__codelineno-24-44" href="#__codelineno-24-44"></a>                <span class="n">title</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">title</span><span class="p">,</span>
+</span><span id="__span-24-45"><a id="__codelineno-24-45" name="__codelineno-24-45" href="#__codelineno-24-45"></a>                <span class="n">body</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">body</span><span class="p">,</span>
+</span><span id="__span-24-46"><a id="__codelineno-24-46" name="__codelineno-24-46" href="#__codelineno-24-46"></a>                <span class="n">hashtags</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">hashtags</span><span class="p">,</span>
+</span><span id="__span-24-47"><a id="__codelineno-24-47" name="__codelineno-24-47" href="#__codelineno-24-47"></a>                <span class="n">progress_callback</span><span class="o">=</span><span class="n">progress_callback</span><span class="p">,</span>
+</span><span id="__span-24-48"><a id="__codelineno-24-48" name="__codelineno-24-48" href="#__codelineno-24-48"></a>            <span class="p">)</span>
+</span><span id="__span-24-49"><a id="__codelineno-24-49" name="__codelineno-24-49" href="#__codelineno-24-49"></a>        <span class="k">else</span><span class="p">:</span>
+</span><span id="__span-24-50"><a id="__codelineno-24-50" name="__codelineno-24-50" href="#__codelineno-24-50"></a>            <span class="n">success</span> <span class="o">=</span> <span class="k">await</span> <span class="n">publisher</span><span class="o">.</span><span class="n">publish</span><span class="p">(</span>
+</span><span id="__span-24-51"><a id="__codelineno-24-51" name="__codelineno-24-51" href="#__codelineno-24-51"></a>                <span class="n">images</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">images</span><span class="p">,</span>
+</span><span id="__span-24-52"><a id="__codelineno-24-52" name="__codelineno-24-52" href="#__codelineno-24-52"></a>                <span class="n">title</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">title</span><span class="p">,</span>
+</span><span id="__span-24-53"><a id="__codelineno-24-53" name="__codelineno-24-53" href="#__codelineno-24-53"></a>                <span class="n">body</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">body</span><span class="p">,</span>
+</span><span id="__span-24-54"><a id="__codelineno-24-54" name="__codelineno-24-54" href="#__codelineno-24-54"></a>                <span class="n">hashtags</span><span class="o">=</span><span class="n">job</span><span class="o">.</span><span class="n">hashtags</span><span class="p">,</span>
+</span><span id="__span-24-55"><a id="__codelineno-24-55" name="__codelineno-24-55" href="#__codelineno-24-55"></a>                <span class="n">progress_callback</span><span class="o">=</span><span class="n">progress_callback</span><span class="p">,</span>
+</span><span id="__span-24-56"><a id="__codelineno-24-56" name="__codelineno-24-56" href="#__codelineno-24-56"></a>            <span class="p">)</span>
+</span><span id="__span-24-57"><a id="__codelineno-24-57" name="__codelineno-24-57" href="#__codelineno-24-57"></a>
+</span><span id="__span-24-58"><a id="__codelineno-24-58" name="__codelineno-24-58" href="#__codelineno-24-58"></a>        <span class="k">return</span> <span class="n">success</span>
+</span></code></pre></div>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 3: 验证语法</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-25-1"><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>python<span class="w"> </span>-m<span class="w"> </span>py_compile<span class="w"> </span>pixelle_video/services/android_device_dispatcher.py
+</span></code></pre></div>
+<p>Expected: 无输出表示语法正确</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 4: Commit 调度器简化</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-26-1"><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>git<span class="w"> </span>add<span class="w"> </span>pixelle_video/services/android_device_dispatcher.py
+</span><span id="__span-26-2"><a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;refactor: simplify android_device_dispatcher to hardware-only mode&quot;</span>
+</span></code></pre></div>
+<hr />
+<h2 id="task-7-api">Task 7: 清理 API 路由引用<a class="headerlink" href="#task-7-api" title="Permanent link">&para;</a></h2>
+<p><strong>Files:</strong>
+- Modify: <code>api/routers/__init__.py</code> (删除 phone_agent_router 导入和导出)
+- Modify: <code>api/app.py</code> (删除 phone_agent_router 注册)</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 1: 从 <strong>init</strong>.py 删除导入</strong></li>
+</ul>
+<p>在 <code>api/routers/__init__.py</code> 中删除:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-27-1"><a id="__codelineno-27-1" name="__codelineno-27-1" href="#__codelineno-27-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">api.routers.phone_agent</span><span class="w"> </span><span class="kn">import</span> <span class="n">router</span> <span class="k">as</span> <span class="n">phone_agent_router</span>
+</span></code></pre></div>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 2: 从 <strong>all</strong> 删除导出</strong></li>
+</ul>
+<p>在 <code>api/routers/__init__.py</code> 的 <code>__all__</code> 列表中删除:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-28-1"><a id="__codelineno-28-1" name="__codelineno-28-1" href="#__codelineno-28-1"></a><span class="s2">&quot;phone_agent_router&quot;</span><span class="p">,</span>
+</span></code></pre></div>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 3: 从 app.py 删除路由注册</strong></li>
+</ul>
+<p>在 <code>api/app.py</code> 中删除:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-29-1"><a id="__codelineno-29-1" name="__codelineno-29-1" href="#__codelineno-29-1"></a><span class="n">app</span><span class="o">.</span><span class="n">include_router</span><span class="p">(</span><span class="n">phone_agent_router</span><span class="p">)</span>
+</span></code></pre></div>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 4: 验证 API 启动</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-30-1"><a id="__codelineno-30-1" name="__codelineno-30-1" href="#__codelineno-30-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;from api.app import app; print(&#39;API app loaded successfully&#39;)&quot;</span>
+</span></code></pre></div>
+<p>Expected: <code>API app loaded successfully</code></p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 5: Commit API 路由清理</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-31-1"><a id="__codelineno-31-1" name="__codelineno-31-1" href="#__codelineno-31-1"></a>git<span class="w"> </span>add<span class="w"> </span>api/routers/__init__.py<span class="w"> </span>api/app.py
+</span><span id="__span-31-2"><a id="__codelineno-31-2" name="__codelineno-31-2" href="#__codelineno-31-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;refactor: remove phone_agent router from API&quot;</span>
+</span></code></pre></div>
+<hr />
+<h2 id="task-8-web-ui-settings">Task 8: 清理 Web UI Settings 页面<a class="headerlink" href="#task-8-web-ui-settings" title="Permanent link">&para;</a></h2>
+<p><strong>Files:</strong>
+- Modify: <code>web/views/9_Settings.py:159-190</code> (删除 Phone Agent 状态卡片)
+- Modify: <code>web/views/9_Settings.py:252-378</code> (删除 Phone Agent 配置区域)</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 1: 读取当前文件结构</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-32-1"><a id="__codelineno-32-1" name="__codelineno-32-1" href="#__codelineno-32-1"></a>grep<span class="w"> </span>-n<span class="w"> </span><span class="s2">&quot;Phone Agent&quot;</span><span class="w"> </span>web/views/9_Settings.py
+</span></code></pre></div>
+<p>Expected: 显示所有 Phone Agent 相关行号</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 2: 删除 Phone Agent 状态卡片（约 159-190 行）</strong></li>
+</ul>
+<p>删除包含以下内容的代码块:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-33-1"><a id="__codelineno-33-1" name="__codelineno-33-1" href="#__codelineno-33-1"></a><span class="c1"># ── Phone Agent ──</span>
+</span><span id="__span-33-2"><a id="__codelineno-33-2" name="__codelineno-33-2" href="#__codelineno-33-2"></a><span class="n">pa_url</span> <span class="o">=</span> <span class="n">cfg</span><span class="o">.</span><span class="n">phone_agent</span><span class="o">.</span><span class="n">url</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span>
+</span><span id="__span-33-3"><a id="__codelineno-33-3" name="__codelineno-33-3" href="#__codelineno-33-3"></a><span class="c1"># ... 整个 Phone Agent 状态检查逻辑</span>
+</span><span id="__span-33-4"><a id="__codelineno-33-4" name="__codelineno-33-4" href="#__codelineno-33-4"></a><span class="n">_status_card</span><span class="p">(</span><span class="s2">&quot;Phone Agent（HTTP）&quot;</span><span class="p">,</span> <span class="n">pa_ok</span><span class="p">,</span> <span class="n">pa_detail</span><span class="p">)</span>
+</span></code></pre></div>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 3: 删除 Phone Agent 配置区域（约 252-378 行）</strong></li>
+</ul>
+<p>删除整个配置区域:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-34-1"><a id="__codelineno-34-1" name="__codelineno-34-1" href="#__codelineno-34-1"></a><span class="c1"># ── 6. Phone Agent 配置 ─────────────────────────────────────────</span>
+</span><span id="__span-34-2"><a id="__codelineno-34-2" name="__codelineno-34-2" href="#__codelineno-34-2"></a><span class="k">with</span> <span class="n">st</span><span class="o">.</span><span class="n">expander</span><span class="p">(</span><span class="s2">&quot;📱 6. Phone Agent 配置&quot;</span><span class="p">,</span> <span class="n">expanded</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+</span><span id="__span-34-3"><a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a>    <span class="c1"># ... 所有 phone_agent 配置 UI</span>
+</span></code></pre></div>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 4: 验证 Streamlit 语法</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-35-1"><a id="__codelineno-35-1" name="__codelineno-35-1" href="#__codelineno-35-1"></a>python<span class="w"> </span>-m<span class="w"> </span>py_compile<span class="w"> </span>web/views/9_Settings.py
+</span></code></pre></div>
+<p>Expected: 无输出表示语法正确</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 5: Commit Settings 页面清理</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-36-1"><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a>git<span class="w"> </span>add<span class="w"> </span>web/views/9_Settings.py
+</span><span id="__span-36-2"><a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;refactor: remove phone_agent config from Settings UI&quot;</span>
+</span></code></pre></div>
+<hr />
+<h2 id="task-9-web-ui-publish-post">Task 9: 清理 Web UI Publish 和 Post 页面<a class="headerlink" href="#task-9-web-ui-publish-post" title="Permanent link">&para;</a></h2>
+<p><strong>Files:</strong>
+- Modify: <code>web/views/4_Publish.py</code> (删除 phone_agent 设备选择)
+- Modify: <code>web/views/_post.py</code> (删除 phone_agent 发布选项)</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 1: 检查 Publish 页面中的 phone_agent 引用</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-37-1"><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a>grep<span class="w"> </span>-n<span class="w"> </span><span class="s2">&quot;phone_agent\|Phone Agent\|termux&quot;</span><span class="w"> </span>web/views/4_Publish.py
+</span></code></pre></div>
+<p>Expected: 显示所有相关引用</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 2: 删除 Publish 页面中的 phone_agent 相关代码</strong></li>
+</ul>
+<p>删除所有 phone_agent 相关的设备选择 UI 和 Termux 配置提示。</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 3: 检查 Post 页面中的 phone_agent 引用</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-38-1"><a id="__codelineno-38-1" name="__codelineno-38-1" href="#__codelineno-38-1"></a>grep<span class="w"> </span>-n<span class="w"> </span><span class="s2">&quot;phone_agent\|Phone Agent&quot;</span><span class="w"> </span>web/views/_post.py
+</span></code></pre></div>
+<p>Expected: 显示所有相关引用</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 4: 删除 Post 页面中的 phone_agent 相关代码</strong></li>
+</ul>
+<p>删除所有 phone_agent 相关的发布选项和设备状态显示。</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 5: 验证语法</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-39-1"><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a>python<span class="w"> </span>-m<span class="w"> </span>py_compile<span class="w"> </span>web/views/4_Publish.py
+</span><span id="__span-39-2"><a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a>python<span class="w"> </span>-m<span class="w"> </span>py_compile<span class="w"> </span>web/views/_post.py
+</span></code></pre></div>
+<p>Expected: 无输出表示语法正确</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 6: Commit Web UI 清理</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-40-1"><a id="__codelineno-40-1" name="__codelineno-40-1" href="#__codelineno-40-1"></a>git<span class="w"> </span>add<span class="w"> </span>web/views/4_Publish.py<span class="w"> </span>web/views/_post.py
+</span><span id="__span-40-2"><a id="__codelineno-40-2" name="__codelineno-40-2" href="#__codelineno-40-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;refactor: remove phone_agent references from Publish and Post UI&quot;</span>
+</span></code></pre></div>
+<hr />
+<h2 id="task-10">Task 10: 清理未使用的导入<a class="headerlink" href="#task-10" title="Permanent link">&para;</a></h2>
+<p><strong>Files:</strong>
+- Modify: 所有修改过的文件（清理未使用的导入）</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 1: 使用 ruff 检查未使用的导入</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-41-1"><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a>ruff<span class="w"> </span>check<span class="w"> </span>--select<span class="w"> </span>F401<span class="w"> </span>pixelle_video/services/
+</span><span id="__span-41-2"><a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a>ruff<span class="w"> </span>check<span class="w"> </span>--select<span class="w"> </span>F401<span class="w"> </span>api/routers/
+</span><span id="__span-41-3"><a id="__codelineno-41-3" name="__codelineno-41-3" href="#__codelineno-41-3"></a>ruff<span class="w"> </span>check<span class="w"> </span>--select<span class="w"> </span>F401<span class="w"> </span>web/views/
+</span></code></pre></div>
+<p>Expected: 显示所有未使用的导入</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 2: 自动修复未使用的导入</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-42-1"><a id="__codelineno-42-1" name="__codelineno-42-1" href="#__codelineno-42-1"></a>ruff<span class="w"> </span>check<span class="w"> </span>--select<span class="w"> </span>F401<span class="w"> </span>--fix<span class="w"> </span>pixelle_video/services/
+</span><span id="__span-42-2"><a id="__codelineno-42-2" name="__codelineno-42-2" href="#__codelineno-42-2"></a>ruff<span class="w"> </span>check<span class="w"> </span>--select<span class="w"> </span>F401<span class="w"> </span>--fix<span class="w"> </span>api/routers/
+</span><span id="__span-42-3"><a id="__codelineno-42-3" name="__codelineno-42-3" href="#__codelineno-42-3"></a>ruff<span class="w"> </span>check<span class="w"> </span>--select<span class="w"> </span>F401<span class="w"> </span>--fix<span class="w"> </span>web/views/
+</span></code></pre></div>
+<p>Expected: 自动删除未使用的导入</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 3: Commit 导入清理</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-43-1"><a id="__codelineno-43-1" name="__codelineno-43-1" href="#__codelineno-43-1"></a>git<span class="w"> </span>add<span class="w"> </span>-A
+</span><span id="__span-43-2"><a id="__codelineno-43-2" name="__codelineno-43-2" href="#__codelineno-43-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;refactor: remove unused imports&quot;</span>
+</span></code></pre></div>
+<hr />
+<h2 id="task-11">Task 11: 验证和测试<a class="headerlink" href="#task-11" title="Permanent link">&para;</a></h2>
+<p><strong>Files:</strong>
+- Test: 所有修改的文件</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 1: 验证配置加载</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-44-1"><a id="__codelineno-44-1" name="__codelineno-44-1" href="#__codelineno-44-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;from pixelle_video.config import config_manager; config_manager.reload(); print(&#39;Config loaded successfully&#39;)&quot;</span>
+</span></code></pre></div>
+<p>Expected: <code>Config loaded successfully</code></p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 2: 验证 API 启动</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-45-1"><a id="__codelineno-45-1" name="__codelineno-45-1" href="#__codelineno-45-1"></a>python<span class="w"> </span>-c<span class="w"> </span><span class="s2">&quot;from api.app import app; print(&#39;API app loaded successfully&#39;)&quot;</span>
+</span></code></pre></div>
+<p>Expected: <code>API app loaded successfully</code></p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 3: 检查文件统计</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-46-1"><a id="__codelineno-46-1" name="__codelineno-46-1" href="#__codelineno-46-1"></a>find<span class="w"> </span>.<span class="w"> </span>-name<span class="w"> </span><span class="s2">&quot;*.py&quot;</span><span class="w"> </span>-type<span class="w"> </span>f<span class="w"> </span><span class="p">|</span><span class="w"> </span>wc<span class="w"> </span>-l
+</span></code></pre></div>
+<p>Expected: 显示减少后的文件数（约 110 个，减少 27%）</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 4: 运行代码质量检查</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-47-1"><a id="__codelineno-47-1" name="__codelineno-47-1" href="#__codelineno-47-1"></a>ruff<span class="w"> </span>check<span class="w"> </span>pixelle_video/<span class="w"> </span>api/<span class="w"> </span>web/
+</span></code></pre></div>
+<p>Expected: 无严重错误</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 5: Commit 验证结果</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-48-1"><a id="__codelineno-48-1" name="__codelineno-48-1" href="#__codelineno-48-1"></a>git<span class="w"> </span>add<span class="w"> </span>-A
+</span><span id="__span-48-2"><a id="__codelineno-48-2" name="__codelineno-48-2" href="#__codelineno-48-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;test: verify refactoring changes&quot;</span>
+</span></code></pre></div>
+<hr />
+<h2 id="task-12">Task 12: 更新文档<a class="headerlink" href="#task-12" title="Permanent link">&para;</a></h2>
+<p><strong>Files:</strong>
+- Modify: <code>README.md</code> (更新配置说明)
+- Create: <code>docs/MIGRATION.md</code> (迁移指南)</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 1: 更新 README.md 配置部分</strong></li>
+</ul>
+<p>在 README.md 中更新配置说明，删除所有 Phone Agent 和 distribution 相关的配置说明。</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 2: 创建迁移指南</strong></li>
+</ul>
+<p>创建 <code>docs/MIGRATION.md</code>:</p>
+<div class="language-markdown highlight"><pre><span></span><code><span id="__span-49-1"><a id="__codelineno-49-1" name="__codelineno-49-1" href="#__codelineno-49-1"></a><span class="gh"># 配置迁移指南</span>
+</span><span id="__span-49-2"><a id="__codelineno-49-2" name="__codelineno-49-2" href="#__codelineno-49-2"></a>
+</span><span id="__span-49-3"><a id="__codelineno-49-3" name="__codelineno-49-3" href="#__codelineno-49-3"></a><span class="gu">## 从 Phone Agent 模式迁移到纯硬件模式</span>
+</span><span id="__span-49-4"><a id="__codelineno-49-4" name="__codelineno-49-4" href="#__codelineno-49-4"></a>
+</span><span id="__span-49-5"><a id="__codelineno-49-5" name="__codelineno-49-5" href="#__codelineno-49-5"></a><span class="gu">### 自动迁移</span>
+</span><span id="__span-49-6"><a id="__codelineno-49-6" name="__codelineno-49-6" href="#__codelineno-49-6"></a>
+</span><span id="__span-49-7"><a id="__codelineno-49-7" name="__codelineno-49-7" href="#__codelineno-49-7"></a>配置加载器会自动忽略以下废弃字段：
+</span><span id="__span-49-8"><a id="__codelineno-49-8" name="__codelineno-49-8" href="#__codelineno-49-8"></a><span class="k">-</span><span class="w"> </span><span class="sb">`phone_agent`</span>
+</span><span id="__span-49-9"><a id="__codelineno-49-9" name="__codelineno-49-9" href="#__codelineno-49-9"></a><span class="k">-</span><span class="w"> </span><span class="sb">`distribution`</span>
+</span><span id="__span-49-10"><a id="__codelineno-49-10" name="__codelineno-49-10" href="#__codelineno-49-10"></a><span class="k">-</span><span class="w"> </span><span class="sb">`distribution_mode`</span>
+</span><span id="__span-49-11"><a id="__codelineno-49-11" name="__codelineno-49-11" href="#__codelineno-49-11"></a>
+</span><span id="__span-49-12"><a id="__codelineno-49-12" name="__codelineno-49-12" href="#__codelineno-49-12"></a><span class="gu">### 手动清理（可选）</span>
+</span><span id="__span-49-13"><a id="__codelineno-49-13" name="__codelineno-49-13" href="#__codelineno-49-13"></a>
+</span><span id="__span-49-14"><a id="__codelineno-49-14" name="__codelineno-49-14" href="#__codelineno-49-14"></a>如果您想手动清理配置文件，删除以下配置块：
+</span><span id="__span-49-15"><a id="__codelineno-49-15" name="__codelineno-49-15" href="#__codelineno-49-15"></a>
+</span><span id="__span-49-16"><a id="__codelineno-49-16" name="__codelineno-49-16" href="#__codelineno-49-16"></a>```yaml
+</span><span id="__span-49-17"><a id="__codelineno-49-17" name="__codelineno-49-17" href="#__codelineno-49-17"></a><span class="gh"># 删除这些配置</span>
+</span><span id="__span-49-18"><a id="__codelineno-49-18" name="__codelineno-49-18" href="#__codelineno-49-18"></a>phone_agent:
+</span><span id="__span-49-19"><a id="__codelineno-49-19" name="__codelineno-49-19" href="#__codelineno-49-19"></a>  url: &#39;&#39;
+</span><span id="__span-49-20"><a id="__codelineno-49-20" name="__codelineno-49-20" href="#__codelineno-49-20"></a>  token: &#39;&#39;
+</span><span id="__span-49-21"><a id="__codelineno-49-21" name="__codelineno-49-21" href="#__codelineno-49-21"></a>
+</span><span id="__span-49-22"><a id="__codelineno-49-22" name="__codelineno-49-22" href="#__codelineno-49-22"></a>distribution_mode: legacy
+</span><span id="__span-49-23"><a id="__codelineno-49-23" name="__codelineno-49-23" href="#__codelineno-49-23"></a>
+</span><span id="__span-49-24"><a id="__codelineno-49-24" name="__codelineno-49-24" href="#__codelineno-49-24"></a>distribution:
+</span><span id="__span-49-25"><a id="__codelineno-49-25" name="__codelineno-49-25" href="#__codelineno-49-25"></a>  mode: phone_agent
+</span></code></pre></div>
+<h3 id="_3">设备数据迁移<a class="headerlink" href="#_3" title="Permanent link">&para;</a></h3>
+<p>如果您之前使用 Phone Agent 设备，这些设备将不再可用。
+请重新注册硬件设备（COM 端口）。</p>
+<h3 id="phone-agent">恢复 Phone Agent（如需要）<a class="headerlink" href="#phone-agent" title="Permanent link">&para;</a></h3>
+<p>如果未来需要恢复 Phone Agent 功能：</p>
+<p><div class="language-bash highlight"><pre><span></span><code><span id="__span-50-1"><a id="__codelineno-50-1" name="__codelineno-50-1" href="#__codelineno-50-1"></a>git<span class="w"> </span>log<span class="w"> </span>--all<span class="w"> </span>--full-history<span class="w"> </span>--<span class="w"> </span><span class="s2">&quot;*phone_agent*&quot;</span>
+</span><span id="__span-50-2"><a id="__codelineno-50-2" name="__codelineno-50-2" href="#__codelineno-50-2"></a>git<span class="w"> </span>checkout<span class="w"> </span>&lt;commit-hash&gt;<span class="w"> </span>--<span class="w"> </span>pixelle_video/services/phone_agent_client.py
+</span></code></pre></div>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-51-1"><a id="__codelineno-51-1" name="__codelineno-51-1" href="#__codelineno-51-1"></a>- [ ] **Step 3: Commit 文档更新**
+</span><span id="__span-51-2"><a id="__codelineno-51-2" name="__codelineno-51-2" href="#__codelineno-51-2"></a>
+</span><span id="__span-51-3"><a id="__codelineno-51-3" name="__codelineno-51-3" href="#__codelineno-51-3"></a>```bash
+</span><span id="__span-51-4"><a id="__codelineno-51-4" name="__codelineno-51-4" href="#__codelineno-51-4"></a>git add README.md docs/MIGRATION.md
+</span><span id="__span-51-5"><a id="__codelineno-51-5" name="__codelineno-51-5" href="#__codelineno-51-5"></a>git commit -m &quot;docs: update README and add migration guide&quot;
+</span></code></pre></div></p>
+<hr />
+<h2 id="task-13">Task 13: 最终验证和合并<a class="headerlink" href="#task-13" title="Permanent link">&para;</a></h2>
+<p><strong>Files:</strong>
+- Test: 整个项目</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 1: 运行完整的代码检查</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-52-1"><a id="__codelineno-52-1" name="__codelineno-52-1" href="#__codelineno-52-1"></a>ruff<span class="w"> </span>check<span class="w"> </span>.
+</span></code></pre></div>
+<p>Expected: 无严重错误</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 2: 验证 Web UI 启动</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-53-1"><a id="__codelineno-53-1" name="__codelineno-53-1" href="#__codelineno-53-1"></a><span class="c1"># 在后台启动 Streamlit（测试用）</span>
+</span><span id="__span-53-2"><a id="__codelineno-53-2" name="__codelineno-53-2" href="#__codelineno-53-2"></a>timeout<span class="w"> </span><span class="m">10</span><span class="w"> </span>streamlit<span class="w"> </span>run<span class="w"> </span>web/app.py<span class="w"> </span>--server.headless<span class="w"> </span><span class="nb">true</span><span class="w"> </span><span class="o">||</span><span class="w"> </span><span class="nb">true</span>
+</span></code></pre></div>
+<p>Expected: Streamlit 能够启动（10 秒后自动停止）</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 3: 查看所有提交</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-54-1"><a id="__codelineno-54-1" name="__codelineno-54-1" href="#__codelineno-54-1"></a>git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span>refactor/ch9329-cleanup<span class="w"> </span>^main
+</span></code></pre></div>
+<p>Expected: 显示所有重构相关的提交</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 4: 创建最终总结提交</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-55-1"><a id="__codelineno-55-1" name="__codelineno-55-1" href="#__codelineno-55-1"></a>git<span class="w"> </span>add<span class="w"> </span>-A
+</span><span id="__span-55-2"><a id="__codelineno-55-2" name="__codelineno-55-2" href="#__codelineno-55-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;refactor: complete CH9329 hardware mode cleanup</span>
+</span><span id="__span-55-3"><a id="__codelineno-55-3" name="__codelineno-55-3" href="#__codelineno-55-3"></a>
+</span><span id="__span-55-4"><a id="__codelineno-55-4" name="__codelineno-55-4" href="#__codelineno-55-4"></a><span class="s2">- Removed 40+ files (Phone Agent, ADB, obsolete test scripts)</span>
+</span><span id="__span-55-5"><a id="__codelineno-55-5" name="__codelineno-55-5" href="#__codelineno-55-5"></a><span class="s2">- Simplified config schema (removed PhoneAgentConfig, DistributionConfig)</span>
+</span><span id="__span-55-6"><a id="__codelineno-55-6" name="__codelineno-55-6" href="#__codelineno-55-6"></a><span class="s2">- Simplified service layer (hardware-only dispatcher)</span>
+</span><span id="__span-55-7"><a id="__codelineno-55-7" name="__codelineno-55-7" href="#__codelineno-55-7"></a><span class="s2">- Cleaned up API routes and Web UI</span>
+</span><span id="__span-55-8"><a id="__codelineno-55-8" name="__codelineno-55-8" href="#__codelineno-55-8"></a><span class="s2">- Updated documentation</span>
+</span><span id="__span-55-9"><a id="__codelineno-55-9" name="__codelineno-55-9" href="#__codelineno-55-9"></a>
+</span><span id="__span-55-10"><a id="__codelineno-55-10" name="__codelineno-55-10" href="#__codelineno-55-10"></a><span class="s2">Code reduction: ~27% (from 150 to 110 Python files)</span>
+</span><span id="__span-55-11"><a id="__codelineno-55-11" name="__codelineno-55-11" href="#__codelineno-55-11"></a><span class="s2">Config simplification: ~38% (from 96 to 60 lines)&quot;</span>
+</span></code></pre></div>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> <strong>Step 5: 推送分支（可选）</strong></li>
+</ul>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-56-1"><a id="__codelineno-56-1" name="__codelineno-56-1" href="#__codelineno-56-1"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>refactor/ch9329-cleanup
+</span></code></pre></div>
+<p>Expected: 分支推送成功</p>
+<hr />
+<h2 id="_4">验证清单<a class="headerlink" href="#_4" title="Permanent link">&para;</a></h2>
+<p>完成所有任务后，验证以下项目：</p>
+<ul class="task-list">
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 配置文件加载无错误</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> API 服务可以启动</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Web UI 可以启动</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> Settings 页面不显示 Phone Agent 配置</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 设备管理功能正常</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 代码库减少约 27%（从 ~150 个文件降至 ~110 个）</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 无未使用的导入</li>
+<li class="task-list-item"><label class="task-list-control"><input type="checkbox" disabled/><span class="task-list-indicator"></span></label> 文档已更新</li>
+</ul>
+<h2 id="_5">回滚计划<a class="headerlink" href="#_5" title="Permanent link">&para;</a></h2>
+<p>如果需要回滚：</p>
+<div class="language-bash highlight"><pre><span></span><code><span id="__span-57-1"><a id="__codelineno-57-1" name="__codelineno-57-1" href="#__codelineno-57-1"></a><span class="c1"># 回滚到 main 分支</span>
+</span><span id="__span-57-2"><a id="__codelineno-57-2" name="__codelineno-57-2" href="#__codelineno-57-2"></a>git<span class="w"> </span>checkout<span class="w"> </span>main
+</span><span id="__span-57-3"><a id="__codelineno-57-3" name="__codelineno-57-3" href="#__codelineno-57-3"></a>git<span class="w"> </span>branch<span class="w"> </span>-D<span class="w"> </span>refactor/ch9329-cleanup
+</span><span id="__span-57-4"><a id="__codelineno-57-4" name="__codelineno-57-4" href="#__codelineno-57-4"></a>
+</span><span id="__span-57-5"><a id="__codelineno-57-5" name="__codelineno-57-5" href="#__codelineno-57-5"></a><span class="c1"># 或者从特定提交恢复文件</span>
+</span><span id="__span-57-6"><a id="__codelineno-57-6" name="__codelineno-57-6" href="#__codelineno-57-6"></a>git<span class="w"> </span>checkout<span class="w"> </span>&lt;commit-hash&gt;<span class="w"> </span>--<span class="w"> </span>&lt;file-path&gt;
+</span></code></pre></div>
+<hr />
+<p><strong>预计总时间</strong>: 约 2-3 小时（实际执行时间可能更短，因为是删除操作为主）</p>
+<p><strong>风险等级</strong>: 低（主要是删除操作，可随时从 Git 历史恢复）</p>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="最后更新">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-datetime" title="May 28, 2026 03:36:29 UTC">May 28, 2026 03:36:29</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="创建日期">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-datetime" title="May 28, 2026 03:36:29 UTC">May 28, 2026 03:36:29</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  回到页面顶部
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2025 Pixelle.AI
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/AIDC-AI/Pixelle-Video" target="_blank" rel="noopener" title="GitHub Repository" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "\u5df2\u590d\u5236", "clipboard.copy": "\u590d\u5236", "search.result.more.one": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.more.other": "\u5728\u8be5\u9875\u4e0a\u8fd8\u6709 # \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.none": "\u6ca1\u6709\u627e\u5230\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.one": "\u627e\u5230 1 \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.other": "# \u4e2a\u7b26\u5408\u6761\u4ef6\u7684\u7ed3\u679c", "search.result.placeholder": "\u952e\u5165\u4ee5\u5f00\u59cb\u641c\u7d22", "search.result.term.missing": "\u7f3a\u5c11", "select.version": "\u9009\u62e9\u5f53\u524d\u7248\u672c"}, "version": null}</script>
+    
+    
+      <script src="../../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

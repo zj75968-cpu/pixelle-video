@@ -1,0 +1,2271 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="AI Video Creator - Generate a short video in 3 minutes">
+      
+      
+        <meta name="author" content="Pixelle.AI">
+      
+      
+        <link rel="canonical" href="https://AIDC-AI.github.io/Pixelle-Video/superpowers/specs/2026-05-30-productization-refactor-design/">
+      
+      
+      
+      
+        
+          <link rel="alternate" href="./" hreflang="en">
+        
+          <link rel="alternate" href="../../../zh/superpowers/specs/2026-05-30-productization-refactor-design/" hreflang="zh">
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Productization Refactor Design - Pixelle-Video</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../stylesheets/extra.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#productization-refactor-design" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow md-header--lifted" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="Pixelle-Video" class="md-header__button md-logo" aria-label="Pixelle-Video" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            Pixelle-Video
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Productization Refactor Design
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+      <div class="md-header__option">
+  <div class="md-select">
+    
+    <button class="md-header__button md-icon" aria-label="Select language">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m12.87 15.07-2.54-2.51.03-.03A17.5 17.5 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2zm-2.62 7 1.62-4.33L19.12 17z"/></svg>
+    </button>
+    <div class="md-select__inner">
+      <ul class="md-select__list">
+        
+          <li class="md-select__item">
+            <a href="./" hreflang="en" class="md-select__link">
+              English
+            </a>
+          </li>
+        
+          <li class="md-select__item">
+            <a href="../../../zh/superpowers/specs/2026-05-30-productization-refactor-design/" hreflang="zh" class="md-select__link">
+              中文
+            </a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+</div>
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/AIDC-AI/Pixelle-Video" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AIDC-AI/Pixelle-Video
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+    
+      
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../getting-started/installation/" class="md-tabs__link">
+          
+  
+  
+  Getting Started
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../user-guide/web-ui/" class="md-tabs__link">
+          
+  
+  
+  User Guide
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../gallery/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Gallery
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../tutorials/your-first-video/" class="md-tabs__link">
+          
+  
+  
+  Tutorials
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../reference/api-overview/" class="md-tabs__link">
+          
+  
+  
+  Reference
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../../development/architecture/" class="md-tabs__link">
+          
+  
+  
+  Development
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../faq/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  FAQ
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../../troubleshooting/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Troubleshooting
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+    
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="Pixelle-Video" class="md-nav__button md-logo" aria-label="Pixelle-Video" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    Pixelle-Video
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/AIDC-AI/Pixelle-Video" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    AIDC-AI/Pixelle-Video
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting Started
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/quick-start/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quick Start
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User Guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/web-ui/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Web UI
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/workflows/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflows
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../user-guide/templates/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Templates
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../gallery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gallery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Tutorials
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Tutorials
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/your-first-video/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Your First Video
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/custom-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Custom Style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../tutorials/voice-cloning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Voice Cloning
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/api-overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../reference/config-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Config Schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+          
+        
+        <input class="md-nav__toggle md-toggle md-toggle--indeterminate" type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Development
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/architecture/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../development/contributing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-non-goals" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Non-Goals
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-compatibility-policy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Compatibility Policy
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Compatibility Policy">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#strong-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Strong compatibility
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#medium-compatibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Medium compatibility
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#weak-compatibility-cleanup-candidates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weak compatibility / cleanup candidates
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-target-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Target Architecture
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-configuration-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Configuration Design
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-runtime-profiles" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Runtime Profiles
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-lifecycle-design" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Lifecycle Design
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-application-factory-and-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Application Factory and Context
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-use-case-layer" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Use Case Layer
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-pixellevideocore-compatibility-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. PixelleVideoCore Compatibility Plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-service-and-provider-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Service and Provider Split
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-entry-point-refactor" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Entry Point Refactor
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="13. Entry Point Refactor">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#streamlit" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Streamlit
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fastapi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        FastAPI
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cli-scripts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CLI / scripts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#14-phased-migration-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        14. Phased Migration Plan
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="14. Phased Migration Plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-0-inventory-and-protection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 0: Inventory and protection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-architecture-baseline" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 1: Architecture baseline
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-entry-slimming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 2: Entry slimming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-core-use-case-migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 3: Core use-case migration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-product-delivery-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 4: Product delivery paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-5-legacy-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Phase 5: Legacy cleanup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#15-verification-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        15. Verification Plan
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#16-risks-and-mitigations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        16. Risks and Mitigations
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="16. Risks and Mitigations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#risk-hidden-behavior-changes-from-moving-configuration-code" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk: hidden behavior changes from moving configuration code
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#risk-duplicate-background-jobs-across-streamlit-and-api" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk: duplicate background jobs across Streamlit and API
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#risk-breaking-existing-webapi-flows-during-entry-slimming" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk: breaking existing Web/API flows during entry slimming
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#risk-provider-split-becomes-too-large" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk: provider split becomes too large
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#risk-cleanup-deletes-something-users-depend-on" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Risk: cleanup deletes something users depend on
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#17-success-criteria" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        17. Success Criteria
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="productization-refactor-design">Productization Refactor Design<a class="headerlink" href="#productization-refactor-design" title="Permanent link">&para;</a></h1>
+<p>Date: 2026-05-30</p>
+<h2 id="1-context">1. Context<a class="headerlink" href="#1-context" title="Permanent link">&para;</a></h2>
+<p>Pixelle-Video is a Python 3.11 AI short-video and content creation platform. It currently includes a Streamlit UI, FastAPI backend, video/post generation pipelines, external provider integrations, publishing automation, device automation, Docker assets, local startup scripts, and documentation.</p>
+<p>The refactor goal is a system-wide productization baseline. The project should eventually support three standard delivery paths:</p>
+<ol>
+<li>local one-click use for ordinary users;</li>
+<li>Docker/server deployment for long-running services;</li>
+<li>CLI/API/package use for developers and automation.</li>
+</ol>
+<p>The first implementation stage will not chase visible feature changes. It will establish internal architecture boundaries for configuration, runtime profiles, lifecycle ownership, application factories, and service composition. Existing video generation and publishing flows must remain usable during the migration.</p>
+<h2 id="2-goals">2. Goals<a class="headerlink" href="#2-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Establish a productized architecture baseline before changing delivery paths.</li>
+<li>Keep the main video generation and publishing flows strongly compatible.</li>
+<li>Make entry points thin and explicit: Streamlit, FastAPI, CLI, scripts, and Docker should bootstrap the application rather than own business orchestration.</li>
+<li>Separate configuration schema, loading, migration, and user-scoped persistence.</li>
+<li>Define explicit runtime profiles for local UI, API server, worker, CLI, and development/test usage.</li>
+<li>Centralize scheduler, device manager, and cleanup lifecycle ownership.</li>
+<li>Reduce <code>PixelleVideoCore</code> from an all-purpose service locator into a compatibility facade over clearer factories, context, services, and use cases.</li>
+<li>Prepare the repository for local, Docker, and CLI/API product paths without requiring a large rewrite.</li>
+</ul>
+<h2 id="3-non-goals">3. Non-Goals<a class="headerlink" href="#3-non-goals" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Do not redesign the product UI in the first stage.</li>
+<li>Do not rewrite all pipelines at once.</li>
+<li>Do not remove <code>PixelleVideoCore</code> immediately.</li>
+<li>Do not require users to rewrite existing <code>config.yaml</code> files during the first stage.</li>
+<li>Do not require real external services or physical devices for default automated tests.</li>
+<li>Do not clean every legacy artifact before compatibility paths are in place.</li>
+</ul>
+<h2 id="4-compatibility-policy">4. Compatibility Policy<a class="headerlink" href="#4-compatibility-policy" title="Permanent link">&para;</a></h2>
+<h3 id="strong-compatibility">Strong compatibility<a class="headerlink" href="#strong-compatibility" title="Permanent link">&para;</a></h3>
+<p>These should keep working throughout the first refactor stages:</p>
+<ul>
+<li>primary Streamlit pages;</li>
+<li>video generation flow;</li>
+<li>publishing flow;</li>
+<li>common API endpoints;</li>
+<li>existing <code>config.yaml</code> format;</li>
+<li>user data directories and generated assets.</li>
+</ul>
+<h3 id="medium-compatibility">Medium compatibility<a class="headerlink" href="#medium-compatibility" title="Permanent link">&para;</a></h3>
+<p>These may change with migration notes or compatibility wrappers:</p>
+<ul>
+<li>startup scripts;</li>
+<li>Docker Compose layout;</li>
+<li>CLI entry points;</li>
+<li>developer scripts;</li>
+<li>internal configuration structure.</li>
+</ul>
+<h3 id="weak-compatibility-cleanup-candidates">Weak compatibility / cleanup candidates<a class="headerlink" href="#weak-compatibility-cleanup-candidates" title="Permanent link">&para;</a></h3>
+<p>These may be deprecated, migrated, or removed after inventory:</p>
+<ul>
+<li>old ADB / Phone Agent paths;</li>
+<li><code>.old</code> files;</li>
+<li>runtime debug dumps and screenshots;</li>
+<li>root-level temporary outputs;</li>
+<li>unsupported experimental scripts;</li>
+<li>stale package entry points;</li>
+<li>obsolete binaries not required by supported product flows.</li>
+</ul>
+<h2 id="5-target-architecture">5. Target Architecture<a class="headerlink" href="#5-target-architecture" title="Permanent link">&para;</a></h2>
+<p>The desired architecture separates entry points, application orchestration, domain services, providers, and infrastructure.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-0-1"><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Entry points
+</span><span id="__span-0-2"><a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>├─ web/                 Streamlit UI: pages, interactions, display, use-case calls
+</span><span id="__span-0-3"><a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>├─ api/                 FastAPI HTTP boundary: requests, responses, schemas, errors
+</span><span id="__span-0-4"><a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>├─ CLI / scripts        command entry points: argument parsing and use-case calls
+</span><span id="__span-0-5"><a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>└─ deployment           Docker, local startup scripts, env vars, volumes, logging
+</span><span id="__span-0-6"><a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+</span><span id="__span-0-7"><a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>Application layer
+</span><span id="__span-0-8"><a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>├─ use_cases/           generation, publishing, config, device, task, health flows
+</span><span id="__span-0-9"><a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>├─ lifecycle/           scheduler, device, cleanup startup/shutdown coordination
+</span><span id="__span-0-10"><a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>└─ factories/           create context, services, use cases, compatibility facade
+</span><span id="__span-0-11"><a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
+</span><span id="__span-0-12"><a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>Domain / service layer
+</span><span id="__span-0-13"><a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>├─ pipelines/           video/post/action-transfer generation pipelines
+</span><span id="__span-0-14"><a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>├─ services/            LLM, TTS, media, video, publish, device capabilities
+</span><span id="__span-0-15"><a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>├─ config/              schema, loading, validation, migration, user config service
+</span><span id="__span-0-16"><a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a>└─ models/              domain models, task status, configuration objects
+</span><span id="__span-0-17"><a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>
+</span><span id="__span-0-18"><a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>Infrastructure layer
+</span><span id="__span-0-19"><a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>├─ providers/           OpenAI, Ollama, ComfyUI, RunningHub, Supabase, XHS, CH9329
+</span><span id="__span-0-20"><a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a>├─ storage/             paths, user data, assets, cache, logs
+</span><span id="__span-0-21"><a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a>└─ automation/          physical device automation implementations
+</span></code></pre></div>
+<p>Core principles:</p>
+<ol>
+<li>Entry points only bootstrap runtime state and call use cases.</li>
+<li>Application use cases own business orchestration.</li>
+<li>Lifecycle ownership is explicit and profile-dependent.</li>
+<li>Configuration reads are separated from filesystem mutation.</li>
+<li><code>PixelleVideoCore</code> remains as a compatibility facade while new code depends on use cases or explicit services.</li>
+<li>Legacy cleanup follows the compatibility policy instead of deleting files opportunistically.</li>
+</ol>
+<h2 id="6-configuration-design">6. Configuration Design<a class="headerlink" href="#6-configuration-design" title="Permanent link">&para;</a></h2>
+<p>The current configuration responsibilities should be separated into focused modules:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-1-1"><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pixelle_video/config/
+</span><span id="__span-1-2"><a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>├─ schema.py            configuration structures, defaults, validation rules
+</span><span id="__span-1-3"><a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>├─ loader.py            load and merge config.yaml, env vars, CLI arguments
+</span><span id="__span-1-4"><a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>├─ migrator.py          explicit config version migrations and old-field compatibility
+</span><span id="__span-1-5"><a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>├─ store.py             user-scoped config file read/write/create/save behavior
+</span><span id="__span-1-6"><a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>└─ service.py           business-facing ConfigService facade
+</span></code></pre></div>
+<p>Rules:</p>
+<ul>
+<li><code>schema.py</code> is pure model and validation logic.</li>
+<li><code>loader.py</code> loads and merges sources but does not persist data or create files.</li>
+<li><code>store.py</code> owns filesystem effects: user directories, config copies, saves, backups, permission checks.</li>
+<li><code>migrator.py</code> runs explicitly during startup or save flows.</li>
+<li><code>service.py</code> provides the stable surface consumed by use cases and compatibility code.</li>
+<li>Existing <code>config.yaml</code> remains accepted in the first phase.</li>
+</ul>
+<p>This design supports:</p>
+<ul>
+<li>local use: project/user config files;</li>
+<li>Docker/server use: environment variables and mounted config/data volumes;</li>
+<li>CLI/API use: <code>--config</code>, <code>--user-id</code>, and environment overrides.</li>
+</ul>
+<h2 id="7-runtime-profiles">7. Runtime Profiles<a class="headerlink" href="#7-runtime-profiles" title="Permanent link">&para;</a></h2>
+<p>Introduce an explicit <code>RunProfile</code> instead of letting behavior emerge from the entry file.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-2-1"><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>RunProfile
+</span><span id="__span-2-2"><a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├─ local_ui             Streamlit single-machine use
+</span><span id="__span-2-3"><a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>├─ api_server           FastAPI HTTP service
+</span><span id="__span-2-4"><a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>├─ worker               background publishing, device, and cleanup service
+</span><span id="__span-2-5"><a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>├─ cli                  one-shot command execution
+</span><span id="__span-2-6"><a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>└─ dev                  development/test mode
+</span></code></pre></div>
+<p>Each profile declares:</p>
+<ul>
+<li>whether it may start the scheduler;</li>
+<li>whether it may connect to physical devices;</li>
+<li>whether it needs web session state;</li>
+<li>where logs go;</li>
+<li>which data/cache directories are used;</li>
+<li>configuration source priority;</li>
+<li>whether diagnostics are enabled.</li>
+</ul>
+<p>Default lifecycle expectations:</p>
+<ul>
+<li><code>worker</code> may start publishing scheduler, device manager, and cleanup jobs.</li>
+<li><code>api_server</code> does not start physical device automation unless explicitly enabled.</li>
+<li><code>local_ui</code> may use embedded lifecycle behavior, but protected by single-instance locks to survive Streamlit reloads.</li>
+<li><code>cli</code> does not start long-running background tasks by default.</li>
+<li><code>dev</code> may enable diagnostics and mocks.</li>
+</ul>
+<h2 id="8-lifecycle-design">8. Lifecycle Design<a class="headerlink" href="#8-lifecycle-design" title="Permanent link">&para;</a></h2>
+<p>Create a lifecycle coordination layer:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-3-1"><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pixelle_video/lifecycle/
+</span><span id="__span-3-2"><a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>├─ app_lifecycle.py       application-level startup/shutdown coordination
+</span><span id="__span-3-3"><a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>├─ scheduler_lifecycle.py publishing scheduler lifecycle
+</span><span id="__span-3-4"><a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>├─ device_lifecycle.py    device manager lifecycle
+</span><span id="__span-3-5"><a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>├─ cleanup_lifecycle.py   TTL/temp cleanup lifecycle
+</span><span id="__span-3-6"><a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>└─ locks.py               process/single-instance locks
+</span></code></pre></div>
+<p>Requirements:</p>
+<ul>
+<li>Background services start only from profiles that explicitly own them.</li>
+<li>Scheduler, device manager, and cleanup startup/shutdown calls are idempotent.</li>
+<li>Global resources use locks to prevent duplicate workers across Streamlit reloads or multiple processes.</li>
+<li>Entry files delegate lifecycle to this layer instead of directly creating global tasks.</li>
+<li>Lock failures produce clear logs and user-facing diagnostics where appropriate.</li>
+</ul>
+<h2 id="9-application-factory-and-context">9. Application Factory and Context<a class="headerlink" href="#9-application-factory-and-context" title="Permanent link">&para;</a></h2>
+<p>Add an application composition root:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-4-1"><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pixelle_video/app/
+</span><span id="__span-4-2"><a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>├─ profiles.py           RunProfile definitions
+</span><span id="__span-4-3"><a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>├─ context.py            AppContext: profile, config, paths, logger, user, flags
+</span><span id="__span-4-4"><a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>├─ factory.py            create_app_context, create_core, create_use_cases
+</span><span id="__span-4-5"><a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>└─ errors.py             startup and configuration error types
+</span></code></pre></div>
+<p>Example direction:</p>
+<div class="language-python highlight"><pre><span></span><code><span id="__span-5-1"><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="n">context</span> <span class="o">=</span> <span class="n">create_app_context</span><span class="p">(</span><span class="n">profile</span><span class="o">=</span><span class="n">RunProfile</span><span class="o">.</span><span class="n">LOCAL_UI</span><span class="p">)</span>
+</span><span id="__span-5-2"><a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="n">use_cases</span> <span class="o">=</span> <span class="n">create_use_cases</span><span class="p">(</span><span class="n">context</span><span class="p">)</span>
+</span></code></pre></div>
+<p>The same factory should gradually replace:</p>
+<ul>
+<li>Streamlit session-specific manual core caching;</li>
+<li>FastAPI dependency-specific manual core creation;</li>
+<li>scripts that instantiate <code>ConfigManager</code> or <code>PixelleVideoCore</code> directly;</li>
+<li>duplicated <code>config.yaml</code> loading logic.</li>
+</ul>
+<h2 id="10-use-case-layer">10. Use Case Layer<a class="headerlink" href="#10-use-case-layer" title="Permanent link">&para;</a></h2>
+<p>Add <code>pixelle_video/use_cases/</code> for application orchestration:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-6-1"><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>pixelle_video/use_cases/
+</span><span id="__span-6-2"><a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>├─ generate_video.py       create video tasks and run generation pipelines
+</span><span id="__span-6-3"><a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>├─ generate_post.py        image/text/XHS post generation
+</span><span id="__span-6-4"><a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>├─ publish_content.py      publishing tasks, queues, and execution
+</span><span id="__span-6-5"><a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>├─ manage_config.py        read/save/migrate user configuration
+</span><span id="__span-6-6"><a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>├─ manage_devices.py       detect/select/control devices
+</span><span id="__span-6-7"><a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>├─ manage_tasks.py         query/cancel/cleanup tasks
+</span><span id="__span-6-8"><a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>└─ health_check.py         validate config, dependencies, services, devices
+</span></code></pre></div>
+<p>Rules:</p>
+<ul>
+<li>Web pages call use cases rather than assembling services directly.</li>
+<li>API routers call use cases rather than directly managing pipelines, scheduler, or devices.</li>
+<li>CLI commands call use cases and do not duplicate Web/API logic.</li>
+<li>Use cases may depend on service interfaces and <code>AppContext</code>, but not on Streamlit or FastAPI.</li>
+</ul>
+<p>Suggested migration order:</p>
+<ol>
+<li><code>manage_config</code></li>
+<li><code>health_check</code></li>
+<li><code>manage_tasks</code></li>
+<li><code>publish_content</code></li>
+<li><code>manage_devices</code></li>
+<li><code>generate_post</code></li>
+<li><code>generate_video</code></li>
+</ol>
+<p>This order starts with lower-risk boundaries before moving the most important generation and device flows.</p>
+<h2 id="11-pixellevideocore-compatibility-plan">11. <code>PixelleVideoCore</code> Compatibility Plan<a class="headerlink" href="#11-pixellevideocore-compatibility-plan" title="Permanent link">&para;</a></h2>
+<p><code>PixelleVideoCore</code> should not be removed in the first stage. It becomes a compatibility facade.</p>
+<p>Current direction:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-7-1"><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>web/api/scripts -&gt; PixelleVideoCore -&gt; services/pipelines/config
+</span></code></pre></div>
+<p>Target direction:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-8-1"><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>web/api/scripts -&gt; use_cases -&gt; services/pipelines/config/providers
+</span></code></pre></div>
+<p>Compatibility period:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-9-1"><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>PixelleVideoCore -&gt; AppContext + UseCaseRegistry + ServiceRegistry
+</span></code></pre></div>
+<p>Migration steps:</p>
+<ol>
+<li>Make <code>PixelleVideoCore</code> internally use the new context and factory where possible.</li>
+<li>Keep public attributes and methods stable for existing callers.</li>
+<li>Prevent new code from adding fresh <code>core.xxx</code> dependencies.</li>
+<li>Replace old <code>core.xxx</code> call sites incrementally with use cases.</li>
+<li>Later decide whether to keep a thin facade or remove it in a breaking release.</li>
+</ol>
+<h2 id="12-service-and-provider-split">12. Service and Provider Split<a class="headerlink" href="#12-service-and-provider-split" title="Permanent link">&para;</a></h2>
+<p>Gradually distinguish business services from external adapters.</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-10-1"><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>pixelle_video/services/
+</span><span id="__span-10-2"><a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>├─ llm_service.py          business-facing LLM capability
+</span><span id="__span-10-3"><a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>├─ tts_service.py          business-facing TTS capability
+</span><span id="__span-10-4"><a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>├─ media_service.py        media processing capability
+</span><span id="__span-10-5"><a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>├─ video_service.py        video composition capability
+</span><span id="__span-10-6"><a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>├─ publish_service.py      publishing business capability
+</span><span id="__span-10-7"><a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>└─ device_service.py       device business capability
+</span><span id="__span-10-8"><a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>
+</span><span id="__span-10-9"><a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>pixelle_video/providers/
+</span><span id="__span-10-10"><a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>├─ llm/openai_provider.py
+</span><span id="__span-10-11"><a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>├─ llm/ollama_provider.py
+</span><span id="__span-10-12"><a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>├─ comfyui/provider.py
+</span><span id="__span-10-13"><a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>├─ runninghub/provider.py
+</span><span id="__span-10-14"><a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>├─ storage/file_provider.py
+</span><span id="__span-10-15"><a id="__codelineno-10-15" name="__codelineno-10-15" href="#__codelineno-10-15"></a>├─ publish/xhs_provider.py
+</span><span id="__span-10-16"><a id="__codelineno-10-16" name="__codelineno-10-16" href="#__codelineno-10-16"></a>└─ hardware/ch9329_provider.py
+</span></code></pre></div>
+<p>Services express what the product needs. Providers express how external systems are called. This enables mock testing, provider replacement, and cleaner Docker/CLI/API boundaries.</p>
+<h2 id="13-entry-point-refactor">13. Entry Point Refactor<a class="headerlink" href="#13-entry-point-refactor" title="Permanent link">&para;</a></h2>
+<h3 id="streamlit">Streamlit<a class="headerlink" href="#streamlit" title="Permanent link">&para;</a></h3>
+<p>Split <code>web/app.py</code> into focused modules:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-11-1"><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>web/
+</span><span id="__span-11-2"><a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>├─ app.py                  thin Streamlit entry
+</span><span id="__span-11-3"><a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>├─ bootstrap.py            page registration and session initialization
+</span><span id="__span-11-4"><a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>├─ auth.py                 login, cookies, user context
+</span><span id="__span-11-5"><a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>├─ navigation.py           page navigation
+</span><span id="__span-11-6"><a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>├─ diagnostics.py          dev-only startup/page diagnostics
+</span><span id="__span-11-7"><a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>├─ state/session.py        Streamlit session adapter
+</span><span id="__span-11-8"><a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>└─ views/
+</span></code></pre></div>
+<p>Split the publishing view into smaller UI components:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-12-1"><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>web/views/publish/
+</span><span id="__span-12-2"><a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>├─ page.py                 page skeleton
+</span><span id="__span-12-3"><a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>├─ queue_panel.py          publishing queue
+</span><span id="__span-12-4"><a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>├─ device_panel.py         device status
+</span><span id="__span-12-5"><a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>├─ task_actions.py         publishing actions
+</span><span id="__span-12-6"><a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>├─ scheduler_panel.py      scheduler status
+</span><span id="__span-12-7"><a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>└─ forms.py                forms and shared controls
+</span></code></pre></div>
+<h3 id="fastapi">FastAPI<a class="headerlink" href="#fastapi" title="Permanent link">&para;</a></h3>
+<p>Keep API modules focused on HTTP boundary concerns:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-13-1"><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>api/
+</span><span id="__span-13-2"><a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>├─ app.py                  create_api_app(profile=RunProfile.API_SERVER)
+</span><span id="__span-13-3"><a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>├─ dependencies.py         context/use-case providers
+</span><span id="__span-13-4"><a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>├─ error_handlers.py       unified error mapping
+</span><span id="__span-13-5"><a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>├─ routers/
+</span><span id="__span-13-6"><a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>└─ schemas/
+</span></code></pre></div>
+<p>Routers should not directly own lifecycle, device, scheduler, or pipeline construction.</p>
+<h3 id="cli-scripts">CLI / scripts<a class="headerlink" href="#cli-scripts" title="Permanent link">&para;</a></h3>
+<p>Repair or remove stale console entry points. The productized CLI should eventually provide at least:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-14-1"><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>pixelle-video health
+</span><span id="__span-14-2"><a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>pixelle-video init-config
+</span><span id="__span-14-3"><a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>pixelle-video run-worker
+</span><span id="__span-14-4"><a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>pixelle-video create-video
+</span></code></pre></div>
+<p>Scripts should become thin wrappers around these commands or be moved to documented developer-only locations.</p>
+<h2 id="14-phased-migration-plan">14. Phased Migration Plan<a class="headerlink" href="#14-phased-migration-plan" title="Permanent link">&para;</a></h2>
+<h3 id="phase-0-inventory-and-protection">Phase 0: Inventory and protection<a class="headerlink" href="#phase-0-inventory-and-protection" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Inventory entry points: Streamlit, FastAPI, startup scripts, Docker Compose, CLI, operational scripts.</li>
+<li>Confirm whether <code>pixelle_video.cli:main</code> exists and is supported.</li>
+<li>Inventory main flows: config load, web video creation, API task creation/query, publishing scheduler, device control, Docker startup.</li>
+<li>Add minimal smoke/unit tests before large movement.</li>
+</ul>
+<p>Acceptance:</p>
+<ul>
+<li>Entry-point and main-flow inventory exists.</li>
+<li>Initial safety tests exist for config load, API app creation, lifecycle idempotency, and CLI presence or documented absence.</li>
+</ul>
+<h3 id="phase-1-architecture-baseline">Phase 1: Architecture baseline<a class="headerlink" href="#phase-1-architecture-baseline" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add <code>pixelle_video/app/</code>, <code>pixelle_video/lifecycle/</code>, and supporting config/storage boundaries.</li>
+<li>Define <code>RunProfile</code> and <code>AppContext</code>.</li>
+<li>Split configuration responsibilities behind compatibility wrappers.</li>
+<li>Add lifecycle coordinator and locks.</li>
+<li>Let old <code>ConfigManager</code> and <code>PixelleVideoCore</code> delegate to the new implementation where practical.</li>
+</ul>
+<p>Acceptance:</p>
+<ul>
+<li>All supported entry points declare a profile.</li>
+<li>Configuration reading and writing side effects are separated.</li>
+<li>Scheduler/device/cleanup cannot be started accidentally by multiple owners.</li>
+<li>Existing config files still load.</li>
+</ul>
+<h3 id="phase-2-entry-slimming">Phase 2: Entry slimming<a class="headerlink" href="#phase-2-entry-slimming" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Make <code>web/app.py</code> a thin bootstrap entry.</li>
+<li>Move auth, navigation, diagnostics, and session behavior into focused modules.</li>
+<li>Make <code>api/app.py</code> expose <code>create_api_app</code>.</li>
+<li>Keep API dependencies responsible for request/application-scoped context and use-case providers.</li>
+</ul>
+<p>Acceptance:</p>
+<ul>
+<li>Web still opens.</li>
+<li>API app still creates successfully.</li>
+<li>Background tasks are lifecycle-owned.</li>
+<li>Entry files contain less business and diagnostic logic.</li>
+</ul>
+<h3 id="phase-3-core-use-case-migration">Phase 3: Core use-case migration<a class="headerlink" href="#phase-3-core-use-case-migration" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Add <code>pixelle_video/use_cases/</code>.</li>
+<li>Migrate config, health check, task management, publishing, device, post, and video generation orchestration in that order.</li>
+<li>Keep <code>PixelleVideoCore</code> as facade for old callers.</li>
+</ul>
+<p>Acceptance:</p>
+<ul>
+<li>At least one Web/API/CLI path shares a common use case.</li>
+<li>New code avoids new direct <code>core.xxx</code> dependencies.</li>
+<li>Key use cases have unit tests with mocked services/providers.</li>
+</ul>
+<h3 id="phase-4-product-delivery-paths">Phase 4: Product delivery paths<a class="headerlink" href="#phase-4-product-delivery-paths" title="Permanent link">&para;</a></h3>
+<p>Local one-click path:</p>
+<ul>
+<li>normalize <code>start_web.bat</code> / <code>start_web.sh</code>;</li>
+<li>make first-run config initialization explicit;</li>
+<li>stabilize log/cache/output directories;</li>
+<li>show readable missing-dependency/config errors.</li>
+</ul>
+<p>Docker/server path:</p>
+<ul>
+<li>split Compose responsibilities into api, web, worker, and optional tunnel/proxy as appropriate;</li>
+<li>prefer env vars and mounted volumes over source-tree mutation;</li>
+<li>send logs to stdout or declared volumes;</li>
+<li>make worker profile own scheduler/device/cleanup by default.</li>
+</ul>
+<p>CLI/API/developer path:</p>
+<ul>
+<li>repair or remove the stale package entry point;</li>
+<li>implement basic CLI commands around use cases;</li>
+<li>align API schemas with use-case DTOs;</li>
+<li>document developer invocation paths.</li>
+</ul>
+<p>Acceptance:</p>
+<ul>
+<li>Each delivery path has a documented standard entry.</li>
+<li>Docker does not rely on mutating source-tree <code>config.yaml</code>.</li>
+<li>Installed CLI can show help and run health checks.</li>
+</ul>
+<h3 id="phase-5-legacy-cleanup">Phase 5: Legacy cleanup<a class="headerlink" href="#phase-5-legacy-cleanup" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Classify old ADB/Phone Agent artifacts, <code>.old</code> files, runtime debug assets, temporary outputs, unsupported scripts, and obsolete binaries.</li>
+<li>Migrate or deprecate user-facing scripts before removal.</li>
+<li>Remove only after references in docs, startup scripts, and supported flows are checked.</li>
+<li>Update README, usage guide, and deployment docs.</li>
+</ul>
+<p>Acceptance:</p>
+<ul>
+<li>Product structure no longer mixes runtime dumps and unsupported historical paths with supported code.</li>
+<li>Any removals have a clear compatibility note or migration path.</li>
+</ul>
+<h2 id="15-verification-plan">15. Verification Plan<a class="headerlink" href="#15-verification-plan" title="Permanent link">&para;</a></h2>
+<p>Default verification per phase:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-15-1"><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>ruff check
+</span><span id="__span-15-2"><a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>pytest tests/unit
+</span><span id="__span-15-3"><a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>pytest tests/integration -m &quot;not external&quot;
+</span><span id="__span-15-4"><a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>API app creation smoke
+</span><span id="__span-15-5"><a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>Config load smoke
+</span><span id="__span-15-6"><a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>Lifecycle idempotency tests
+</span></code></pre></div>
+<p>When delivery paths are touched:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-16-1"><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>Streamlit bootstrap smoke
+</span><span id="__span-16-2"><a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>Docker Compose config validation
+</span><span id="__span-16-3"><a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>CLI --help / health smoke
+</span></code></pre></div>
+<p>When publishing or devices are touched:</p>
+<div class="language-text highlight"><pre><span></span><code><span id="__span-17-1"><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>publish scheduler dry-run
+</span><span id="__span-17-2"><a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>device manager mock test
+</span><span id="__span-17-3"><a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>CH9329 provider mock/contract test
+</span></code></pre></div>
+<p>Real ComfyUI, RunningHub, XHS, Supabase, and physical-device tests should be marked manual or environment-gated. They should not block default local verification unless explicitly requested.</p>
+<h2 id="16-risks-and-mitigations">16. Risks and Mitigations<a class="headerlink" href="#16-risks-and-mitigations" title="Permanent link">&para;</a></h2>
+<h3 id="risk-hidden-behavior-changes-from-moving-configuration-code">Risk: hidden behavior changes from moving configuration code<a class="headerlink" href="#risk-hidden-behavior-changes-from-moving-configuration-code" title="Permanent link">&para;</a></h3>
+<p>Mitigation: keep <code>ConfigManager</code> compatibility wrappers, add config load/save tests, and make migration explicit.</p>
+<h3 id="risk-duplicate-background-jobs-across-streamlit-and-api">Risk: duplicate background jobs across Streamlit and API<a class="headerlink" href="#risk-duplicate-background-jobs-across-streamlit-and-api" title="Permanent link">&para;</a></h3>
+<p>Mitigation: use profile-based lifecycle ownership, idempotent start/stop, and process locks.</p>
+<h3 id="risk-breaking-existing-webapi-flows-during-entry-slimming">Risk: breaking existing Web/API flows during entry slimming<a class="headerlink" href="#risk-breaking-existing-webapi-flows-during-entry-slimming" title="Permanent link">&para;</a></h3>
+<p>Mitigation: thin entries incrementally and keep routers/pages calling existing facade until corresponding use cases are ready.</p>
+<h3 id="risk-provider-split-becomes-too-large">Risk: provider split becomes too large<a class="headerlink" href="#risk-provider-split-becomes-too-large" title="Permanent link">&para;</a></h3>
+<p>Mitigation: split providers only when touching the relevant service for a use case or product path.</p>
+<h3 id="risk-cleanup-deletes-something-users-depend-on">Risk: cleanup deletes something users depend on<a class="headerlink" href="#risk-cleanup-deletes-something-users-depend-on" title="Permanent link">&para;</a></h3>
+<p>Mitigation: classify first, check docs and entry references, deprecate before deletion when user-facing.</p>
+<h2 id="17-success-criteria">17. Success Criteria<a class="headerlink" href="#17-success-criteria" title="Permanent link">&para;</a></h2>
+<p>The refactor is successful when:</p>
+<ul>
+<li>each supported entry point has an explicit runtime profile;</li>
+<li>configuration source, validation, migration, and persistence responsibilities are separate;</li>
+<li>scheduler, device manager, and cleanup ownership are clear and not duplicated accidentally;</li>
+<li><code>web/app.py</code> and <code>api/app.py</code> are thin bootstraps;</li>
+<li>new business orchestration lives in use cases;</li>
+<li><code>PixelleVideoCore</code> remains compatible but is no longer the default dependency for new code;</li>
+<li>local, Docker/server, and CLI/API paths each have a documented standard route;</li>
+<li>tests protect configuration, lifecycle, app creation, and selected use cases;</li>
+<li>legacy artifacts are classified and no longer obscure supported product structure.</li>
+</ul>
+
+
+
+
+
+
+
+  
+    
+  
+  
+    
+  
+
+
+  <aside class="md-source-file">
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Last update">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M21 13.1c-.1 0-.3.1-.4.2l-1 1 2.1 2.1 1-1c.2-.2.2-.6 0-.8l-1.3-1.3c-.1-.1-.2-.2-.4-.2m-1.9 1.8-6.1 6V23h2.1l6.1-6.1zM12.5 7v5.2l4 2.4-1 1L11 13V7zM11 21.9c-5.1-.5-9-4.8-9-9.9C2 6.5 6.5 2 12 2c5.3 0 9.6 4.1 10 9.3-.3-.1-.6-.2-1-.2s-.7.1-1 .2C19.6 7.2 16.2 4 12 4c-4.4 0-8 3.6-8 8 0 4.1 3.1 7.5 7.1 7.9l-.1.2z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-datetime" title="May 29, 2026 22:46:56 UTC">May 29, 2026 22:46:56</span>
+  </span>
+
+    
+    
+      
+  <span class="md-source-file__fact">
+    <span class="md-icon" title="Created">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M14.47 15.08 11 13V7h1.5v5.25l3.08 1.83c-.41.28-.79.62-1.11 1m-1.39 4.84c-.36.05-.71.08-1.08.08-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8c0 .37-.03.72-.08 1.08.69.1 1.33.32 1.92.64.1-.56.16-1.13.16-1.72 0-5.5-4.5-10-10-10S2 6.5 2 12s4.47 10 10 10c.59 0 1.16-.06 1.72-.16-.32-.59-.54-1.23-.64-1.92M18 15v3h-3v2h3v3h2v-3h3v-2h-3v-3z"/></svg>
+    </span>
+    <span class="git-revision-date-localized-plugin git-revision-date-localized-plugin-datetime" title="May 29, 2026 22:46:56 UTC">May 29, 2026 22:46:56</span>
+  </span>
+
+    
+    
+    
+  </aside>
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; 2025 Pixelle.AI
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/AIDC-AI/Pixelle-Video" target="_blank" rel="noopener" title="GitHub Repository" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["navigation.instant", "navigation.tracking", "navigation.tabs", "navigation.tabs.sticky", "navigation.sections", "navigation.expand", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "search.share", "content.code.copy", "content.code.annotate", "content.tabs.link"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
