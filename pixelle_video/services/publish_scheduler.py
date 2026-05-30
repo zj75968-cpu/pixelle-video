@@ -642,7 +642,7 @@ class PublishScheduler:
     async def _execute_job(self, job_id: str):
         """Execute a publish job (serialized per device) with automatic retry."""
         job = self._jobs.get(job_id)
-        if not job or job.status == JobStatus.CANCELLED:
+        if not job or job.status not in (JobStatus.PENDING, JobStatus.SCHEDULED):
             return
 
         from pixelle_video.utils.user_context import set_current_user
@@ -658,8 +658,8 @@ class PublishScheduler:
         device_lock = self._device_locks[job.serial]
 
         async with device_lock:
-            # Re-check after acquiring lock (may have been cancelled while waiting)
-            if job.status == JobStatus.CANCELLED:
+            # Re-check after acquiring lock (status may have changed while waiting).
+            if job.status not in (JobStatus.PENDING, JobStatus.SCHEDULED):
                 return
 
             job.status = JobStatus.RUNNING

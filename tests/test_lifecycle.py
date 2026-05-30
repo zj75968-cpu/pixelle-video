@@ -243,6 +243,113 @@ def test_publish_scheduler_start_scheduler_is_idempotent(monkeypatch):
     ]
 
 
+def test_publish_scheduler_execute_job_ignores_in_flight_and_terminal_jobs(monkeypatch):
+    scheduler_module = importlib.import_module("pixelle_video.services.publish_scheduler")
+
+    calls = []
+
+    class FakeDataDir:
+        def mkdir(self, *args, **kwargs):
+            calls.append("DATA_DIR.mkdir")
+
+    monkeypatch.setattr(scheduler_module, "DATA_DIR", FakeDataDir())
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_load", lambda self: None)
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_recover_orphaned_running_jobs", lambda self: None)
+
+    async def fake_execute_impl(self, job):
+        calls.append(("execute", job.status))
+
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_execute_job_impl", fake_execute_impl)
+
+    scheduler = scheduler_module.PublishScheduler()
+    guarded_statuses = [
+        scheduler_module.JobStatus.RUNNING,
+        scheduler_module.JobStatus.SUCCESS,
+        scheduler_module.JobStatus.FAILED,
+        scheduler_module.JobStatus.CANCELLED,
+    ]
+    for status in guarded_statuses:
+        job = scheduler_module.PublishJob(
+            job_id=status,
+            serial="device-1",
+            task_id=f"task-{status}",
+            title="title",
+            body="body",
+            hashtags=[],
+            images=[],
+        )
+        job.status = status
+        scheduler._jobs[job.job_id] = job
+        asyncio.run(scheduler._execute_job(job.job_id))
+
+    assert calls == ["DATA_DIR.mkdir"]
+
+
+def test_publish_scheduler_execute_job_rechecks_status_after_device_lock(monkeypatch):
+    scheduler_module = importlib.import_module("pixelle_video.services.publish_scheduler")
+
+    calls = []
+
+    class FakeDataDir:
+        def mkdir(self, *args, **kwargs):
+            calls.append("DATA_DIR.mkdir")
+
+    class MutatingLock:
+        def __init__(self, job):
+            self._job = job
+
+        async def __aenter__(self):
+            self._job.status = scheduler_module.JobStatus.SUCCESS
+
+        async def __aexit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeAdapter:
+        async def execute_job(self, job, progress_callback):
+            calls.append(("execute", job.status))
+            return True
+
+    class FakeDispatcherModule:
+        @staticmethod
+        def DistributionAdapter():
+            return FakeAdapter()
+
+    class FakePublisherModule:
+        class XHSPublisher:
+            @staticmethod
+            def _resolve_adb():
+                return "adb"
+
+    monkeypatch.setattr(scheduler_module, "DATA_DIR", FakeDataDir())
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_load", lambda self: None)
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_recover_orphaned_running_jobs", lambda self: None)
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_save", lambda self: calls.append("_save"))
+    monkeypatch.setitem(
+        sys.modules,
+        "pixelle_video.services.android_device_dispatcher",
+        FakeDispatcherModule(),
+    )
+    monkeypatch.setitem(sys.modules, "pixelle_video.services.xhs_publisher", FakePublisherModule())
+
+    scheduler = scheduler_module.PublishScheduler()
+    job = scheduler_module.PublishJob(
+        job_id="job-1",
+        serial="device-1",
+        task_id="task-1",
+        title="title",
+        body="body",
+        hashtags=[],
+        images=[],
+    )
+    job.status = scheduler_module.JobStatus.PENDING
+    scheduler._jobs[job.job_id] = job
+    scheduler._device_locks[job.serial] = MutatingLock(job)
+
+    asyncio.run(scheduler._execute_job(job.job_id))
+
+    assert calls == ["DATA_DIR.mkdir"]
+
+
 def test_test_profile_lifecycle_is_noop(monkeypatch):
     import api.lifecycle as lifecycle
 
