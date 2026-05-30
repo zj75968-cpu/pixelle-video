@@ -64,6 +64,28 @@ from api.routers import (
 )
 
 
+API_DESCRIPTION = """
+    ## Pixelle-Video - AI Video Generation Platform API
+
+    ### Features
+    - 🤖 **LLM**: Large language model integration
+    - 🔊 **TTS**: Text-to-speech synthesis
+    - 🎨 **Image**: AI image generation
+    - 📝 **Content**: Automated content generation
+    - 🎬 **Video**: End-to-end video generation
+
+    ### Video Generation Modes
+    - **Sync**: `/api/video/generate/sync` - For small videos (< 30s)
+    - **Async**: `/api/video/generate/async` - For large videos with task tracking
+
+    ### Getting Started
+    1. Check health: `GET /health`
+    2. Generate narrations: `POST /api/content/narration`
+    3. Generate video: `POST /api/video/generate/sync` or `/async`
+    4. Track task progress: `GET /api/tasks/{task_id}`
+    """
+
+
 def create_lifespan(profile):
     """Create the application lifespan handler for a run profile."""
     coerced_profile = RunProfile.coerce(profile)
@@ -97,26 +119,7 @@ def create_app(profile=RunProfile.API_SERVER, lifespan_override=None) -> FastAPI
     # Create FastAPI app
     app = FastAPI(
         title="Pixelle-Video API",
-        description="""
-        ## Pixelle-Video - AI Video Generation Platform API
-
-        ### Features
-        - 🤖 **LLM**: Large language model integration
-        - 🔊 **TTS**: Text-to-speech synthesis
-        - 🎨 **Image**: AI image generation
-        - 📝 **Content**: Automated content generation
-        - 🎬 **Video**: End-to-end video generation
-
-        ### Video Generation Modes
-        - **Sync**: `/api/video/generate/sync` - For small videos (< 30s)
-        - **Async**: `/api/video/generate/async` - For large videos with task tracking
-
-        ### Getting Started
-        1. Check health: `GET /health`
-        2. Generate narrations: `POST /api/content/narration`
-        3. Generate video: `POST /api/video/generate/sync` or `/async`
-        4. Track task progress: `GET /api/tasks/{task_id}`
-        """,
+        description=API_DESCRIPTION,
         version="0.1.0",
         docs_url=api_config.docs_url,
         redoc_url=api_config.redoc_url,

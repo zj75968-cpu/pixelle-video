@@ -3,6 +3,17 @@ from fastapi.testclient import TestClient
 from api.config import api_config
 
 
+def test_create_app_test_profile_preserves_api_description():
+    from api.app import API_DESCRIPTION, create_app
+
+    app = create_app(profile="test")
+
+    assert app.description == API_DESCRIPTION
+    assert app.description.startswith("\n    ## Pixelle-Video - AI Video Generation Platform API")
+    assert "\n    ### Features" in app.description
+    assert "\n        ### Features" not in app.description
+
+
 def test_create_app_test_profile_exposes_pure_health_endpoints():
     from api.app import create_app
 
