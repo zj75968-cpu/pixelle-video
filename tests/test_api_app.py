@@ -51,11 +51,17 @@ def test_create_app_preserves_route_prefixes():
     assert f"{api_config.api_prefix}/tasks" in paths
     assert f"{api_config.api_prefix}/devices" in paths
     assert f"{api_config.api_prefix}/publish/agent/pending" in paths
-    assert "/webhooks/runninghub/task-complete" in paths
+    assert "/webhooks/runninghub" in paths
+
+
+def test_create_lifespan_returns_none_for_test_profile():
+    from api.app import create_lifespan
+
+    assert create_lifespan("test") is None
 
 
 def test_create_app_test_profile_disables_lifespan_side_effects(monkeypatch):
-    import api.lifecycle as lifecycle
+    import api.app as app_module
     from api.app import create_app
 
     calls = []
@@ -66,8 +72,8 @@ def test_create_app_test_profile_disables_lifespan_side_effects(monkeypatch):
     async def fake_stop(profile):
         calls.append(("stop", profile))
 
-    monkeypatch.setattr(lifecycle, "start_app_lifecycle", fake_start)
-    monkeypatch.setattr(lifecycle, "stop_app_lifecycle", fake_stop)
+    monkeypatch.setattr(app_module, "start_app_lifecycle", fake_start)
+    monkeypatch.setattr(app_module, "stop_app_lifecycle", fake_stop)
 
     app = create_app(profile="test")
 
