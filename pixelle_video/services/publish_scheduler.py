@@ -240,7 +240,7 @@ class PublishScheduler:
     def _save(self):
         """Synchronous save for backward compatibility. Schedules async save if in async context."""
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             # We're in an async context, schedule debounced save
             asyncio.create_task(self._save_debounced())
         except RuntimeError:
@@ -413,6 +413,7 @@ class PublishScheduler:
         # ── 拦截：如果配置了 cloud_url，且不是云端本身的 FastAPI 进程，则上传并同步到云端控制中心 ──
         try:
             import os
+
             from pixelle_video.config import config_manager
             dist_cfg = getattr(config_manager.config, "distribution", None)
             cloud_url = (getattr(dist_cfg, "cloud_url", "") or "").strip().rstrip("/")
@@ -874,11 +875,7 @@ class PublishScheduler:
         device_lock = self._device_locks[job.serial]
 
         async with device_lock:
-<<<<<<< HEAD
-            # Re-check after acquiring lock (may have been cancelled/completed while waiting)
-=======
             # Re-check after acquiring lock (status may have changed while waiting).
->>>>>>> worktree-productization-refactor-phase-0-1
             if job.status not in (JobStatus.PENDING, JobStatus.SCHEDULED):
                 return
 
