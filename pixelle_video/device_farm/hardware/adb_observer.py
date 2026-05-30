@@ -9,11 +9,14 @@ Provides functionality to:
 - Check device connectivity status
 """
 
-import subprocess
+import os
 import re
-from typing import List, Optional, Tuple
+import shutil
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from typing import List, Optional, Tuple
+
 from loguru import logger
 
 
@@ -34,6 +37,77 @@ class ADBDevice:
         return f"ADBDevice(serial={self.serial}, status={self.status}, model={self.model})"
 
 
+def _candidate_adb_paths() -> List[Path]:
+    """Return common adb.exe fallback paths for local Android Platform Tools installs."""
+    candidates: List[Path] = []
+
+    localappdata = os.environ.get("LOCALAPPDATA")
+    if localappdata:
+        winget_packages = Path(localappdata) / "Microsoft" / "WinGet" / "Packages"
+        candidates.extend(sorted(winget_packages.glob("Google.PlatformTools*/platform-tools/adb.exe")))
+        candidates.append(
+            winget_packages
+            / "Google.PlatformTools_Microsoft.Winget.Source_8wekyb3d8bbwe"
+            / "platform-tools"
+            / "adb.exe"
+        )
+
+    userprofile = os.environ.get("USERPROFILE")
+    if userprofile:
+        candidates.append(
+            Path(userprofile) / "AppData" / "Local" / "Android" / "Sdk" / "platform-tools" / "adb.exe"
+        )
+        candidates.append(
+            Path(userprofile)
+            / "AppData"
+            / "Local"
+            / "Microsoft"
+            / "WinGet"
+            / "Packages"
+            / "Google.PlatformTools_Microsoft.Winget.Source_8wekyb3d8bbwe"
+            / "platform-tools"
+            / "adb.exe"
+        )
+
+    candidates.extend([
+        Path("C:/Android/platform-tools/adb.exe"),
+        Path("C:/platform-tools/adb.exe"),
+    ])
+
+    return candidates
+
+
+def _resolve_adb_executable() -> str:
+    """Resolve the adb executable from configuration, PATH, or known install locations."""
+    configured_path = os.environ.get("PIXELLE_ADB_PATH")
+    if configured_path:
+        adb_path = Path(configured_path).expanduser()
+        if adb_path.is_file():
+            return str(adb_path)
+        raise ADBError(
+            "PIXELLE_ADB_PATH points to a missing ADB executable: "
+            f"{configured_path}. Set PIXELLE_ADB_PATH to adb.exe or clear it to use PATH/fallback detection."
+        )
+
+    path_adb = shutil.which("adb")
+    if path_adb:
+        return path_adb
+
+    checked_paths = []
+    for candidate in _candidate_adb_paths():
+        checked_paths.append(str(candidate))
+        if candidate.is_file():
+            return str(candidate)
+
+    guidance = (
+        "ADB executable not found. Install Android Platform Tools, add adb to PATH, "
+        "or set PIXELLE_ADB_PATH to the full adb.exe path."
+    )
+    if checked_paths:
+        guidance += " Checked fallback paths: " + "; ".join(checked_paths)
+    raise ADBError(guidance)
+
+
 def _run_adb_command(args: List[str], timeout: int = 10) -> Tuple[int, str, str]:
     """
     Execute an ADB command and return (returncode, stdout, stderr).
@@ -46,7 +120,7 @@ def _run_adb_command(args: List[str], timeout: int = 10) -> Tuple[int, str, str]
         Tuple of (returncode, stdout, stderr)
     """
     try:
-        cmd = ['adb'] + args
+        cmd = [_resolve_adb_executable()] + args
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -59,7 +133,9 @@ def _run_adb_command(args: List[str], timeout: int = 10) -> Tuple[int, str, str]
     except subprocess.TimeoutExpired:
         raise ADBError(f"ADB command timed out after {timeout}s: {' '.join(args)}")
     except FileNotFoundError:
-        raise ADBError("ADB executable not found. Ensure Android Platform Tools are installed and in PATH.")
+        raise ADBError("ADB executable not found. Install Android Platform Tools, add adb to PATH, or set PIXELLE_ADB_PATH.")
+    except ADBError:
+        raise
     except Exception as e:
         raise ADBError(f"Failed to execute ADB command: {e}")
 
@@ -149,7 +225,7 @@ def capture_screenshot(serial: str, output_path: Optional[str] = None) -> bytes:
     # We need to re-encode and handle it as binary
     try:
         # Re-run with binary mode for screenshot
-        cmd = ['adb', '-s', serial, 'exec-out', 'screencap', '-p']
+        cmd = [_resolve_adb_executable(), '-s', serial, 'exec-out', 'screencap', '-p']
         result = subprocess.run(
             cmd,
             capture_output=True,
@@ -180,6 +256,8 @@ def capture_screenshot(serial: str, output_path: Optional[str] = None) -> bytes:
 
     except subprocess.TimeoutExpired:
         raise ADBError(f"Screenshot capture timed out for {serial}")
+    except ADBError:
+        raise
     except Exception as e:
         raise ADBError(f"Failed to capture screenshot from {serial}: {e}")
 
