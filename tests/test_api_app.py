@@ -68,6 +68,18 @@ def test_create_app_preserves_route_prefixes():
     assert "/webhooks/runninghub" in paths
 
 
+def test_publish_agent_contract_routes_exist():
+    from api.app import create_app
+
+    app = create_app(profile="test")
+    paths = {getattr(route, "path", None) for route in app.routes}
+
+    assert "/api/publish/agent/pending" in paths
+    assert "/api/publish/agent/wait" in paths
+    assert "/api/publish/agent/jobs/{job_id}/progress" in paths
+    assert "/api/publish/agent/jobs/{job_id}/result" in paths
+
+
 def test_create_lifespan_returns_none_for_test_profile():
     from api.app import create_lifespan
 

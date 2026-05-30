@@ -60,7 +60,6 @@ from api.routers import (
     publish_router,
     runninghub_router,
     webhooks_router,
-    phone_agent_router,
 )
 
 
@@ -163,7 +162,6 @@ def create_app(profile=RunProfile.API_SERVER, lifespan_override=None) -> FastAPI
     app.include_router(runninghub_router, prefix=api_config.api_prefix)
     # Webhooks have no /api prefix so external services (e.g. RunningHub) can hit a stable URL.
     app.include_router(webhooks_router)
-    app.include_router(phone_agent_router, prefix=api_config.api_prefix)
 
     # Top-level shortcut: /s -> phone-agent setup script
     # Lets the UI advertise an ultra-short command:

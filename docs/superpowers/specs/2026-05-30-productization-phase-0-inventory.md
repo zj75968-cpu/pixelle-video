@@ -43,3 +43,12 @@ Date: 2026-05-30
 - No forced config format migration.
 - No deletion of old device artifacts.
 - No Docker Compose redesign.
+
+## Agent Contract Follow-Up
+
+The local agent result submission path needs a dedicated compatibility decision before Phase 3 publishing refactor:
+
+- `scripts/local_agent.py` submits job results as JSON.
+- `api/routers/publish.py` currently declares the result endpoint with form fields and optional file upload.
+
+Phase 1 only preserves route presence. A later task should either support both JSON and multipart/form results or migrate the local agent with a documented compatibility note.
