@@ -89,3 +89,57 @@ def test_compute_comfykit_config_hash_is_stable_for_sorted_dicts():
     assert core._compute_comfykit_config_hash(first) == core._compute_comfykit_config_hash(
         same_values_different_order
     )
+
+
+def test_config_service_delegates_to_existing_manager(monkeypatch):
+    from pixelle_video.config import service as service_module
+
+    calls = []
+
+    class FakeManager:
+        @property
+        def config(self):
+            calls.append("config")
+            return {"project_name": "unit"}
+
+        def get(self, key, default=None):
+            calls.append(("get", key, default))
+            return default
+
+        def update(self, updates):
+            calls.append(("update", updates))
+
+        def save(self):
+            calls.append("save")
+
+        def reload(self):
+            calls.append("reload")
+
+        def validate(self):
+            calls.append("validate")
+            return True
+
+    monkeypatch.setattr(service_module, "config_manager", FakeManager())
+
+    config_service = service_module.ConfigService()
+
+    assert config_service.config == {"project_name": "unit"}
+    assert config_service.get("missing", "fallback") == "fallback"
+    config_service.update({"llm": {"model": "unit"}})
+    config_service.save()
+    config_service.reload()
+    assert config_service.validate() is True
+    assert calls == [
+        "config",
+        ("get", "missing", "fallback"),
+        ("update", {"llm": {"model": "unit"}}),
+        "save",
+        "reload",
+        "validate",
+    ]
+
+
+def test_config_service_is_exported_from_config_package():
+    from pixelle_video.config import ConfigService
+
+    assert ConfigService.__name__ == "ConfigService"
