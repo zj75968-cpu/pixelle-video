@@ -35,6 +35,7 @@ PUBLISH_TIMEOUT_SECONDS = 30 * 60
 ORPHAN_RUNNING_GRACE_MINUTES = 35
 MAX_JOB_RETRIES = 2  # total attempts = MAX_JOB_RETRIES + 1
 RETRY_DELAY_SECONDS = 15  # wait between retries
+SCHEDULE_POLL_INTERVAL_SECONDS = 60
 
 
 # ---- Job Status ---------------------------------------------------------------
@@ -261,22 +262,21 @@ class PublishScheduler:
         Used when APScheduler is not running (e.g. Streamlit context).
         Checks every 60 seconds; safe to call multiple times.
 
-        Returns True only when a polling thread is running or intentionally preserved.
-        Returns False when an old thread is still alive but already stopping, so callers
-        do not record a false started state during rapid stop/start races.
+        Returns True only when a polling thread is running.
         """
         import threading as _threading
 
         if self._sched_poll_thread and self._sched_poll_thread.is_alive():
-            if self._sched_poll_stop_event and self._sched_poll_stop_event.is_set():
-                return False
-            return True  # already running
+            return not (
+                self._sched_poll_stop_event is not None
+                and self._sched_poll_stop_event.is_set()
+            )
 
-        self._sched_poll_stop_event = _threading.Event()
+        stop_event = _threading.Event()
+        self._sched_poll_stop_event = stop_event
 
         def _poll():
-            import time as _time
-            while not self._sched_poll_stop_event.is_set():
+            while not stop_event.is_set():
                 try:
                     now = datetime.now()
                     for job in list(self._jobs.values()):
@@ -301,16 +301,17 @@ class PublishScheduler:
                             ).start()
                 except Exception as _exc:
                     logger.warning(f"[SchedulePoll] error: {_exc}")
-                _time.sleep(60)
+                stop_event.wait(SCHEDULE_POLL_INTERVAL_SECONDS)
 
         self._sched_poll_thread = _threading.Thread(target=_poll, daemon=True, name="sched-poll")
         self._sched_poll_thread.start()
         logger.debug("[SchedulePoll] background polling thread started")
-        return True
+        return self._sched_poll_thread.is_alive()
 
     def start_background_polling(self):
         """Start the scheduled-job polling thread once."""
-        if self._background_polling_started:
+        thread = self._sched_poll_thread
+        if self._background_polling_started and thread is not None and thread.is_alive():
             return
         self._background_polling_started = bool(self._start_schedule_poll())
 

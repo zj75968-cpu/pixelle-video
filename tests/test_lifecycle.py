@@ -36,28 +36,87 @@ def test_publish_scheduler_background_polling_methods_are_idempotent(monkeypatch
         def mkdir(self, *args, **kwargs):
             calls.append("DATA_DIR.mkdir")
 
+    class FakeThread:
+        def __init__(self):
+            self._alive = True
+
+        def is_alive(self):
+            return self._alive
+
+        def join(self, timeout=None):
+            calls.append(("thread.join", timeout))
+            self._alive = False
+
+    class FakeStopEvent:
+        def set(self):
+            calls.append("stop_event.set")
+
+    def fake_start_schedule_poll(self):
+        calls.append("_start_schedule_poll")
+        self._sched_poll_thread = FakeThread()
+        self._sched_poll_stop_event = FakeStopEvent()
+        return self._sched_poll_thread.is_alive()
+
     monkeypatch.setattr(scheduler_module, "DATA_DIR", FakeDataDir())
     monkeypatch.setattr(scheduler_module.PublishScheduler, "_load", lambda self: None)
     monkeypatch.setattr(scheduler_module.PublishScheduler, "_recover_orphaned_running_jobs", lambda self: None)
     monkeypatch.setattr(
         scheduler_module.PublishScheduler,
         "_start_schedule_poll",
-        lambda self: calls.append("_start_schedule_poll") or True,
+        fake_start_schedule_poll,
     )
 
     scheduler = scheduler_module.PublishScheduler()
-    scheduler._sched_poll_stop_event = type(
-        "FakeStopEvent",
-        (),
-        {"set": lambda self: calls.append("stop_event.set")},
-    )()
 
     scheduler.start_background_polling()
     scheduler.start_background_polling()
     scheduler.stop_background_polling()
     scheduler.stop_background_polling()
 
-    assert calls == ["DATA_DIR.mkdir", "_start_schedule_poll", "stop_event.set"]
+    assert calls == ["DATA_DIR.mkdir", "_start_schedule_poll", "stop_event.set", ("thread.join", 0.2)]
+
+
+def test_publish_scheduler_rapid_stop_start_replaces_stopping_poller(monkeypatch):
+    import time
+
+    scheduler_module = importlib.import_module("pixelle_video.services.publish_scheduler")
+
+    calls = []
+
+    class FakeDataDir:
+        def mkdir(self, *args, **kwargs):
+            calls.append("DATA_DIR.mkdir")
+
+    monkeypatch.setattr(scheduler_module, "DATA_DIR", FakeDataDir())
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_load", lambda self: None)
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_recover_orphaned_running_jobs", lambda self: None)
+    monkeypatch.setattr(scheduler_module, "SCHEDULE_POLL_INTERVAL_SECONDS", 60)
+
+    scheduler = scheduler_module.PublishScheduler()
+    scheduler.start_background_polling()
+    first_thread = scheduler._sched_poll_thread
+
+    deadline = time.monotonic() + 1
+    while first_thread is not None and not first_thread.is_alive() and time.monotonic() < deadline:
+        time.sleep(0.01)
+
+    scheduler.stop_background_polling()
+    scheduler.start_background_polling()
+    second_thread = scheduler._sched_poll_thread
+
+    try:
+        assert first_thread is not None
+        assert not first_thread.is_alive()
+        assert second_thread is not None
+        assert second_thread is not first_thread
+        assert second_thread.is_alive()
+        assert scheduler._background_polling_started is True
+    finally:
+        scheduler.stop_background_polling()
+        if first_thread is not None:
+            first_thread.join(timeout=1)
+        if second_thread is not None:
+            second_thread.join(timeout=1)
 
 
 def test_publish_scheduler_rapid_stop_start_does_not_mark_stopping_thread_started(monkeypatch):
