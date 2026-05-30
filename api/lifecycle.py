@@ -141,6 +141,7 @@ async def stop_app_lifecycle(profile: RunProfile | str = RunProfile.API_SERVER) 
             _stop_cookie_keepalive()()
         except Exception as exc:
             logger.warning(f"Failed to stop cookie keepalive: {exc}")
+            record_cleanup_error(exc)
 
         device_manager_service = _device_manager()
         publish_scheduler_service = _publish_scheduler()

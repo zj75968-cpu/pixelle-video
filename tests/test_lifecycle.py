@@ -304,7 +304,7 @@ def test_cleanup_failure_attempts_all_steps_then_raises_first_error(monkeypatch)
     monkeypatch.setattr(lifecycle, "shutdown_pixelle_video", fake_shutdown_pixelle_video)
 
     asyncio.run(lifecycle.start_app_lifecycle(lifecycle.RunProfile.API_SERVER))
-    with pytest.raises(RuntimeError, match="device cleanup failed"):
+    with pytest.raises(RuntimeError, match="cookie cleanup failed"):
         asyncio.run(lifecycle.stop_app_lifecycle(lifecycle.RunProfile.API_SERVER))
     asyncio.run(lifecycle.start_app_lifecycle(lifecycle.RunProfile.API_SERVER))
 
@@ -325,4 +325,72 @@ def test_cleanup_failure_attempts_all_steps_then_raises_first_error(monkeypatch)
         "publish_scheduler.start_background_polling",
         "publish_scheduler.start_scheduler",
         ("start_cookie_keepalive", 12.0),
+    ]
+
+
+def test_cookie_cleanup_failure_attempts_later_steps_then_raises_cookie_error(monkeypatch):
+    import pytest
+
+    import api.lifecycle as lifecycle
+
+    lifecycle.reset_lifecycle_state_for_tests()
+    calls = []
+
+    class FakeTaskManager:
+        async def start(self):
+            calls.append("task_manager.start")
+
+        async def stop(self):
+            calls.append("task_manager.stop")
+
+    class FakeDeviceManager:
+        def start_auto_sync(self, interval_seconds):
+            calls.append(("device_manager.start_auto_sync", interval_seconds))
+
+        def stop_auto_sync(self):
+            calls.append("device_manager.stop_auto_sync")
+
+    class FakePublishScheduler:
+        def start_background_polling(self):
+            calls.append("publish_scheduler.start_background_polling")
+
+        def start_scheduler(self):
+            calls.append("publish_scheduler.start_scheduler")
+
+        def stop_scheduler(self):
+            calls.append("publish_scheduler.stop_scheduler")
+
+        def stop_background_polling(self):
+            calls.append("publish_scheduler.stop_background_polling")
+
+    async def fake_shutdown_pixelle_video():
+        calls.append("shutdown_pixelle_video")
+
+    def fail_cookie_stop():
+        calls.append("stop_cookie_keepalive")
+        raise RuntimeError("cookie cleanup failed")
+
+    monkeypatch.setattr(lifecycle, "task_manager", FakeTaskManager())
+    monkeypatch.setattr(lifecycle, "device_manager", FakeDeviceManager())
+    monkeypatch.setattr(lifecycle, "publish_scheduler", FakePublishScheduler())
+    monkeypatch.setattr(lifecycle, "start_cookie_keepalive", lambda interval_hours: calls.append(("start_cookie_keepalive", interval_hours)))
+    monkeypatch.setattr(lifecycle, "stop_cookie_keepalive", fail_cookie_stop)
+    monkeypatch.setattr(lifecycle, "shutdown_pixelle_video", fake_shutdown_pixelle_video)
+
+    asyncio.run(lifecycle.start_app_lifecycle(lifecycle.RunProfile.API_SERVER))
+    with pytest.raises(RuntimeError, match="cookie cleanup failed"):
+        asyncio.run(lifecycle.stop_app_lifecycle(lifecycle.RunProfile.API_SERVER))
+
+    assert calls == [
+        "task_manager.start",
+        ("device_manager.start_auto_sync", 8),
+        "publish_scheduler.start_background_polling",
+        "publish_scheduler.start_scheduler",
+        ("start_cookie_keepalive", 12.0),
+        "stop_cookie_keepalive",
+        "device_manager.stop_auto_sync",
+        "publish_scheduler.stop_scheduler",
+        "publish_scheduler.stop_background_polling",
+        "task_manager.stop",
+        "shutdown_pixelle_video",
     ]
