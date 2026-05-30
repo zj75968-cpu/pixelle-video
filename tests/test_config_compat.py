@@ -91,7 +91,7 @@ def test_compute_comfykit_config_hash_is_stable_for_sorted_dicts():
     )
 
 
-def test_config_service_delegates_to_existing_manager(monkeypatch):
+def test_config_service_delegates_to_existing_manager():
     from pixelle_video.config import service as service_module
 
     calls = []
@@ -119,9 +119,7 @@ def test_config_service_delegates_to_existing_manager(monkeypatch):
             calls.append("validate")
             return True
 
-    monkeypatch.setattr(service_module, "config_manager", FakeManager())
-
-    config_service = service_module.ConfigService()
+    config_service = service_module.ConfigService(FakeManager())
 
     assert config_service.config == {"project_name": "unit"}
     assert config_service.get("missing", "fallback") == "fallback"
@@ -137,6 +135,20 @@ def test_config_service_delegates_to_existing_manager(monkeypatch):
         "reload",
         "validate",
     ]
+
+
+def test_config_service_module_does_not_create_its_own_config_manager():
+    from pixelle_video.config import service as service_module
+
+    assert "config_manager" not in service_module.__dict__
+
+
+def test_config_service_defaults_to_package_config_manager():
+    from pixelle_video.config import service as service_module
+
+    config_service = service_module.ConfigService()
+
+    assert config_service._manager is config_manager
 
 
 def test_config_service_is_exported_from_config_package():

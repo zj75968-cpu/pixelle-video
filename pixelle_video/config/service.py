@@ -1,16 +1,14 @@
 """Minimal configuration service facade."""
 
-from .manager import ConfigManager
-
-
-config_manager = ConfigManager()
-
 
 class ConfigService:
     """Small facade that delegates configuration operations to ConfigManager."""
 
     def __init__(self, manager=None):
-        self._manager = manager or config_manager
+        if manager is None:
+            from pixelle_video.config import config_manager as manager
+
+        self._manager = manager
 
     @property
     def config(self):
