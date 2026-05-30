@@ -1,6 +1,7 @@
 import asyncio
 import importlib
 import sys
+from datetime import datetime, timedelta
 
 
 def test_publish_scheduler_constructor_does_not_start_schedule_poll(monkeypatch):
@@ -18,7 +19,7 @@ def test_publish_scheduler_constructor_does_not_start_schedule_poll(monkeypatch)
     monkeypatch.setattr(
         scheduler_module.PublishScheduler,
         "_start_schedule_poll",
-        lambda self: calls.append("_start_schedule_poll"),
+        lambda self: calls.append("_start_schedule_poll") or True,
     )
 
     scheduler_module.PublishScheduler()
@@ -41,7 +42,7 @@ def test_publish_scheduler_background_polling_methods_are_idempotent(monkeypatch
     monkeypatch.setattr(
         scheduler_module.PublishScheduler,
         "_start_schedule_poll",
-        lambda self: calls.append("_start_schedule_poll"),
+        lambda self: calls.append("_start_schedule_poll") or True,
     )
 
     scheduler = scheduler_module.PublishScheduler()
@@ -58,6 +59,87 @@ def test_publish_scheduler_background_polling_methods_are_idempotent(monkeypatch
 
     assert calls == ["DATA_DIR.mkdir", "_start_schedule_poll", "stop_event.set"]
 
+
+def test_publish_scheduler_rapid_stop_start_does_not_mark_stopping_thread_started(monkeypatch):
+    scheduler_module = importlib.import_module("pixelle_video.services.publish_scheduler")
+
+    calls = []
+
+    class FakeDataDir:
+        def mkdir(self, *args, **kwargs):
+            calls.append("DATA_DIR.mkdir")
+
+    class FakeStopEvent:
+        def __init__(self):
+            self._set = False
+
+        def set(self):
+            calls.append("stop_event.set")
+            self._set = True
+
+        def is_set(self):
+            return self._set
+
+    class FakeThread:
+        def __init__(self):
+            self.joined = False
+
+        def is_alive(self):
+            return not self.joined
+
+        def join(self, timeout=None):
+            calls.append(("thread.join", timeout))
+
+    monkeypatch.setattr(scheduler_module, "DATA_DIR", FakeDataDir())
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_load", lambda self: None)
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_recover_orphaned_running_jobs", lambda self: None)
+
+    scheduler = scheduler_module.PublishScheduler()
+    scheduler._background_polling_started = True
+    scheduler._sched_poll_stop_event = FakeStopEvent()
+    scheduler._sched_poll_thread = FakeThread()
+
+    scheduler.stop_background_polling()
+    scheduler.start_background_polling()
+
+    assert scheduler._background_polling_started is False
+    assert calls == ["DATA_DIR.mkdir", "stop_event.set", ("thread.join", 0.2)]
+
+
+def test_publish_scheduler_standalone_scheduled_job_starts_background_polling(monkeypatch):
+    scheduler_module = importlib.import_module("pixelle_video.services.publish_scheduler")
+
+    calls = []
+
+    class FakeDataDir:
+        def mkdir(self, *args, **kwargs):
+            calls.append("DATA_DIR.mkdir")
+
+    monkeypatch.setattr(scheduler_module, "DATA_DIR", FakeDataDir())
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_load", lambda self: None)
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_recover_orphaned_running_jobs", lambda self: None)
+    monkeypatch.setattr(scheduler_module.PublishScheduler, "_save", lambda self: calls.append("_save"))
+    monkeypatch.setattr(
+        scheduler_module.PublishScheduler,
+        "start_background_polling",
+        lambda self: calls.append("start_background_polling"),
+    )
+
+    scheduler = scheduler_module.PublishScheduler()
+    scheduled_at = (datetime.now() + timedelta(minutes=5)).isoformat()
+
+    job = scheduler.add_job(
+        serial="device-1",
+        task_id="task-1",
+        title="title",
+        body="body",
+        hashtags=[],
+        images=[],
+        scheduled_at=scheduled_at,
+    )
+
+    assert job.status == scheduler_module.JobStatus.SCHEDULED
+    assert calls == ["DATA_DIR.mkdir", "_save", "_save", "start_background_polling"]
 
 def test_publish_scheduler_start_scheduler_is_idempotent(monkeypatch):
     scheduler_module = importlib.import_module("pixelle_video.services.publish_scheduler")

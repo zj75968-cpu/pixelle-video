@@ -255,16 +255,22 @@ class PublishScheduler:
         if changed:
             self._save()
 
-    def _start_schedule_poll(self):
+    def _start_schedule_poll(self) -> bool:
         """Start a background thread that fires SCHEDULED jobs when their time arrives.
 
         Used when APScheduler is not running (e.g. Streamlit context).
-        Checks every 60 seconds; safe to call multiple times (no-op if already running).
+        Checks every 60 seconds; safe to call multiple times.
+
+        Returns True only when a polling thread is running or intentionally preserved.
+        Returns False when an old thread is still alive but already stopping, so callers
+        do not record a false started state during rapid stop/start races.
         """
         import threading as _threading
 
         if self._sched_poll_thread and self._sched_poll_thread.is_alive():
-            return  # already running
+            if self._sched_poll_stop_event and self._sched_poll_stop_event.is_set():
+                return False
+            return True  # already running
 
         self._sched_poll_stop_event = _threading.Event()
 
@@ -300,20 +306,35 @@ class PublishScheduler:
         self._sched_poll_thread = _threading.Thread(target=_poll, daemon=True, name="sched-poll")
         self._sched_poll_thread.start()
         logger.debug("[SchedulePoll] background polling thread started")
+        return True
 
     def start_background_polling(self):
         """Start the scheduled-job polling thread once."""
         if self._background_polling_started:
             return
-        self._start_schedule_poll()
-        self._background_polling_started = True
+        self._background_polling_started = bool(self._start_schedule_poll())
 
     def stop_background_polling(self):
         """Stop the scheduled-job polling thread safely."""
-        if not self._background_polling_started:
+        thread = self._sched_poll_thread
+        if not self._background_polling_started and thread is None:
             return
+
         if self._sched_poll_stop_event is not None:
             self._sched_poll_stop_event.set()
+
+        if thread is not None:
+            try:
+                import threading as _threading
+                if thread is not _threading.current_thread():
+                    thread.join(timeout=0.2)
+            except RuntimeError:
+                pass
+
+            if not thread.is_alive():
+                self._sched_poll_thread = None
+                self._sched_poll_stop_event = None
+
         self._background_polling_started = False
 
     # -------------------------------------------------------------------------
@@ -380,14 +401,15 @@ class PublishScheduler:
             except Exception as _aex:
                 logger.warning(f"[banned_keywords] audit write failed: {_aex}")
 
-        # If APScheduler is running and a schedule time is specified, register it
-        if self._scheduler and scheduled_at:
+        # If APScheduler is running and a schedule time is specified, register it.
+        # Otherwise preserve standalone compatibility by enabling fallback polling.
+        if self._scheduler and getattr(self._scheduler, "running", False) and scheduled_at:
             self._schedule_job(job)
         elif scheduled_at:
-            # No APScheduler — mark as SCHEDULED; polling thread will fire it when due
             job.status = JobStatus.SCHEDULED
             self._save()
             logger.info(f"Job {job.job_id} marked SCHEDULED at {scheduled_at} (polling mode)")
+            self.start_background_polling()
         else:
             # Immediate jobs: schedule ASAP (next tick).
             # asyncio.get_running_loop() raises RuntimeError when there is no running
