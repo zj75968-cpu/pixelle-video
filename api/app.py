@@ -103,11 +103,12 @@ def create_lifespan(profile):
         await start_app_lifecycle(coerced_profile)
         logger.info("✅ Pixelle-Video API started successfully\n")
 
-        yield
-
-        logger.info("🛑 Shutting down Pixelle-Video API...")
-        await stop_app_lifecycle(coerced_profile)
-        logger.info("✅ Pixelle-Video API shutdown complete")
+        try:
+            yield
+        finally:
+            logger.info("🛑 Shutting down Pixelle-Video API...")
+            await stop_app_lifecycle(coerced_profile)
+            logger.info("✅ Pixelle-Video API shutdown complete")
 
     return lifespan
 

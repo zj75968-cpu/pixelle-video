@@ -1,3 +1,6 @@
+import asyncio
+
+import pytest
 from fastapi.testclient import TestClient
 
 from api.config import api_config
@@ -69,6 +72,37 @@ def test_create_lifespan_returns_none_for_test_profile():
     from api.app import create_lifespan
 
     assert create_lifespan("test") is None
+
+
+
+def test_create_lifespan_stops_lifecycle_when_context_body_raises(monkeypatch):
+    import api.app as app_module
+    from api.app import create_lifespan
+    from api.lifecycle import RunProfile
+
+    calls = []
+
+    async def fake_start(profile):
+        calls.append(("start", profile))
+
+    async def fake_stop(profile):
+        calls.append(("stop", profile))
+
+    monkeypatch.setattr(app_module, "start_app_lifecycle", fake_start)
+    monkeypatch.setattr(app_module, "stop_app_lifecycle", fake_stop)
+
+    async def run_lifespan_with_error():
+        lifespan = create_lifespan(RunProfile.API_SERVER)
+        with pytest.raises(RuntimeError, match="boom"):
+            async with lifespan(app=None):
+                raise RuntimeError("boom")
+
+    asyncio.run(run_lifespan_with_error())
+
+    assert calls == [
+        ("start", RunProfile.API_SERVER),
+        ("stop", RunProfile.API_SERVER),
+    ]
 
 
 def test_create_app_test_profile_disables_lifespan_side_effects(monkeypatch):
