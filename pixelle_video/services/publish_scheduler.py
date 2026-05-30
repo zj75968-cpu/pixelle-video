@@ -29,13 +29,13 @@ from typing import Dict, List, Optional
 import aiofiles
 from loguru import logger
 
-
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 QUEUE_FILE = DATA_DIR / "publish_queue.json"
 PUBLISH_TIMEOUT_SECONDS = 30 * 60
 ORPHAN_RUNNING_GRACE_MINUTES = 35
 MAX_JOB_RETRIES = 2  # total attempts = MAX_JOB_RETRIES + 1
 RETRY_DELAY_SECONDS = 15  # wait between retries
+SCHEDULE_POLL_INTERVAL_SECONDS = 60
 
 
 # ---- Job Status ---------------------------------------------------------------
@@ -185,6 +185,7 @@ class PublishScheduler:
         # is not running, e.g. in Streamlit)
         self._sched_poll_thread = None
         self._sched_poll_stop_event = None
+        self._background_polling_started = False
         # Async save debouncing
         self._save_pending = False
         self._save_lock = asyncio.Lock()
@@ -193,7 +194,6 @@ class PublishScheduler:
         self._job_available_event = asyncio.Event()
         self._load()
         self._recover_orphaned_running_jobs()
-        self._start_schedule_poll()
 
     # -------------------------------------------------------------------------
     # Persistence
@@ -293,22 +293,27 @@ class PublishScheduler:
         if changed:
             self._save()
 
-    def _start_schedule_poll(self):
+    def _start_schedule_poll(self) -> bool:
         """Start a background thread that fires SCHEDULED jobs when their time arrives.
 
         Used when APScheduler is not running (e.g. Streamlit context).
-        Checks every 60 seconds; safe to call multiple times (no-op if already running).
+        Checks every 60 seconds; safe to call multiple times.
+
+        Returns True only when a polling thread is running.
         """
         import threading as _threading
 
         if self._sched_poll_thread and self._sched_poll_thread.is_alive():
-            return  # already running
+            return not (
+                self._sched_poll_stop_event is not None
+                and self._sched_poll_stop_event.is_set()
+            )
 
-        self._sched_poll_stop_event = _threading.Event()
+        stop_event = _threading.Event()
+        self._sched_poll_stop_event = stop_event
 
         def _poll():
-            import time as _time
-            while not self._sched_poll_stop_event.is_set():
+            while not stop_event.is_set():
                 try:
                     now = datetime.now()
                     for job in list(self._jobs.values()):
@@ -333,11 +338,42 @@ class PublishScheduler:
                             ).start()
                 except Exception as _exc:
                     logger.warning(f"[SchedulePoll] error: {_exc}")
-                _time.sleep(60)
+                stop_event.wait(SCHEDULE_POLL_INTERVAL_SECONDS)
 
         self._sched_poll_thread = _threading.Thread(target=_poll, daemon=True, name="sched-poll")
         self._sched_poll_thread.start()
         logger.debug("[SchedulePoll] background polling thread started")
+        return self._sched_poll_thread.is_alive()
+
+    def start_background_polling(self):
+        """Start the scheduled-job polling thread once."""
+        thread = self._sched_poll_thread
+        if self._background_polling_started and thread is not None and thread.is_alive():
+            return
+        self._background_polling_started = bool(self._start_schedule_poll())
+
+    def stop_background_polling(self):
+        """Stop the scheduled-job polling thread safely."""
+        thread = self._sched_poll_thread
+        if not self._background_polling_started and thread is None:
+            return
+
+        if self._sched_poll_stop_event is not None:
+            self._sched_poll_stop_event.set()
+
+        if thread is not None:
+            try:
+                import threading as _threading
+                if thread is not _threading.current_thread():
+                    thread.join(timeout=0.2)
+            except RuntimeError:
+                pass
+
+            if not thread.is_alive():
+                self._sched_poll_thread = None
+                self._sched_poll_stop_event = None
+
+        self._background_polling_started = False
 
     # -------------------------------------------------------------------------
     # Queue Management
@@ -523,14 +559,15 @@ class PublishScheduler:
             except Exception as _aex:
                 logger.warning(f"[banned_keywords] audit write failed: {_aex}")
 
-        # If APScheduler is running and a schedule time is specified, register it
-        if self._scheduler and scheduled_at:
+        # If APScheduler is running and a schedule time is specified, register it.
+        # Otherwise preserve standalone compatibility by enabling fallback polling.
+        if self._scheduler and getattr(self._scheduler, "running", False) and scheduled_at:
             self._schedule_job(job)
         elif scheduled_at:
-            # No APScheduler — mark as SCHEDULED; polling thread will fire it when due
             job.status = JobStatus.SCHEDULED
             self._save()
             logger.info(f"Job {job.job_id} marked SCHEDULED at {scheduled_at} (polling mode)")
+            self.start_background_polling()
         else:
             # Immediate jobs: schedule ASAP (next tick).
             # asyncio.get_running_loop() raises RuntimeError when there is no running
@@ -758,6 +795,8 @@ class PublishScheduler:
 
     def start_scheduler(self):
         """Start the APScheduler background scheduler."""
+        if self._scheduler and self._scheduler.running:
+            return
         try:
             from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore
         except ImportError:
@@ -835,7 +874,11 @@ class PublishScheduler:
         device_lock = self._device_locks[job.serial]
 
         async with device_lock:
+<<<<<<< HEAD
             # Re-check after acquiring lock (may have been cancelled/completed while waiting)
+=======
+            # Re-check after acquiring lock (status may have changed while waiting).
+>>>>>>> worktree-productization-refactor-phase-0-1
             if job.status not in (JobStatus.PENDING, JobStatus.SCHEDULED):
                 return
 
@@ -1030,8 +1073,12 @@ class PublishScheduler:
             return False
             
         elif mode == "phone_agent":
-            from pixelle_video.services.phone_agent_client import delete_http, wait_for_status, resolve_agent_url
             from pixelle_video.config import config_manager
+            from pixelle_video.services.phone_agent_client import (
+                delete_http,
+                resolve_agent_url,
+                wait_for_status,
+            )
             
             cfg = config_manager.config
             agent_url = resolve_agent_url(getattr(job, "serial", ""))
@@ -1148,8 +1195,12 @@ class PublishScheduler:
             return False
             
         elif mode == "phone_agent":
-            from pixelle_video.services.phone_agent_client import comment_http, wait_for_status, resolve_agent_url
             from pixelle_video.config import config_manager
+            from pixelle_video.services.phone_agent_client import (
+                comment_http,
+                resolve_agent_url,
+                wait_for_status,
+            )
             
             cfg = config_manager.config
             agent_url = resolve_agent_url(getattr(job, "serial", ""))

@@ -31,6 +31,7 @@ Usage:
 """
 from .schema import PixelleVideoConfig, LLMConfig, ComfyUIConfig, TTSSubConfig, ImageSubConfig, VideoSubConfig, XHSPublishConfig
 from .manager import ConfigManager
+from .service import ConfigService
 from .loader import load_config_dict, save_config_dict
 
 # Global singleton instance
@@ -45,6 +46,7 @@ __all__ = [
     "VideoSubConfig",
     "XHSPublishConfig",
     "ConfigManager",
+    "ConfigService",
     "config_manager",
     "load_config_dict",
     "save_config_dict",
