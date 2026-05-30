@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import Any, Callable
 
 from loguru import logger
+
+from pixelle_video.app.profiles import RunProfile
 
 
 task_manager: Any | None = None
@@ -13,21 +14,6 @@ publish_scheduler: Any | None = None
 start_cookie_keepalive: Callable[..., Any] | None = None
 stop_cookie_keepalive: Callable[..., Any] | None = None
 shutdown_pixelle_video: Callable[..., Any] | None = None
-
-
-class RunProfile(StrEnum):
-    API_SERVER = "api_server"
-    LOCAL_UI = "local_ui"
-    WORKER = "worker"
-    CLI = "cli"
-    DEV = "dev"
-    TEST = "test"
-
-    @classmethod
-    def coerce(cls, value: RunProfile | str) -> RunProfile:
-        if isinstance(value, cls):
-            return value
-        return cls(str(value).lower())
 
 
 @dataclass(frozen=True)
