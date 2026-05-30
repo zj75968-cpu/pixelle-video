@@ -74,10 +74,11 @@ def test_publish_agent_contract_routes_exist():
     app = create_app(profile="test")
     paths = {getattr(route, "path", None) for route in app.routes}
 
-    assert "/api/publish/agent/pending" in paths
-    assert "/api/publish/agent/wait" in paths
-    assert "/api/publish/agent/jobs/{job_id}/progress" in paths
-    assert "/api/publish/agent/jobs/{job_id}/result" in paths
+    assert f"{api_config.api_prefix}/publish/agent/pending" in paths
+    assert f"{api_config.api_prefix}/publish/agent/list" in paths
+    assert f"{api_config.api_prefix}/publish/agent/download-client" in paths
+    assert f"{api_config.api_prefix}/publish/agent/jobs/{{job_id}}/progress" in paths
+    assert f"{api_config.api_prefix}/publish/agent/jobs/{{job_id}}/result" in paths
 
 
 def test_create_lifespan_returns_none_for_test_profile():

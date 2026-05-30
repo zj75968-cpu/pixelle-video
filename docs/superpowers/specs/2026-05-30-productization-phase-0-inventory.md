@@ -32,7 +32,7 @@ Date: 2026-05-30
 3. `ConfigManager.config_path` creates user config directories and copies config files for non-default users.
 4. `ConfigManager` is a singleton; later `ConfigManager(config_path=...)` calls do not replace the initialized path.
 5. `PixelleVideoCore(config_path=...)` accepts `config_path` but currently reads from global `config_manager`.
-6. API agent result submission appears to have a JSON-vs-form contract seam between `scripts/local_agent.py` and `api/routers/publish.py`.
+6. API agent progress submission uses JSON, while final result submission uses multipart/form with optional screenshot upload.
 7. Docker Compose currently lets API and Web share `data/publish_queue.json`; later phases should make one process the background owner.
 
 ## Phase 1 Non-Goals
@@ -48,7 +48,8 @@ Date: 2026-05-30
 
 The local agent result submission path needs a dedicated compatibility decision before Phase 3 publishing refactor:
 
-- `scripts/local_agent.py` submits job results as JSON.
-- `api/routers/publish.py` currently declares the result endpoint with form fields and optional file upload.
+- `scripts/local_agent.py` reports progress with JSON payloads.
+- `scripts/local_agent.py` submits final job results as multipart/form data with optional screenshot upload.
+- `api/routers/publish.py` matches those two contracts: the progress endpoint accepts a JSON body, and the result endpoint declares form fields with an optional file upload.
 
-Phase 1 only preserves route presence. A later task should either support both JSON and multipart/form results or migrate the local agent with a documented compatibility note.
+Phase 1 only preserves route presence. A later task should decide whether this mixed payload style needs explicit compatibility documentation or a unified client/server contract before the Phase 3 publishing refactor.
