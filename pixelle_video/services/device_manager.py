@@ -106,8 +106,25 @@ class DeviceManager:
         return ["COM3"]
 
     def check_adb_available(self) -> bool:
-        """ADB is removed. Always return False."""
-        return False
+        """Return True so legacy publish UI can operate in CH9329 mode."""
+        return True
+
+    def configure_adb_server(self, host: str = "127.0.0.1", port: int = 5037):
+        """Keep legacy ADB server settings harmlessly accepted in hardware mode."""
+        self._adb_server_host = host or "127.0.0.1"
+        self._adb_server_port = int(port or 5037)
+
+    def connect_wifi(self, host: str, port: int) -> tuple[bool, str]:
+        """WiFi ADB is unavailable when publishing through CH9329 hardware control."""
+        return False, "CH9329 硬件控制模式不需要 ADB WiFi 连接，请在配置中设置串口 COM 号。"
+
+    def pair_wireless(self, host: str, pair_port: int, pairing_code: str) -> tuple[bool, str]:
+        """Wireless ADB pairing is unavailable in CH9329 hardware mode."""
+        return False, "CH9329 硬件控制模式不需要 Android 无线配对。"
+
+    def scan_mdns(self, timeout: float = 5.0) -> list[dict]:
+        """mDNS discovery is only used by ADB wireless devices; CH9329 has none."""
+        return []
 
     def sync_connected(self):
         """Dummy sync."""

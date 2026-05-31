@@ -403,7 +403,7 @@ def _keyword_match(media: dict, fields: list[str], keyword: str) -> bool:
 def _render_device_cards(dm, devices):
     """Render registered device cards."""
     if not devices:
-        st.info("暂无设备。请通过 USB 连接手机，或使用下方 WiFi 连接。")
+        st.info("暂无本地发布设备。请在下方添加 CH9329 串口设备（例如 COM3）。")
         return
 
     for dev in devices:
@@ -440,7 +440,7 @@ def _render_device_cards(dm, devices):
 @st.fragment(run_every="8s")
 def _render_auto_refresh_device_list(dm):
     """Auto-refresh device list every 8s so users don't need manual refresh."""
-    st.caption("设备状态每 8 秒自动检测一次；已保存 WiFi 设备会自动重连。")
+    st.caption("设备状态每 8 秒自动检测一次；已保存的本地发布设备会自动刷新。")
 
     if st.button("🔄 立即刷新连接状态"):
         dm.sync_connected()
@@ -463,24 +463,18 @@ def _render_auto_refresh_device_list(dm):
         if is_vps:
             st.warning(
                 "⚠️ **您当前使用的是公网 VPS 网页后台**\n\n"
-                "由于手机是用 USB 数据线插在您的**本地电脑**上，公网 VPS 无法跨越网络直接读取您本地电脑的 USB 接口，因此这里不会显示任何 USB 设备。\n\n"
-                "**💡 极简解决方案（推荐）：**\n"
-                "- **无需连接电脑**，请直接点击上方 **「📱 手机自治挂机 (免电脑)」** 选项卡。\n"
-                f"- 按照说明在手机 Termux 中直接输入 `curl -sSL http://{host or '<你的VPS>'}/api/phone-agent/setup | bash` 命令，"
-                "脚本会自动安装环境、拉取 phone_agent、自动注册到 VPS 并立刻挂机上线。\n\n"
-                "**💻 如仍需使用电脑 USB 灌装：**\n"
-                "1. **请在您的本地电脑上运行本地服务**：双击本地目录下的 `start_web.bat`（启动本地网页端）。\n"
-                "2. 在本地电脑的浏览器中打开：[http://localhost:8501](http://localhost:8501)。\n"
-                "3. 在本地网页的「📱 设备管理」中，即可看到您插在电脑上的手机并点击「🚀 初始化 Agent」灌装！\n"
-                "4. 灌装完成后拔掉 USB，在手机上输入 `start`，设备就会自动同步并显示在当前的公网网页上了！"
+                "本地发布依赖连接在您电脑上的 CH9329 串口控制器，公网 VPS 无法直接访问您本地电脑的 COM 口。\n\n"
+                "**推荐方案：**\n"
+                "1. 在连接 CH9329 控制器的本地电脑上运行本地网页端。\n"
+                "2. 在本地浏览器打开：[http://localhost:8501](http://localhost:8501)。\n"
+                "3. 在「设备管理」中添加 CH9329 串口设备（例如 COM3），再执行发布。\n\n"
+                "如需多电脑协作，可使用下方客户端代理模式，让本地电脑代理拉取云端任务并控制本地发布设备。"
             )
         else:
             st.info(
-                "💡 **暂无已注册设备。**\n\n"
-                "请将手机通过 USB 连接至电脑。如果已连接但仍未显示，请检查：\n"
-                "1. 手机是否已开启**「开发者选项」**和**「USB 调试」**。\n"
-                "2. 手机下拉通知栏的 USB 连接模式是否已设为**「传输文件」**（MTP）。\n"
-                "3. 电脑是否已安装该手机的 **USB 驱动**（特别是华为/OPPO等手机，不装驱动电脑无法识别）。"
+                "💡 **暂无已注册的本地发布设备。**\n\n"
+                "请在下方添加 CH9329 串口控制器对应的 COM 口（例如 COM3）。"
+                "添加后即可通过本地硬件控制手机完成小红书发布。"
             )
     else:
         _render_device_cards(dm, devices)
@@ -494,21 +488,11 @@ def render_devices_tab():
     adb_ok = dm.check_adb_available()
 
     if not adb_ok:
-        st.error(
-            "❌ **ADB 环境问题** — ADB 命令未找到。\n\n"
-            "**解决方案：**\n"
-            "1. 下载 Android SDK Platform-Tools: https://developer.android.google.cn/studio/releases/platform-tools\n"
-            "2. 解压到本地，记下路径\n"
-            "3. 将路径添加到系统 PATH 环境变量\n"
-            "4. 重启本应用\n\n"
-            "**或者临时测试：** 在终端运行以下命令后再重启本应用\n"
-            "`$env:PATH = 'C:\\path\\to\\platform-tools;' + $env:PATH`\n\n"
-            "需要帮助？查看 [Android 调试官方文档](https://developer.android.google.cn/studio/debug/debug-device)",
-            icon="❌",
+        st.info(
+            "ℹ️ **本地发布使用 CH9329 串口模式**\n\n"
+            "当前页面使用 CH9329 串口硬件控制。请在下方「CH9329 串口设置」中填写本机 COM 口和波特率，"
+            "保存后即可把该串口作为本地发布设备使用。"
         )
-        if st.button("🔄 重新检查 ADB"):
-            st.rerun()
-        return
 
     # ── 实时检测通过 USB/WiFi 连接但未注册的设备 ──
     try:
@@ -536,10 +520,10 @@ def render_devices_tab():
     st.subheader("🖥️ 挂机节点扩展助手")
     st.info(
         "💡 **分布式多电脑矩阵挂机**：\n"
-        "如果你想在其他 Windows 电脑上插手机并连接到本云端，只需在新电脑上运行本助手即可，一键双击直连，无需配置 Python 环境！\n\n"
+        "如果你想在其他 Windows 电脑上接入本地发布设备并连接到本云端，只需在新电脑上运行本助手即可，一键双击直连，无需配置 Python 环境！\n\n"
         "1. 点击下方按钮，下载挂机小助手程序到你的新电脑；\n"
-        "2. 将新电脑的手机开启 USB 调试并连入新电脑；\n"
-        "3. 双击运行小助手即可立刻在当前网页捕获新接入的设备！"
+        "2. 在新电脑上准备好本地发布设备；\n"
+        "3. 双击运行小助手即可立刻在当前网页捕获新接入的本地发布设备！"
     )
     
     from pathlib import Path
@@ -561,154 +545,26 @@ def render_devices_tab():
     st.markdown("---")
     st.subheader("➕ 添加设备")
 
-    tab_usb, tab_wifi, tab_pair = st.tabs(["USB 连接", "鸿蒙 / 手动 WiFi", "Android 11+ 无线配对"])
-
-    with tab_usb:
-        st.info(
-            "通过 USB 连接手机后，运行 `adb devices` 获取 Serial，再填入下方。\n"
-            "确保手机已开启开发者模式和 USB 调试。"
-        )
-        with st.form("add_usb_device"):
-            serial = st.text_input("设备 Serial", placeholder="如：emulator-5554")
-            name = st.text_input("设备名称", placeholder="如：主号手机")
-            theme = st.text_input("内容主题", placeholder="如：旅行摄影")
-            if st.form_submit_button("注册设备"):
-                if serial.strip():
-                    dm.add_device(serial=serial.strip(), name=name.strip(), theme=theme.strip())
-                    st.success(f"已注册设备 {serial}")
-                    st.rerun()
-
-    with tab_wifi:
-        st.info(
-            "**适用设备**：华为 / 荣耀 鸿蒙系统（HarmonyOS），以及任何可在设置中看到 IP:端口 的无线调试设备。\n\n"
-            "鸿蒙无线调试由**手机显示 IP:端口**，电脑主动发起连接，无需配对码。"
-        )
-
-        st.markdown("##### 📱 手机端操作步骤")
-        st.markdown(
-            "1. 打开「设置」→「关于手机」，连续点击「版本号」7 次，开启**开发者选项**\n"
-            "2. 进入「设置」→「开发者选项」→「无线调试」→ **打开开关**\n"
-            "3. 屏幕上会显示形如 `192.168.x.x:xxxxx` 的 **IP 地址和端口**\n"
-            "4. 将上方 IP 和端口填入下方表单，点击「连接并注册」\n"
-            "5. 手机弹出授权弹窗，选择「允许」即可 ✅"
-        )
-
-        st.markdown("---")
-        st.markdown("##### ✍️ 填写 IP 连接")
-        with st.form("add_wifi_device"):
-            host = st.text_input("手机 IP 地址", placeholder="如：192.168.1.100")
-            port = st.number_input("ADB 端口", value=5555, min_value=1, max_value=65535)
-            name = st.text_input("设备名称", placeholder="如：鸿蒙主机")
-            theme = st.text_input("内容主题", placeholder="如：美食探店")
-            if st.form_submit_button("连接并注册"):
-                if host.strip():
-                    serial = f"{host.strip()}:{int(port)}"
-                    ok, adb_msg = dm.connect_wifi(host.strip(), int(port))
-                    if ok:
-                        dm.add_device(serial=serial, name=name.strip(), theme=theme.strip())
-                        st.success(f"WiFi 连接成功：{serial}")
-                        st.rerun()
-                    else:
-                        _hint = _wifi_connect_hint(adb_msg)
-                        st.error(f"连接失败 `{serial}`\n\nADB 返回：`{adb_msg}`\n\n{_hint}")
-
-    with tab_pair:
-        st.info(
-            "**Android 11+ 无线调试（无需 USB）**\n\n"
-            "1. 手机：**设置 → 开发者选项 → 无线调试 → 开启**\n"
-            "2. 点击「**使用配对码配对设备**」，屏幕会出现 IP、**配对端口**、**6 位配对码**\n"
-            "3. 将上述信息填入「**第一步：配对**」并提交\n"
-            "4. 配对成功后，回到无线调试主页查看「**IP 地址和端口**」（连接端口），填入「**第二步：连接**」\n\n"
-            "> 配对端口和连接端口是**不同**的，注意区分"
-        )
-
-        # ── mDNS auto-discovery ────────────────────────────────────────────
-        st.markdown("##### 🔍 自动发现（mDNS，Android 11+）")
-        st.caption("已开启「无线调试」的设备会通过 mDNS 广播，点击扫描可直接发现，无需手填 IP。")
-        if "mdns_scan_results" not in st.session_state:
-            st.session_state["mdns_scan_results"] = None
-
-        mdns_col, _ = st.columns([1, 3])
-        with mdns_col:
-            if st.button("🔍 扫描 mDNS 设备", key="scan_mdns_btn"):
-                if not hasattr(dm, "scan_mdns"):
-                    st.error("功能需重启 Streamlit 才能加载，请关闭并重新运行 `start_web.bat`")
-                else:
-                    with st.spinner("正在扫描 mDNS（约 5 秒）…"):
-                        mdns_found = dm.scan_mdns(timeout=5.0)
-                    st.session_state["mdns_scan_results"] = mdns_found
-
-        mdns_res = st.session_state.get("mdns_scan_results")
-        if mdns_res is not None:
-            connect_entries = [r for r in mdns_res if r["type"] == "connect"]
-            pair_entries    = [r for r in mdns_res if r["type"] == "pair"]
-            if not mdns_res:
-                st.warning(
-                    "未发现 mDNS 设备。请确认：\n"
-                    "- 手机与电脑在同一 WiFi\n"
-                    "- 手机已开启「无线调试」\n"
-                    "- adb 版本 ≥ 30（`adb --version`）"
+    st.markdown("##### CH9329 串口设置")
+    st.info(
+        "CH9329 串口模式是本机发布的主要路径：将 CH9329 控制器接入本机后，"
+        "填写系统分配的 COM 口和波特率即可注册为本地发布设备。"
+    )
+    with st.form("add_ch9329_serial_device"):
+        serial = st.text_input("COM 口", placeholder="如：COM3")
+        baudrate = st.number_input("波特率", value=9600, min_value=1200, max_value=115200)
+        name = st.text_input("设备名称", placeholder="如：主号 CH9329")
+        theme = st.text_input("内容主题", placeholder="如：旅行摄影")
+        if st.form_submit_button("注册 CH9329 设备"):
+            if serial.strip():
+                dm.add_device(
+                    serial=serial.strip(),
+                    name=name.strip() or "CH9329 本地发布设备",
+                    theme=theme.strip(),
+                    notes=f"CH9329 serial baudrate={int(baudrate)}",
                 )
-            if connect_entries:
-                st.success(f"发现 {len(connect_entries)} 台可直接连接的设备：")
-                for _e in connect_entries:
-                    _ec1, _ec2 = st.columns([3, 1])
-                    with _ec1:
-                        st.code(_e["serial"])
-                    with _ec2:
-                        if st.button("一键连接", key=f"mdns_connect_{_e['serial']}"):
-                            _ok, _msg = dm.connect_wifi(_e["ip"], _e["port"])
-                            if _ok:
-                                dm.add_device(serial=_e["serial"], name=_e["ip"], theme="")
-                                st.success(f"✅ 已连接并注册：{_e['serial']}")
-                                st.session_state["mdns_scan_results"] = None
-                                st.rerun()
-                            else:
-                                st.error(f"连接失败：{_e['serial']}")
-            if pair_entries:
-                st.info(
-                    f"发现 {len(pair_entries)} 台待配对设备（下方填入配对码完成配对）："
-                )
-                for _p in pair_entries:
-                    st.code(f"IP: {_p['ip']}  配对端口: {_p['port']}")
-                    st.session_state["_pair_host"] = _p["ip"]
-
-        st.markdown("---")
-
-        st.markdown("##### 第一步：配对")
-        with st.form("pair_wifi_step1"):
-            p_host = st.text_input("手机 IP", placeholder="如：192.168.1.100", key="p_host")
-            p_pair_port = st.number_input("配对端口（Pair Port）", min_value=1, max_value=65535, value=40123, key="p_pair_port")
-            p_code = st.text_input("配对码（6 位数字）", placeholder="如：123456", key="p_code", max_chars=8)
-            if st.form_submit_button("🔗 执行 adb pair"):
-                if p_host.strip() and p_code.strip():
-                    ok, msg = dm.pair_wireless(p_host.strip(), int(p_pair_port), p_code.strip())
-                    if ok:
-                        st.success(f"✅ 配对成功！{msg}")
-                        st.session_state["_pair_host"] = p_host.strip()
-                    else:
-                        st.error(f"❌ 配对失败：{msg}")
-                else:
-                    st.warning("请填写 IP 和配对码")
-
-        st.markdown("##### 第二步：连接并注册")
-        pair_host_default = st.session_state.get("_pair_host", "")
-        with st.form("pair_wifi_step2"):
-            c_host = st.text_input("手机 IP", value=pair_host_default, placeholder="同上", key="c_host")
-            c_port = st.number_input("连接端口（无线调试主页的端口）", min_value=1, max_value=65535, value=5555, key="c_port")
-            c_name = st.text_input("设备名称", placeholder="如：测试手机", key="c_name")
-            c_theme = st.text_input("内容主题", placeholder="如：健身打卡", key="c_theme")
-            if st.form_submit_button("📲 连接并注册设备"):
-                if c_host.strip():
-                    serial = f"{c_host.strip()}:{int(c_port)}"
-                    ok, adb_msg = dm.connect_wifi(c_host.strip(), int(c_port))
-                    if ok:
-                        dm.add_device(serial=serial, name=c_name.strip(), theme=c_theme.strip())
-                        st.success(f"✅ 已连接并注册设备：{serial}")
-                        st.rerun()
-                    else:
-                        _hint = _wifi_connect_hint(adb_msg)
-                        st.error(f"连接失败 `{serial}`\n\nADB 返回：`{adb_msg}`\n\n{_hint}")
+                st.success(f"已注册 CH9329 串口设备 {serial.strip()}（{int(baudrate)} bps）")
+                st.rerun()
 
     # Publish automation settings
     st.markdown("---")
@@ -761,41 +617,45 @@ def render_publish_settings():
                 st.rerun()
 
         st.markdown("---")
-        st.markdown("##### 🔌 ADB Server 设置（代理/远程）")
+        st.markdown("##### CH9329 串口设置")
         st.caption(
-            "默认 ADB Server 运行在本机 `127.0.0.1:5037`。"
-            "如果手机接在**同局域网其他电脑**上，可将那台电脑以 "
-            "`adb -a nodaemon server start` 启动监听，然后在此填写该机 IP。"
+            "本地发布优先使用 CH9329 串口控制器。请确认 COM 口与设备管理中注册的本地发布设备一致。"
         )
-        current_adb_host = getattr(cfg, "adb_server_host", "127.0.0.1") if cfg else "127.0.0.1"
-        current_adb_port = getattr(cfg, "adb_server_port", 5037) if cfg else 5037
-        col_h, col_p, col_abtn = st.columns([3, 1, 1])
-        with col_h:
-            new_adb_host = st.text_input(
-                "ADB Server 地址",
-                value=current_adb_host,
-                key="adb_server_host_input",
-                placeholder="127.0.0.1",
+        hardware_cfg = getattr(cfg, "hardware", None) if cfg else None
+        current_com = getattr(hardware_cfg, "com_port", "COM3") if hardware_cfg else "COM3"
+        current_baudrate = getattr(hardware_cfg, "baudrate", 9600) if hardware_cfg else 9600
+        col_port, col_baud, col_save = st.columns([2, 1, 1])
+        with col_port:
+            com_val = st.text_input(
+                "COM 口",
+                value=current_com,
+                key="ch9329_com_port_input",
+                placeholder="COM3",
             )
-        with col_p:
-            new_adb_port = st.number_input(
-                "端口",
-                value=current_adb_port,
-                min_value=1,
-                max_value=65535,
-                key="adb_server_port_input",
+        with col_baud:
+            baudrate_val = st.number_input(
+                "波特率",
+                value=int(current_baudrate),
+                min_value=1200,
+                max_value=115200,
+                key="ch9329_baudrate_input",
             )
-        with col_abtn:
+        with col_save:
             st.markdown("<br>", unsafe_allow_html=True)
-            if st.button("💾 保存 ADB", key="save_adb_server"):
-                host_val = new_adb_host.strip() or "127.0.0.1"
-                port_val = int(new_adb_port)
+            if st.button("💾 保存 CH9329", key="save_ch9329_serial_settings"):
+                com_val = str(com_val).strip() or "COM3"
+                baudrate_val = int(baudrate_val)
                 config_manager.update(
-                    {"xhs_publish": {"adb_server_host": host_val, "adb_server_port": port_val}}
+                    {"xhs_publish": {"hardware": {"com_port": com_val, "baudrate": baudrate_val}}}
                 )
                 config_manager.save()
-                get_device_manager().configure_adb_server(host_val, port_val)
-                st.success("ADB Server 设置已保存并生效")
+                get_device_manager().add_device(
+                    serial=com_val,
+                    name="CH9329 发帖机",
+                    theme="",
+                    notes=f"CH9329 serial baudrate={baudrate_val}",
+                )
+                st.success("CH9329 串口设置已保存")
                 st.rerun()
 
 
@@ -1140,7 +1000,7 @@ def _render_publish_queue_list(filter_val: str | None):
 def render_client_agent_tab():
     """Render client agent pull-mode management tab."""
     st.subheader("💻 客户端代理模式 (多端拉取)")
-    st.caption("适合多用户协作：其他发布人员在他们自己的电脑上运行代理，控制自己电脑上连接的手机进行自动发布。")
+    st.caption("适合多用户协作：其他发布人员在他们自己的电脑上运行代理，控制自己电脑上连接的本地发布设备进行自动发布。")
 
     from pixelle_video.config import config_manager
     
@@ -1163,7 +1023,7 @@ def render_client_agent_tab():
             "ℹ️ **什么是客户端代理模式？**\n\n"
             "在该模式下，你可以在网页里统一生成并排期帖子，"
             "然后把命令行和脚本分享给别人。他们运行后，代理会自动从你的服务器下载视频/图片，"
-            "并控制他们手机上的小红书发布！"
+            "并控制他们的本地发布设备完成小红书发布！"
         )
 
     st.markdown("---")
@@ -1261,7 +1121,7 @@ if %errorlevel% neq 0 (
 :: 7. Run Agent
 echo.
 echo ------------------------------------------------------
-echo Starting agent. Ensure USB debugging is enabled on your phone.
+echo Starting agent. Ensure your local publishing device is ready.
 echo ------------------------------------------------------
 echo.
 python scripts/local_agent.py --server %SERVER_URL%
@@ -1338,7 +1198,7 @@ fi
 # 7. 启动代理
 echo
 echo "------------------------------------------------------"
-echo "正在启动客户端代理，请确保手机已通过 USB 连接并开启 USB 调试！"
+echo "正在启动客户端代理，请确保本地发布设备已就绪！"
 echo "------------------------------------------------------"
 echo
 python3 scripts/local_agent.py --server "$SERVER_URL"
@@ -1367,13 +1227,13 @@ python3 scripts/local_agent.py --server "$SERVER_URL"
 
     st.markdown("#### 🚀 使用步骤（零配置，一步到位）：")
     st.markdown(
-        "1. **准备电脑与手机**：\n"
-        "   - 使用 USB 数据线连接手机与电脑，确保开启手机的「开发者选项」和「USB 调试」模式。\n"
+        "1. **准备电脑与本地发布设备**：\n"
+        "   - 在电脑上接入并确认本地发布设备可用。\n"
         "   - 确保电脑上安装了 Python 环境 (3.9+)。\n"
         "2. **一键运行代理**：\n"
         "   - **Windows**：双击下载的 `start_agent.bat` 脚本即可。脚本会自动下载代理包、解压、安装依赖并运行。\n"
         "   - **macOS / Linux**：打开终端，运行 `chmod +x start_agent.sh` 赋予权限，然后运行 `./start_agent.sh` 即可。\n"
-        "3. **自动同步**：运行后，代理会在终端显示连接成功，并在此电脑连接的手机上自动执行服务器下发的帖子发布、评论或删除任务。"
+        "3. **自动同步**：运行后，代理会在终端显示连接成功，并在此电脑连接的本地发布设备上自动执行服务器下发的帖子发布、评论或删除任务。"
     )
 
     st.caption(f"当前配置的连接服务器地址为：`http://{local_ip}:{server_port}`。如需外网使用，可自行编辑下载的脚本文件，将服务器 IP 修改为您的公网 IP 或域名。")
@@ -1427,11 +1287,11 @@ python3 scripts/local_agent.py --server "$SERVER_URL"
                     st.markdown(f"💻 **代理 ID**: `{agent_id}`")
                     st.markdown(f"🌐 **客户端 IP**: `{ip}`")
                 with c2:
-                    st.markdown(f"📱 **检测到手机数量**: `{len(serials)}` 台")
+                    st.markdown(f"📱 **检测到本地发布设备数量**: `{len(serials)}` 台")
                     if serials:
-                        st.markdown(f"📋 **手机 Serial**: `{', '.join(serials)}`")
+                        st.markdown(f"📋 **本地发布设备标识**: `{', '.join(serials)}`")
                     else:
-                        st.markdown("⚠️ *未检测到已连接手机，请确保已运行 adb devices 并授权*")
+                        st.markdown("⚠️ *未检测到已连接的本地发布设备，请确认客户端代理已完成设备授权并可访问设备*")
                 with c3:
                     st.markdown(f"⏱️ **最后心跳**: {seen_label}")
                     st.markdown("🟢 **在线**" if "刚刚" in seen_label or seconds_ago <= 15 else "🔴 **离线**")
@@ -1468,7 +1328,7 @@ def main():
         pass
 
     st.title("📱 发布管理")
-    st.caption("管理 Android 设备并将图文帖子发布到小红书")
+    st.caption("管理 CH9329 串口发布设备并将图文帖子发布到小红书")
 
     tab_devices, tab_publish, tab_agent = st.tabs([
         "📱 设备管理",

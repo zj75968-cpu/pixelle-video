@@ -773,8 +773,14 @@ class PublishScheduler:
     def _notify_job_available(self):
         """Signal that a new job is available for any waiting agent."""
         self._job_available_event.set()
-        # Reset the event after a short delay to allow multiple waiters to wake up
-        asyncio.create_task(self._reset_job_event())
+        # Reset the event after a short delay to allow multiple waiters to wake up.
+        # Streamlit and tests can call this from synchronous threads without an
+        # event loop; in that case leave the event set instead of leaking a coroutine.
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        loop.create_task(self._reset_job_event())
 
     async def _reset_job_event(self):
         """Reset the job available event after a short delay."""

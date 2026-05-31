@@ -165,7 +165,7 @@ def test_publish_scheduler_rapid_stop_start_does_not_mark_stopping_thread_starte
     assert calls == ["DATA_DIR.mkdir", "stop_event.set", ("thread.join", 0.2)]
 
 
-def test_publish_scheduler_standalone_scheduled_job_starts_background_polling(monkeypatch):
+def test_publish_scheduler_standalone_scheduled_job_starts_background_polling(monkeypatch, recwarn):
     scheduler_module = importlib.import_module("pixelle_video.services.publish_scheduler")
 
     calls = []
@@ -183,6 +183,7 @@ def test_publish_scheduler_standalone_scheduled_job_starts_background_polling(mo
         "start_background_polling",
         lambda self: calls.append("start_background_polling"),
     )
+    monkeypatch.setenv("IS_FASTAPI_PROCESS", "1")
 
     scheduler = scheduler_module.PublishScheduler()
     scheduled_at = (datetime.now() + timedelta(minutes=5)).isoformat()
@@ -199,6 +200,7 @@ def test_publish_scheduler_standalone_scheduled_job_starts_background_polling(mo
 
     assert job.status == scheduler_module.JobStatus.SCHEDULED
     assert calls == ["DATA_DIR.mkdir", "_save", "_save", "start_background_polling"]
+    assert not [w for w in recwarn if "was never awaited" in str(w.message)]
 
 def test_publish_scheduler_start_scheduler_is_idempotent(monkeypatch):
     scheduler_module = importlib.import_module("pixelle_video.services.publish_scheduler")
