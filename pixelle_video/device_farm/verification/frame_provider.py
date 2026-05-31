@@ -10,6 +10,7 @@ from typing import Any, Protocol
 from PIL import Image
 
 from .models import CaptureMetadata, NormalizedFrame
+from .projection import ProjectionCalibration
 
 try:
     import cv2  # type: ignore
@@ -79,9 +80,15 @@ class MS2130FrameProvider:
         logical_size: tuple[int, int],
         provider_id: str | None = None,
         api: str = "CAP_DSHOW",
+        projection: ProjectionCalibration | None = None,
     ):
         self.camera_index = camera_index
-        self.logical_size = logical_size
+        self.projection = projection or ProjectionCalibration(
+            projection_id=provider_id or f"ms2130:{camera_index}",
+            raw_size=logical_size,
+            logical_size=logical_size,
+        )
+        self.logical_size = self.projection.logical_size
         self.provider_id = provider_id or f"ms2130:{camera_index}"
         self.api = api
         self._capture = None
@@ -111,14 +118,14 @@ class MS2130FrameProvider:
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         image = Image.fromarray(rgb)
         self._last_raw_size = image.size
-        normalized = image.resize(self.logical_size)
+        normalized = self.projection.normalize_image(image)
         return NormalizedFrame(
             image=normalized,
             timestamp=time.time(),
             raw_size=image.size,
             logical_size=self.logical_size,
             provider_id=self.provider_id,
-            projection_id=self.provider_id,
+            projection_id=self.projection.projection_id,
             quality_flags=["ok"],
             metadata=self.get_metadata(),
         )

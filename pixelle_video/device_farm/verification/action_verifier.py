@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
 from typing import Any
 
 from .frame_provider import FrameProvider
@@ -22,16 +24,29 @@ _STATUS_PRIORITY = {
 class ActionVerifier:
     """Verify CH9329 actions using before/after frames and visual rules."""
 
-    def __init__(self, ch9329: Any, before_provider: FrameProvider, after_provider: FrameProvider | None = None):
+    def __init__(
+        self,
+        ch9329: Any,
+        before_provider: FrameProvider,
+        after_provider: FrameProvider | None = None,
+        post_action_delay: float = 0.0,
+        wait_hook: Callable[[float], None] | None = None,
+    ):
         self.ch9329 = ch9329
         self.before_provider = before_provider
         self.after_provider = after_provider or before_provider
+        self.post_action_delay = post_action_delay
+        self.wait_hook = wait_hook or time.sleep
 
     def verify_tap(self, action: ActionMetadata, rules: dict[str, dict[str, Any]]) -> VerificationResult:
-        self.before_provider.open()
-        if self.after_provider is not self.before_provider:
-            self.after_provider.open()
+        before_opened = False
+        after_opened = False
         try:
+            self.before_provider.open()
+            before_opened = True
+            if self.after_provider is not self.before_provider:
+                self.after_provider.open()
+                after_opened = True
             before = self.before_provider.get_frame()
             if action.x_ratio is None or action.y_ratio is None:
                 return VerificationResult(
@@ -47,15 +62,18 @@ class ActionVerifier:
                     reason="CH9329 click returned False",
                     suggested_action="retry",
                 )
+            if self.post_action_delay > 0:
+                self.wait_hook(self.post_action_delay)
             after = self.after_provider.get_frame()
-            return self._evaluate_rules(rules, before, after)
+            return self._evaluate_rules(rules, before, after, action)
         finally:
-            self.before_provider.close()
-            if self.after_provider is not self.before_provider:
+            if before_opened:
+                self.before_provider.close()
+            if after_opened:
                 self.after_provider.close()
 
-    def _evaluate_rules(self, rules, before, after) -> VerificationResult:
-        results = [evaluate_rule(rule_id, rule, before, after) for rule_id, rule in rules.items()]
+    def _evaluate_rules(self, rules, before, after, action: ActionMetadata | None = None) -> VerificationResult:
+        results = [evaluate_rule(rule_id, rule, before, after, action=action) for rule_id, rule in rules.items()]
         if not results:
             return VerificationResult(
                 status=VerificationStatus.UNKNOWN,

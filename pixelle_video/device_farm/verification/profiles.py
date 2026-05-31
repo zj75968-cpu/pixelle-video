@@ -59,6 +59,7 @@ def load_capture_profile(path: str | Path) -> CaptureProfile:
         raw_size=(int(expected_raw["width"]), int(expected_raw["height"])),
         logical_size=(int(normalized_size["width"]), int(normalized_size["height"])),
         rotation=int(projection_data.get("rotation", 0)),
+        crop=tuple(projection_data["crop"]) if "crop" in projection_data else None,
         scale_mode=str(projection_data.get("scale_mode", "stretch")),
     )
 
