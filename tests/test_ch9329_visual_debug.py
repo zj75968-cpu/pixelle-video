@@ -1,10 +1,7 @@
 import importlib.util
 import sys
-import threading
 from pathlib import Path
 from types import SimpleNamespace
-
-import pytest
 
 SCRIPT_PATH = Path("F:/codex project/小红书/scripts/ch9329_visual_debug.py")
 

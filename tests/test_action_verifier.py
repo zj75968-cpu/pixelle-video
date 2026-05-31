@@ -2,7 +2,12 @@ from PIL import Image
 
 from pixelle_video.device_farm.verification.action_verifier import ActionVerifier
 from pixelle_video.device_farm.verification.frame_provider import FileFrameProvider
-from pixelle_video.device_farm.verification.models import ActionMetadata, CaptureMetadata, NormalizedFrame, VerificationStatus
+from pixelle_video.device_farm.verification.models import (
+    ActionMetadata,
+    CaptureMetadata,
+    NormalizedFrame,
+    VerificationStatus,
+)
 
 
 class FakeCH9329:

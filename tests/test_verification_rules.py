@@ -1,6 +1,10 @@
 from PIL import Image
 
-from pixelle_video.device_farm.verification.models import ActionMetadata, NormalizedFrame, VerificationStatus
+from pixelle_video.device_farm.verification.models import (
+    ActionMetadata,
+    NormalizedFrame,
+    VerificationStatus,
+)
 from pixelle_video.device_farm.verification.rules import evaluate_rule
 
 
