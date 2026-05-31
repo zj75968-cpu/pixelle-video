@@ -1,0 +1,56 @@
+schema_version: 1
+
+flow:
+  id: xhs_publish_note_v1
+  name: 小红书图文/视频发布流程
+
+defaults:
+  timeout_ms: 3000
+  stable_window_ms: 500
+  retry_count: 2
+  evidence_dir: runtime/verification
+
+rules:
+  tap_feedback_near_target:
+    description: 点击点附近应出现局部反馈或画面变化
+    layer: coordinate_closed_loop
+    type: touch_feedback
+    radius: 80
+    threshold:
+      min_changed_ratio: 0.015
+    on_fail: manual_required
+
+  tap_publish_button_reacts:
+    description: 点击发布按钮后，发布区域应发生明显变化
+    layer: screen_change
+    type: region_diff
+    region:
+      x: 300
+      y: 1800
+      width: 500
+      height: 500
+    threshold:
+      min_changed_ratio: 0.05
+    on_fail: retryable
+
+  submit_button_enabled:
+    description: 发布按钮应为可点击状态
+    layer: business_semantic
+    type: color_probe
+    probes:
+      - x: 960
+        y: 2200
+        expected:
+          color_near: "#ff2442"
+          tolerance: 35
+    on_fail: manual_required
+
+bindings:
+  xhs.home.tap_publish:
+    action:
+      type: tap
+      point: xhs.home.publish_button
+      risk: reversible
+    verify:
+      - tap_feedback_near_target
+      - tap_publish_button_reacts

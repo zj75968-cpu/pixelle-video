@@ -1,0 +1,41 @@
+schema_version: 1
+
+device:
+  id: vivo_v2199a_001
+  name: Vivo V2199A 001
+  logical_screen:
+    width: 1080
+    height: 2400
+
+observation:
+  provider: ms2130_opencv
+  ms2130:
+    camera_index: 1
+    name_hint: "MS2130"
+    api: "CAP_DSHOW"
+    expected_raw_size:
+      width: 1920
+      height: 1080
+    expected_fps: 30
+
+projection:
+  rotation: 0
+  normalized_size:
+    width: 1080
+    height: 2400
+  scale_mode: stretch
+
+ch9329:
+  port: COM5
+  baudrate: 9600
+
+health_checks:
+  black_frame:
+    enabled: true
+    max_black_ratio: 0.95
+  stale_frame:
+    enabled: true
+    max_age_ms: 500
+  min_resolution:
+    width: 1280
+    height: 720
