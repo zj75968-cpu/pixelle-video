@@ -40,6 +40,9 @@ dev = [
     "pytest-asyncio>=0.23.0",
     "ruff>=0.6.0",
 ]
+ms2130 = [
+    "opencv-python>=4.9.0",
+]
 
 [project.scripts]
 pixelle-video = "pixelle_video.cli:main"
