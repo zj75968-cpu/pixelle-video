@@ -1,6 +1,5 @@
 from pixelle_video.device_farm.verification.models import (
     ActionMetadata,
-    CaptureMetadata,
     NormalizedFrame,
     VerificationResult,
     VerificationStatus,
