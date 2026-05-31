@@ -1,0 +1,39 @@
+# Basic Navigation Test Flow
+# Tests basic device control and navigation
+
+flow_id: "test_basic_navigation"
+name: "Basic Navigation Test"
+description: "Test basic tap, swipe, and navigation actions"
+version: "1.0"
+
+metadata:
+  author: "Device Farm Setup"
+  created: "2026-05-30"
+  tags: ["test", "navigation", "basic"]
+
+steps:
+  - id: "step_1_home"
+    name: "Return to Home"
+    action: "swipe_up_home"
+    description: "Swipe up from bottom to return to home screen"
+    wait_after: 2.0
+
+  - id: "step_2_tap_center"
+    name: "Tap Screen Center"
+    action: "tap"
+    point: "screen.center"
+    description: "Test tap at screen center"
+    wait_after: 1.0
+
+  - id: "step_3_screenshot"
+    name: "Capture Screenshot"
+    action: "screenshot"
+    metadata:
+      filename: "test_navigation_result.png"
+    description: "Capture final screen state"
+
+  - id: "step_4_complete"
+    name: "Test Complete"
+    action: "wait"
+    duration: 0.5
+    description: "Wait before completing"

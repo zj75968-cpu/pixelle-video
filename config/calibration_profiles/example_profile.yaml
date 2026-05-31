@@ -1,0 +1,125 @@
+# Calibration Profile Example
+# This file defines semantic UI points for device automation
+
+profile_id: "pixel6_xhs_profile"
+
+screen:
+  width: 1080
+  height: 2400
+  safe_top: 100        # Status bar height
+  safe_bottom: 120     # Navigation bar height
+  navigation_mode: "gesture"  # or "buttons"
+
+points:
+  # XiaohongShu (XHS) Home Screen Points
+  - name: "xhs.home.publish_button"
+    type: "absolute"
+    x: 540
+    y: 2200
+    description: "Main publish button at bottom center"
+
+  - name: "xhs.home.search_bar"
+    type: "absolute"
+    x: 540
+    y: 150
+    description: "Search bar at top of home screen"
+
+  - name: "xhs.home.tab_discover"
+    type: "absolute"
+    x: 270
+    y: 2300
+    description: "Discover tab in bottom navigation"
+
+  - name: "xhs.home.tab_follow"
+    type: "absolute"
+    x: 540
+    y: 2300
+    description: "Follow tab in bottom navigation"
+
+  - name: "xhs.home.tab_profile"
+    type: "absolute"
+    x: 810
+    y: 2300
+    description: "Profile tab in bottom navigation"
+
+  # XHS Publish Flow Points
+  - name: "xhs.publish.album_option"
+    type: "absolute"
+    x: 270
+    y: 1200
+    description: "Album/Gallery option in publish menu"
+
+  - name: "xhs.publish.video_option"
+    type: "absolute"
+    x: 810
+    y: 1200
+    description: "Video option in publish menu"
+
+  - name: "xhs.album.first_image"
+    type: "absolute"
+    x: 180
+    y: 400
+    description: "First image in gallery grid"
+
+  - name: "xhs.album.confirm_button"
+    type: "absolute"
+    x: 900
+    y: 150
+    description: "Confirm selection button (top right)"
+
+  # XHS Edit Screen Points
+  - name: "xhs.edit.title_field"
+    type: "absolute"
+    x: 540
+    y: 300
+    description: "Title input field"
+
+  - name: "xhs.edit.content_field"
+    type: "absolute"
+    x: 540
+    y: 600
+    description: "Content/description input field"
+
+  - name: "xhs.edit.publish_button"
+    type: "absolute"
+    x: 900
+    y: 150
+    description: "Final publish button (top right)"
+
+  - name: "xhs.edit.location_button"
+    type: "absolute"
+    x: 180
+    y: 1800
+    description: "Add location button"
+
+  - name: "xhs.edit.topic_button"
+    type: "absolute"
+    x: 540
+    y: 1800
+    description: "Add topic/hashtag button"
+
+  # Common UI Elements
+  - name: "common.back_button"
+    type: "absolute"
+    x: 80
+    y: 150
+    description: "Standard back button (top left)"
+
+  - name: "common.keyboard_dismiss"
+    type: "absolute"
+    x: 540
+    y: 2000
+    description: "Area to tap to dismiss keyboard"
+
+  # Swipe Gesture Anchors
+  - name: "swipe.feed_scroll_start"
+    type: "absolute"
+    x: 540
+    y: 1500
+    description: "Start point for feed scrolling"
+
+  - name: "swipe.feed_scroll_end"
+    type: "absolute"
+    x: 540
+    y: 800
+    description: "End point for feed scrolling"

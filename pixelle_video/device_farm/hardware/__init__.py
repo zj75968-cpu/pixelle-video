@@ -11,6 +11,12 @@ from .adb_observer import (
     ADBError,
 )
 
+from .adb_manager import (
+    ADBManager,
+    DeviceHealth,
+    DeviceState,
+)
+
 from .ch9329_controller import (
     scan_com_ports,
     connect_ch9329,
@@ -26,6 +32,10 @@ __all__ = [
     "get_screen_resolution",
     "ADBDevice",
     "ADBError",
+    # ADB Manager
+    "ADBManager",
+    "DeviceHealth",
+    "DeviceState",
     # CH9329 functions
     "scan_com_ports",
     "connect_ch9329",

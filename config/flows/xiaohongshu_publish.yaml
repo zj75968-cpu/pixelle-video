@@ -1,0 +1,59 @@
+flow_id: xiaohongshu_publish
+description: Xiaohongshu video publishing flow
+version: "1.0"
+app_package: com.xingin.xhs
+
+steps:
+  - id: open_xhs
+    action: open_app
+    point: xhs_launcher
+    wait_after: 3.0
+    verify: screenshot_changed
+
+  - id: tap_publish_button
+    action: tap
+    point: publish_button
+    wait_after: 2.0
+    verify: screenshot_changed
+
+  - id: select_video
+    action: tap
+    point: video_thumbnail
+    wait_after: 1.5
+    verify: screenshot_changed
+
+  - id: confirm_selection
+    action: tap
+    point: next_button
+    wait_after: 2.0
+    verify: screenshot_changed
+
+  - id: input_title
+    action: input_text
+    point: title_field
+    value: "Amazing content!"
+    wait_after: 0.5
+    verify: none
+
+  - id: input_description
+    action: input_text
+    point: description_field
+    value: "Check out this amazing video #trending"
+    wait_after: 0.5
+    verify: none
+
+  - id: tap_publish
+    action: tap
+    point: publish_confirm_button
+    wait_after: 5.0
+    verify: screenshot_changed
+
+  - id: verify_published
+    action: screenshot
+    wait_after: 2.0
+    verify: manual_confirm
+
+  - id: return_home
+    action: back
+    wait_after: 1.0
+    verify: none

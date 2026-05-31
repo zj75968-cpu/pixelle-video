@@ -1,0 +1,46 @@
+flow_id: example_login
+description: Example login flow demonstrating Action DSL syntax
+version: "1.0"
+
+steps:
+  - id: open_app
+    action: open_app
+    point: app_launcher
+    wait_after: 2.0
+    verify: screenshot_changed
+
+  - id: tap_login_button
+    action: tap
+    point: login_button
+    wait_after: 1.0
+    verify: screenshot_changed
+
+  - id: input_username
+    action: input_text
+    point: username_field
+    value: "test_user@example.com"
+    wait_after: 0.5
+    verify: none
+
+  - id: input_password
+    action: input_text
+    point: password_field
+    value: "secure_password"
+    wait_after: 0.5
+    verify: none
+
+  - id: tap_submit
+    action: tap
+    point: submit_button
+    wait_after: 3.0
+    verify: screenshot_changed
+
+  - id: verify_login
+    action: screenshot
+    wait_after: 1.0
+    verify: manual_confirm
+
+  - id: navigate_home
+    action: home
+    wait_after: 1.0
+    verify: screenshot_changed

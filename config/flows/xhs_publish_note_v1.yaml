@@ -1,0 +1,128 @@
+flow_id: xhs_publish_note_v1
+description: Xiaohongshu image/text note publishing flow with multi-image support
+version: "1.0"
+app_package: com.xingin.xhs
+
+variables:
+  - name: job.title
+    type: string
+    description: Note title text
+  - name: job.content
+    type: string
+    description: Note body content with hashtags
+  - name: job.images
+    type: list
+    description: List of image URLs or local paths
+  - name: job.num_images
+    type: integer
+    description: Number of images to publish
+
+steps:
+  - id: wake_screen
+    action: press_key
+    key: home
+    wait_after: 1.0
+    verify: none
+    description: Wake up the device screen
+
+  - id: unlock_device
+    action: press_key
+    key: space
+    wait_after: 1.0
+    verify: none
+    description: Trigger unlock screen
+
+  - id: open_xhs_app
+    action: open_app
+    point: xhs.launcher
+    wait_after: 6.0
+    verify: screenshot_changed
+    description: Launch Xiaohongshu app
+
+  - id: tap_publish_button
+    action: tap
+    point: xhs.home.publish_button
+    wait_after: 3.0
+    verify: screenshot_changed
+    description: Tap the main '+' publish button
+
+  - id: select_album_tab
+    action: tap
+    point: xhs.publish.album_tab
+    wait_after: 2.0
+    verify: screenshot_changed
+    description: Switch to album/gallery view
+
+  - id: select_first_image
+    action: tap
+    point: xhs.publish.first_image
+    wait_after: 1.5
+    verify: none
+    description: Select the first (most recent) image from album
+
+  - id: select_additional_images
+    action: conditional
+    condition: "job.num_images > 1"
+    steps:
+      - id: select_multi_images
+        action: tap_sequence
+        points:
+          - xhs.publish.image_2
+          - xhs.publish.image_3
+          - xhs.publish.image_4
+          - xhs.publish.image_5
+          - xhs.publish.image_6
+          - xhs.publish.image_7
+          - xhs.publish.image_8
+          - xhs.publish.image_9
+        count: "job.num_images - 1"
+        wait_between: 0.8
+        description: Select additional images in reverse order for correct sequence
+
+  - id: confirm_image_selection
+    action: tap
+    point: xhs.publish.next_button
+    wait_after: 2.0
+    verify: screenshot_changed
+    description: Confirm image selection and proceed
+
+  - id: skip_filter_page
+    action: tap
+    point: xhs.publish.next_button
+    wait_after: 2.5
+    verify: screenshot_changed
+    description: Skip filter/edit page
+
+  - id: focus_content_area
+    action: tap
+    point: xhs.publish.content_input
+    wait_after: 1.5
+    verify: none
+    description: Focus on content input area to activate keyboard
+
+  - id: paste_combined_text
+    action: press_key
+    key: ctrl_v
+    wait_after: 1.5
+    verify: none
+    description: Paste pre-copied title, content, and hashtags from clipboard
+
+  - id: tap_publish_confirm
+    action: tap
+    point: xhs.publish.submit_button
+    wait_after: 6.0
+    verify: screenshot_changed
+    description: Tap final publish button and wait for upload
+
+  - id: verify_published
+    action: screenshot
+    wait_after: 2.0
+    verify: manual_confirm
+    description: Capture final screen to verify publish success
+
+  - id: return_home
+    action: press_key
+    key: home
+    wait_after: 1.0
+    verify: none
+    description: Return to home screen

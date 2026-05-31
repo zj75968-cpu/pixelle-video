@@ -1,0 +1,150 @@
+profile_id: xhs_publish_calibration_template
+description: Calibration profile template for Xiaohongshu publish flow
+device_model: Generic Android Device
+screen:
+  width: 1080
+  height: 2400
+  safe_top: 100
+  safe_bottom: 120
+  navigation_mode: gesture
+
+points:
+  # ============================================
+  # Home Screen Points
+  # ============================================
+  - name: xhs.launcher
+    type: absolute
+    x: 540
+    y: 1200
+    description: Xiaohongshu app icon on home screen or app drawer
+
+  - name: xhs.home.publish_button
+    type: absolute
+    x: 540
+    y: 2200
+    description: Main '+' publish button at bottom center of home screen
+
+  # ============================================
+  # Publish Flow - Album Selection
+  # ============================================
+  - name: xhs.publish.album_tab
+    type: absolute
+    x: 270
+    y: 2100
+    description: Album/Gallery tab button after tapping publish
+
+  - name: xhs.publish.first_image
+    type: absolute
+    x: 180
+    y: 450
+    description: First image thumbnail in album grid (top-left, most recent)
+
+  # Multi-image selection points (3 columns x 3 rows grid)
+  # Images are selected in reverse order to maintain correct sequence
+  - name: xhs.publish.image_2
+    type: absolute
+    x: 540
+    y: 450
+    description: Second image position (row 0, col 1)
+
+  - name: xhs.publish.image_3
+    type: absolute
+    x: 900
+    y: 450
+    description: Third image position (row 0, col 2)
+
+  - name: xhs.publish.image_4
+    type: absolute
+    x: 180
+    y: 810
+    description: Fourth image position (row 1, col 0)
+
+  - name: xhs.publish.image_5
+    type: absolute
+    x: 540
+    y: 810
+    description: Fifth image position (row 1, col 1)
+
+  - name: xhs.publish.image_6
+    type: absolute
+    x: 900
+    y: 810
+    description: Sixth image position (row 1, col 2)
+
+  - name: xhs.publish.image_7
+    type: absolute
+    x: 180
+    y: 1170
+    description: Seventh image position (row 2, col 0)
+
+  - name: xhs.publish.image_8
+    type: absolute
+    x: 540
+    y: 1170
+    description: Eighth image position (row 2, col 1)
+
+  - name: xhs.publish.image_9
+    type: absolute
+    x: 900
+    y: 1170
+    description: Ninth image position (row 2, col 2)
+
+  - name: xhs.publish.next_button
+    type: absolute
+    x: 960
+    y: 150
+    description: Next/Confirm button at top-right corner
+
+  # ============================================
+  # Publish Flow - Content Input
+  # ============================================
+  - name: xhs.publish.title_input
+    type: absolute
+    x: 540
+    y: 300
+    description: Title input field (optional, may not be visible)
+
+  - name: xhs.publish.content_input
+    type: absolute
+    x: 324
+    y: 1080
+    description: Main content/body input area (center-left of screen)
+
+  - name: xhs.publish.submit_button
+    type: absolute
+    x: 960
+    y: 150
+    description: Final publish/submit button at top-right
+
+# ============================================
+# Calibration Instructions
+# ============================================
+#
+# To calibrate this profile for your device:
+#
+# 1. Take screenshots at each step of the publish flow:
+#    - Home screen with XHS app visible
+#    - XHS home screen showing the '+' button
+#    - Album selection screen
+#    - Content input screen
+#
+# 2. Use an image viewer or annotation tool to identify pixel coordinates
+#    - Most image viewers show cursor position in pixels
+#    - Coordinates are (x, y) from top-left corner (0, 0)
+#
+# 3. Update the x, y values for each point based on your screenshots
+#
+# 4. For multi-image grid:
+#    - Measure the first image position (top-left)
+#    - Calculate spacing between images
+#    - Update image_2 through image_9 coordinates
+#    - Grid formula: x = base_x + (col * spacing_x)
+#                    y = base_y + (row * spacing_y)
+#
+# 5. Test the calibration:
+#    - Run a single-image publish test
+#    - Run a multi-image publish test
+#    - Adjust coordinates if taps miss targets
+#
+# 6. Save the calibrated profile with your device model name:
+#    xhs_publish_<device_model>.yaml

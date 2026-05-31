@@ -1,0 +1,28 @@
+profile_id: example_device
+screen:
+  width: 1080
+  height: 2400
+  safe_top: 100
+  safe_bottom: 120
+  navigation_mode: gesture
+points:
+- name: xhs.home.publish_button
+  type: absolute
+  x: 540
+  y: 2200
+  description: Main publish button on home screen
+- name: xhs.home.search_bar
+  type: absolute
+  x: 540
+  y: 150
+  description: Search bar at top of home screen
+- name: xhs.edit.title_field
+  type: absolute
+  x: 540
+  y: 300
+  description: Title input field in edit screen
+- name: xhs.edit.submit_button
+  type: absolute
+  x: 900
+  y: 150
+  description: Submit/publish button in edit screen
