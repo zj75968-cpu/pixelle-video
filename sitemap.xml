@@ -183,6 +183,13 @@
         <xhtml:link rel="alternate" hreflang="zh" href="https://AIDC-AI.github.io/Pixelle-Video/zh/superpowers/plans/2026-05-28-ch9329-refactor/"/>
     </url>
     <url>
+        <loc>https://AIDC-AI.github.io/Pixelle-Video/superpowers/plans/2026-05-31-ch9329-publish-copy-cleanup/</loc>
+        <lastmod>2026-05-31</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://AIDC-AI.github.io/Pixelle-Video/superpowers/plans/2026-05-31-ch9329-publish-copy-cleanup/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://AIDC-AI.github.io/Pixelle-Video/zh/superpowers/plans/2026-05-31-ch9329-publish-copy-cleanup/"/>
+    </url>
+    <url>
         <loc>https://AIDC-AI.github.io/Pixelle-Video/superpowers/specs/2026-05-28-ch9329-refactor-design/</loc>
         <lastmod>2026-05-31</lastmod>
         <changefreq>daily</changefreq>
@@ -209,6 +216,13 @@
         <changefreq>daily</changefreq>
         <xhtml:link rel="alternate" hreflang="en" href="https://AIDC-AI.github.io/Pixelle-Video/superpowers/specs/2026-05-30-productization-refactor-design/"/>
         <xhtml:link rel="alternate" hreflang="zh" href="https://AIDC-AI.github.io/Pixelle-Video/zh/superpowers/specs/2026-05-30-productization-refactor-design/"/>
+    </url>
+    <url>
+        <loc>https://AIDC-AI.github.io/Pixelle-Video/superpowers/specs/2026-05-31-ch9329-publish-copy-cleanup-design/</loc>
+        <lastmod>2026-05-31</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="en" href="https://AIDC-AI.github.io/Pixelle-Video/superpowers/specs/2026-05-31-ch9329-publish-copy-cleanup-design/"/>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://AIDC-AI.github.io/Pixelle-Video/zh/superpowers/specs/2026-05-31-ch9329-publish-copy-cleanup-design/"/>
     </url>
     <url>
         <loc>https://AIDC-AI.github.io/Pixelle-Video/zh/FAQ/</loc>
@@ -393,6 +407,13 @@
         <xhtml:link rel="alternate" hreflang="en" href="https://AIDC-AI.github.io/Pixelle-Video/superpowers/plans/2026-05-28-ch9329-refactor/"/>
     </url>
     <url>
+        <loc>https://AIDC-AI.github.io/Pixelle-Video/zh/superpowers/plans/2026-05-31-ch9329-publish-copy-cleanup/</loc>
+        <lastmod>2026-05-31</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://AIDC-AI.github.io/Pixelle-Video/zh/superpowers/plans/2026-05-31-ch9329-publish-copy-cleanup/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://AIDC-AI.github.io/Pixelle-Video/superpowers/plans/2026-05-31-ch9329-publish-copy-cleanup/"/>
+    </url>
+    <url>
         <loc>https://AIDC-AI.github.io/Pixelle-Video/zh/superpowers/specs/2026-05-28-ch9329-refactor-design/</loc>
         <lastmod>2026-05-31</lastmod>
         <changefreq>daily</changefreq>
@@ -419,5 +440,12 @@
         <changefreq>daily</changefreq>
         <xhtml:link rel="alternate" hreflang="zh" href="https://AIDC-AI.github.io/Pixelle-Video/zh/superpowers/specs/2026-05-30-productization-refactor-design/"/>
         <xhtml:link rel="alternate" hreflang="en" href="https://AIDC-AI.github.io/Pixelle-Video/superpowers/specs/2026-05-30-productization-refactor-design/"/>
+    </url>
+    <url>
+        <loc>https://AIDC-AI.github.io/Pixelle-Video/zh/superpowers/specs/2026-05-31-ch9329-publish-copy-cleanup-design/</loc>
+        <lastmod>2026-05-31</lastmod>
+        <changefreq>daily</changefreq>
+        <xhtml:link rel="alternate" hreflang="zh" href="https://AIDC-AI.github.io/Pixelle-Video/zh/superpowers/specs/2026-05-31-ch9329-publish-copy-cleanup-design/"/>
+        <xhtml:link rel="alternate" hreflang="en" href="https://AIDC-AI.github.io/Pixelle-Video/superpowers/specs/2026-05-31-ch9329-publish-copy-cleanup-design/"/>
     </url>
 </urlset>
