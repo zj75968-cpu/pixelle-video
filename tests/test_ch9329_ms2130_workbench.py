@@ -1,9 +1,11 @@
 import importlib.util
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
 
 def load_script_module():
-    script = Path("scripts/ch9329_visual_debug.py")
+    script = REPO_ROOT / "scripts" / "ch9329_visual_debug.py"
     spec = importlib.util.spec_from_file_location("ch9329_visual_debug", script)
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
