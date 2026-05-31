@@ -118,6 +118,8 @@ class VisualDebuggerApp(tk.Tk):
         self.drag_start_x = 0
         self.drag_start_y = 0
         self.drag_line_id = None
+        self.drag_candidate = False
+        self.drag_exceeded_threshold = False
         
         # Thread control
         self.auto_refresh_running = False
@@ -311,19 +313,19 @@ class VisualDebuggerApp(tk.Tk):
         self.cb_baud.set("9600")
         self.cb_baud.grid(row=1, column=1, sticky="w", padx=10, pady=5)
         
-        # Section 2: ADB settings
+        # Section 2: MS2130/legacy ADB settings
         lbl_adb_sec = ttk.Label(parent, text=OBSERVATION_LABEL, style="Section.TLabel")
         lbl_adb_sec.pack(anchor="w", pady=(5, 5))
-        
+
         card2 = ttk.Frame(parent, style="DarkCard.TFrame", padding=10)
         card2.pack(fill="x", pady=(0, 15))
-        
-        ttk.Label(card2, text="选择 ADB 序列号:").grid(row=0, column=0, sticky="w", pady=5)
+
+        ttk.Label(card2, text="ADB 序列号 (可选，旧版截图/规格读取):").grid(row=0, column=0, sticky="w", pady=5)
         self.cb_devices = ttk.Combobox(card2, textvariable=self.selected_serial, state="readonly", width=25)
         self.cb_devices.grid(row=0, column=1, columnspan=2, sticky="w", padx=10, pady=5)
         self.cb_devices.bind("<<ComboboxSelected>>", self.on_adb_device_selected)
-        
-        btn_rescan_adb = ttk.Button(card2, text="🔄 刷新 ADB", width=12, command=self.scan_adb)
+
+        btn_rescan_adb = ttk.Button(card2, text="🔄 刷新可选 ADB", width=14, command=self.scan_adb)
         btn_rescan_adb.grid(row=1, column=0, sticky="w", pady=5)
         
         # Section 3: Screen Parameters
@@ -515,17 +517,15 @@ class VisualDebuggerApp(tk.Tk):
         """Scan active adb clients."""
         try:
             devices = scan_adb_devices()
-            if devices:
-                serial_list = [d.serial for d in devices if d.status == "device"]
-                self.cb_devices["values"] = serial_list
-                if serial_list:
-                    self.selected_serial.set(serial_list[0])
-                    self.on_adb_device_selected(None)
+            serial_list = [d.serial for d in devices if d.status == "device"] if devices else []
+            self.cb_devices["values"] = serial_list
+            if serial_list:
+                self.selected_serial.set(serial_list[0])
+                self.on_adb_device_selected(None)
                 logger.info(f"Active ADB devices: {serial_list}")
             else:
-                self.cb_devices["values"] = []
                 self.selected_serial.set("")
-                logger.warning("No active ADB devices found.")
+                logger.warning("No active ADB devices found; legacy ADB observation remains optional.")
         except Exception as e:
             logger.error(f"Error scanning ADB: {e}")
             self.cb_devices["values"] = []
@@ -579,38 +579,40 @@ class VisualDebuggerApp(tk.Tk):
         """Disconnect active, instantiate a fresh CH9329Controller, read configs."""
         port = self.selected_port.get()
         serial = self.selected_serial.get()
-        
+
         if not port:
             messagebox.showerror("Error", "请先选择并确认 CH9329 的串口端口！")
             return
-        if not serial:
-            messagebox.showerror("Error", "请先选择并连接 ADB 设备！")
-            return
-            
+
         # Clean existing
         if self.controller:
             self.controller.disconnect()
-            
+        self.controller = None
+
         try:
+            baudrate = int(self.cb_baud.get())
             # Instantiate CH9329 controller
-            self.controller = CH9329Controller(port=port)
-            self.controller.screen_width = self.screen_width.get()
-            self.controller.screen_height = self.screen_height.get()
-            
-            if not self.controller.connect():
+            controller = CH9329Controller(port=port, baudrate=baudrate)
+            controller.screen_width = self.screen_width.get()
+            controller.screen_height = self.screen_height.get()
+
+            if not controller.connect():
                 raise ConnectionError(f"无法在端口 {port} 上与 CH9329 建立连接。请确认波特率和连接。")
-                
+            self.controller = controller
+
             self.lbl_fps.config(text="● 硬件已联调", foreground="#00FF66")
-            logger.success(f"CH9329 visual debug workbench successfully connected on {port} / {serial}")
-            
+            logger.success(f"CH9329/MS2130 visual debug workbench connected on {port}; optional ADB={serial or 'not selected'}")
+
             # Load Calibration Profile
             self.load_calibration_profile()
-            
-            # Instantly refresh screenshot once
+
+            # Instantly refresh screenshot once when legacy ADB is available.
             self.manual_refresh_screenshot()
-            
-            messagebox.showinfo("Success", f"物理联调连接建立成功！\n- 串口: {port}\n- ADB: {serial}\n- 屏幕: {self.screen_width.get()}x{self.screen_height.get()}")
+
+            adb_text = serial or "未选择（MS2130/CH9329 连接不依赖 ADB）"
+            messagebox.showinfo("Success", f"物理联调连接建立成功！\n- 串口: {port}\n- 波特率: {baudrate}\n- ADB: {adb_text}\n- 屏幕: {self.screen_width.get()}x{self.screen_height.get()}")
         except Exception as e:
+            self.controller = None
             logger.error(f"Failed to connect hardware: {e}")
             messagebox.showerror("Connection Failed", f"连接失败: {e}")
 
@@ -956,28 +958,22 @@ class VisualDebuggerApp(tk.Tk):
             self.point_name.set("xhs.")
             self.point_desc.set(f"Selected point at ({self.selected_x}, {self.selected_y})")
             
-            # Save Drag Start coordinates for SWIPE
+            # Save Drag Start coordinates for possible click/swipe on release
             self.drag_start_x = event.x
             self.drag_start_y = event.y
-            
-            # Trigger physical click in thread to avoid UI lag
-            if self.controller:
-                threading.Thread(
-                    target=self._physical_click_worker,
-                    args=(self.selected_x_ratio, self.selected_y_ratio),
-                    daemon=True
-                ).start()
-            else:
-                logger.warning("Click triggered, but CH9329 is not initialized.")
+            self.drag_candidate = True
+            self.drag_exceeded_threshold = False
+        else:
+            self.drag_candidate = False
 
     def _physical_click_worker(self, xr, yr):
         """Perform hardware click."""
         try:
             self.controller.click(xr, yr)
-            # If auto-refresh is OFF, request one screenshot capture to show outcome
+            # If auto-refresh is OFF, request one screenshot capture on Tk thread to show outcome
             if not self.auto_refresh_var.get():
                 time.sleep(0.6)  # wait for UI render
-                self.manual_refresh_screenshot()
+                self.after(0, self.manual_refresh_screenshot)
         except Exception as e:
             logger.error(f"Physical click fail: {e}")
 
@@ -990,9 +986,13 @@ class VisualDebuggerApp(tk.Tk):
         if not self.raw_image or not self.tk_image:
             return
             
+        distance = math.sqrt((event.x - self.drag_start_x)**2 + (event.y - self.drag_start_y)**2)
+        if distance >= 15:
+            self.drag_exceeded_threshold = True
+
         if self.drag_line_id:
             self.canvas.delete(self.drag_line_id)
-            
+
         # Draw transparent blue dragging vector line
         self.drag_line_id = self.canvas.create_line(
             self.drag_start_x, self.drag_start_y,
@@ -1024,6 +1024,16 @@ class VisualDebuggerApp(tk.Tk):
         # Filter tiny accidental jitter click drags
         distance = math.sqrt((event.x - self.drag_start_x)**2 + (event.y - self.drag_start_y)**2)
         if distance < 15:
+            if self.drag_candidate:
+                self.drag_candidate = False
+                if self.controller:
+                    threading.Thread(
+                        target=self._physical_click_worker,
+                        args=(self.selected_x_ratio, self.selected_y_ratio),
+                        daemon=True
+                    ).start()
+                else:
+                    logger.warning("Click triggered, but CH9329 is not initialized.")
             return
             
         # Check start bounds
@@ -1033,7 +1043,8 @@ class VisualDebuggerApp(tk.Tk):
             y2_r = max(0.0, min(1.0, y2_r))
             
             logger.info(f"Gesture Drag: Swipe from ({x1_r:.3f}, {y1_r:.3f}) to ({x2_r:.3f}, {y2_r:.3f})")
-            
+            self.drag_candidate = False
+
             # Send physical swipe via CH9329 on thread
             if self.controller:
                 threading.Thread(
@@ -1052,7 +1063,7 @@ class VisualDebuggerApp(tk.Tk):
                 logger.success("Swipe executed successfully.")
                 if not self.auto_refresh_var.get():
                     time.sleep(0.8)  # wait for swipe UI animation
-                    self.manual_refresh_screenshot()
+                    self.after(0, self.manual_refresh_screenshot)
             else:
                 logger.error("Swipe gesture execution failed.")
         except Exception as e:
@@ -1060,56 +1071,19 @@ class VisualDebuggerApp(tk.Tk):
 
     def ch9329_swipe_gesture(self, x1_r, y1_r, x2_r, y2_r, duration=0.8) -> bool:
         """
-        Custom high precision smooth mouse swipe gesture solver.
-        Utilizes Cosine Easing (100% Android physical compatibility, no virtual detection trigger).
+        Execute a physical swipe through CH9329Controller.
+
+        Delegating keeps long-distance movement accounting in the controller, which avoids
+        losing clipped residual deltas in this workbench layer.
         """
         if not self.controller:
             return False
-            
-        # 1. Start coordinate move
-        if not self.controller.move_to(x1_r, y1_r):
+
+        swipe = getattr(self.controller, "swipe", None)
+        if not callable(swipe):
+            logger.error("CH9329 controller does not expose swipe().")
             return False
-        time.sleep(0.1)
-        
-        # 2. Press left mouse down
-        self.controller._send_rel_mouse(0x01, 0, 0)
-        time.sleep(0.05)
-        
-        # 3. Calculate absolute distance delta
-        dx = int((x2_r - x1_r) * self.controller.screen_width)
-        dy = int((y2_r - y1_r) * self.controller.screen_height)
-        
-        steps = 25
-        delay = duration / steps
-        
-        # Cosine damping easing simulation
-        for i in range(1, steps + 1):
-            t = i / steps
-            # Total accumulated target pixels up to step
-            curr_x = int(dx * (1 - math.cos(t * math.pi / 2)))
-            curr_y = int(dy * (1 - math.cos(t * math.pi / 2)))
-            
-            # Accumulated target pixels of previous step
-            prev_x = int(dx * (1 - math.cos((i-1) * math.pi / 2)))
-            prev_y = int(dy * (1 - math.cos((i-1) * math.pi / 2)))
-            
-            # Step offset slice
-            step_dx = curr_x - prev_x
-            step_dy = curr_y - prev_y
-            
-            # Hard clipping relative byte constraint limit of [-120, 120]
-            step_dx = max(-120, min(120, step_dx))
-            step_dy = max(-120, min(120, step_dy))
-            
-            # Send step offset packet with button pressed active
-            self.controller._send_rel_mouse(0x01, step_dx, step_dy)
-            time.sleep(delay)
-            
-        time.sleep(0.05)
-        # 4. Release mouse click
-        res = self.controller._send_rel_mouse(0x00, 0, 0)
-        time.sleep(0.1)
-        return res
+        return bool(swipe(x1_r, y1_r, x2_r, y2_r, duration=duration))
 
     # =========================================================================
     # Keyboard & Macro Action Handlers
@@ -1138,7 +1112,7 @@ class VisualDebuggerApp(tk.Tk):
             self.after(0, lambda: self.ent_typing.delete(0, tk.END))
             if not self.auto_refresh_var.get():
                 time.sleep(0.5)
-                self.manual_refresh_screenshot()
+                self.after(0, self.manual_refresh_screenshot)
         except Exception as e:
             logger.error(f"Typing input error: {e}")
 
@@ -1173,7 +1147,7 @@ class VisualDebuggerApp(tk.Tk):
             
             if not self.auto_refresh_var.get():
                 time.sleep(0.6)
-                self.manual_refresh_screenshot()
+                self.after(0, self.manual_refresh_screenshot)
         except Exception as e:
             logger.error(f"Macro action fail: {e}")
 
