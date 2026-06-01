@@ -1,0 +1,1 @@
+"""Web views tests package"""

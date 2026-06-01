@@ -1,0 +1,1 @@
+"""Web components tests package"""
