@@ -53,8 +53,9 @@ config.yaml.bak
 config/devices.yaml
 config/calibration_profiles/*.yaml
 
-# Local external checkouts
+# Local external checkouts / deployment drafts
 cc-connect/
+deploy/
 
 # Logs
 *.log
