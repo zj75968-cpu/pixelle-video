@@ -53,6 +53,8 @@ config.yaml.bak
 config/devices.yaml
 config/calibration_profiles/*.yaml
 
+scratch/
+
 # Local external checkouts / deployment drafts
 cc-connect/
 deploy/
