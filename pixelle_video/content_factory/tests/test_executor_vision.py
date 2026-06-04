@@ -75,3 +75,14 @@ def test_click_on_match_clicks_center_ratio():
     res = ex.execute_flow([{"type": "click_on_match", "template": "xhs/btn"}], {})
     assert res[0].status == "succeeded"
     assert ctrl.clicks == [(0.5, 0.25)]
+
+
+def test_default_flow_with_vision_steps_passes_in_simulate():
+    from content_factory.workers.publish_worker import DEFAULT_FLOW_STEPS
+
+    types = [s["type"] for s in DEFAULT_FLOW_STEPS]
+    assert "wait_for_element" in types  # reference vision step present
+
+    ex = CH9329Executor(simulate=True, vision=None)  # real simulate controller
+    res = ex.execute_flow(DEFAULT_FLOW_STEPS, {})
+    assert all(r.status in ("succeeded", "skipped") for r in res)

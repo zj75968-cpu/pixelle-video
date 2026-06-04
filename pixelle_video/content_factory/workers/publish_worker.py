@@ -21,13 +21,16 @@ from content_factory.domain.publish.models import (
 DEFAULT_FLOW_STEPS = [
     {"type": "checkpoint", "note": "confirm phone is unlocked"},
     {"type": "open_app", "app": "xiaohongshu", "note": "open Xiaohongshu app"},
+    {"type": "wait_for_element", "template": "xhs/home_publish_btn", "timeout": 10, "note": "wait for home loaded"},
     {"type": "tap", "x": 540, "y": 2250, "note": "enter publish entry"},
+    {"type": "verify_screen", "template": "xhs/album_tab", "note": "confirm media picker"},
     {"type": "select_media", "source": "publish_package.media", "note": "select images/videos"},
     {"type": "input_text", "field": "title", "source": "publish_package.title", "note": "input title"},
     {"type": "input_text", "field": "body", "source": "publish_package.body", "note": "input body"},
     {"type": "input_text", "field": "tags", "source": "publish_package.hashtags", "note": "input tags"},
     {"type": "set_cover", "source": "publish_package.cover", "note": "set cover if needed"},
     {"type": "preview", "note": "check preview"},
+    {"type": "verify_screen", "template": "xhs/publish_ready", "note": "confirm ready to save"},
     {"type": "tap", "x": 540, "y": 2300, "note": "save draft"},
     {"type": "checkpoint", "note": "record result"},
 ]
