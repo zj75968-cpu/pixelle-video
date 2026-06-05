@@ -12,6 +12,8 @@ Provides orchestration for:
 - Comparing before/after screenshots (basic change detection)
 """
 
+import subprocess
+import sys
 import time
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field, asdict
@@ -350,12 +352,10 @@ class CalibrationWorkbench:
         logger.info(f"Testing point '{name}' at ratio ({point.x_ratio:.4f}, {point.y_ratio:.4f})")
 
         # Capture before screenshot
-        before_screenshot = None
         before_path = None
         if session.current_screenshot is None:
-            before_screenshot, before_path = self.capture_screen(phone_id)
+            _, before_path = self.capture_screen(phone_id)
         else:
-            before_screenshot = session.current_screenshot
             before_path = session.current_screenshot_path
 
         # Click the point via CH9329
@@ -518,6 +518,333 @@ class CalibrationWorkbench:
         if removed:
             logger.info(f"Removed point '{name}' from profile")
         return removed
+
+    def quick_pick_coordinates(self, phone_id: str, auto_screenshot: bool = True) -> Optional[Tuple[int, int, float, float]]:
+        """
+        快速坐标拾取 - 截图后点击图片获取坐标
+
+        Args:
+            phone_id: 设备ID
+            auto_screenshot: 是否自动截图（False则使用当前截图）
+
+        Returns:
+            (x, y, x_ratio, y_ratio) 或 None
+        """
+        session = self._get_session(phone_id)
+
+        # 截图
+        if auto_screenshot or session.current_screenshot is None:
+            try:
+                self.capture_screen(phone_id)
+            except CalibrationError as e:
+                logger.error(f"截图失败: {e}")
+                return None
+
+        if session.current_screenshot_path is None:
+            logger.error("没有可用的截图")
+            return None
+
+        # 显示图片选择器
+        try:
+            result = self._show_coordinate_picker(
+                session.current_screenshot_path,
+                session.profile.screen_width,
+                session.profile.screen_height
+            )
+
+            return result
+
+        except ImportError:
+            logger.error("需要安装 tkinter 和 Pillow")
+            return None
+        except Exception as e:
+            logger.error(f"坐标拾取失败: {e}")
+            return None
+
+    def _show_coordinate_picker(self, image_path: str, screen_width: int, screen_height: int) -> Optional[Tuple[int, int, float, float]]:
+        """显示坐标拾取窗口"""
+        import tkinter as tk
+        from PIL import Image, ImageTk
+
+        root = tk.Tk()
+        root.title("快速坐标拾取")
+
+        # 加载图片
+        img = Image.open(image_path)
+
+        # 计算缩放
+        max_height = 900
+        img_w, img_h = img.size
+        if img_h > max_height:
+            scale = max_height / img_h
+            new_w = int(img_w * scale)
+            new_h = int(img_h * scale)
+            img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        else:
+            scale = 1.0
+
+        tk_img = ImageTk.PhotoImage(img)
+
+        result = {'coords': None}
+
+        canvas = tk.Canvas(root, width=img.width, height=img.height, bg='black')
+        canvas.pack()
+        canvas.create_image(0, 0, anchor='nw', image=tk_img)
+
+        coord_label = tk.Label(root, text="请点击图片上的目标位置",
+                              font=("Consolas", 12), bg='#2D2D2D', fg='#00FF66', padx=10, pady=5)
+        coord_label.pack(fill='x')
+
+        crosshair_h = None
+        crosshair_v = None
+
+        def on_mouse_move(event):
+            nonlocal crosshair_h, crosshair_v
+            if crosshair_h:
+                canvas.delete(crosshair_h)
+            if crosshair_v:
+                canvas.delete(crosshair_v)
+
+            crosshair_h = canvas.create_line(0, event.y, img.width, event.y, fill='#FF4B4B', width=1, dash=(4, 4))
+            crosshair_v = canvas.create_line(event.x, 0, event.x, img.height, fill='#FF4B4B', width=1, dash=(4, 4))
+
+            actual_x = int(event.x / scale)
+            actual_y = int(event.y / scale)
+            x_ratio = actual_x / screen_width
+            y_ratio = actual_y / screen_height
+
+            coord_label.config(text=f"鼠标位置: ({actual_x}, {actual_y}) | 比例: ({x_ratio:.4f}, {y_ratio:.4f})")
+
+        def on_click(event):
+            actual_x = int(event.x / scale)
+            actual_y = int(event.y / scale)
+            x_ratio = actual_x / screen_width
+            y_ratio = actual_y / screen_height
+
+            r = 8
+            canvas.create_oval(event.x - r, event.y - r, event.x + r, event.y + r, outline='#00FF66', width=3)
+            canvas.create_oval(event.x - 2, event.y - 2, event.x + 2, event.y + 2, fill='#FF4B4B', outline='#FF4B4B')
+
+            coord_label.config(text=f"✓ 已选择: ({actual_x}, {actual_y}) | 比例: ({x_ratio:.4f}, {y_ratio:.4f})", fg='#00FF66')
+
+            result['coords'] = (actual_x, actual_y, x_ratio, y_ratio)
+            root.after(500, root.destroy)
+
+        canvas.bind('<Motion>', on_mouse_move)
+        canvas.bind('<Button-1>', on_click)
+        root.bind('<Escape>', lambda e: root.destroy())
+
+        root.mainloop()
+
+        return result['coords']
+
+    def interactive_debug_console(self, phone_id: str) -> None:
+        """
+        启动交互式CH9329调试控制台
+
+        Args:
+            phone_id: 设备ID
+        """
+        session = self._get_session(phone_id)
+
+        print("\n" + "=" * 70)
+        print("  🎮 CH9329 调试控制台")
+        print(f"  设备: {phone_id}")
+        print(f"  屏幕: {session.profile.screen_width}x{session.profile.screen_height}")
+        print("=" * 70)
+
+        self._print_console_help()
+
+        while True:
+            try:
+                cmd = input("\n[CH9329]> ").strip()
+
+                if not cmd:
+                    continue
+
+                if cmd in ['exit', 'quit', 'q']:
+                    break
+                elif cmd in ['help', 'h', '?']:
+                    self._print_console_help()
+                elif cmd.startswith(('click ', 'c ', 'clickr ', 'cr ')):
+                    self._console_click(session, cmd)
+                elif cmd.startswith(('swipe ', 's ', 'swiper ', 'sr ')):
+                    self._console_swipe(session, cmd)
+                elif cmd.startswith('type ') or cmd.startswith('t '):
+                    self._console_type(session, cmd)
+                elif cmd == 'home':
+                    session.ch9329.swipe_up_to_home()
+                    print("✓ 已返回桌面")
+                elif cmd == 'back':
+                    session.ch9329._send_keyboard(0x00, 0x29)
+                    print("✓ 返回键已发送")
+                elif cmd == 'enter':
+                    session.ch9329.press_enter()
+                    print("✓ 回车键已发送")
+                elif cmd.startswith('backspace'):
+                    parts = cmd.split()
+                    times = int(parts[1]) if len(parts) > 1 else 1
+                    session.ch9329.press_backspace(times)
+                    print(f"✓ 退格键已发送 {times} 次")
+                elif cmd in ['screenshot', 'ss']:
+                    self.capture_screen(phone_id)
+                    print(f"✓ 截图已保存: {session.current_screenshot_path}")
+                elif cmd == 'pick':
+                    coords = self.quick_pick_coordinates(phone_id, auto_screenshot=False)
+                    if coords:
+                        print(f"✓ 坐标: ({coords[0]}, {coords[1]}) | 比例: ({coords[2]:.4f}, {coords[3]:.4f})")
+                elif cmd == 'list':
+                    self._console_list_points(session)
+                elif cmd.startswith('test '):
+                    point_name = cmd.split(maxsplit=1)[1]
+                    self.test_point(phone_id, point_name)
+                else:
+                    print(f"❌ 未知命令: {cmd}")
+
+            except KeyboardInterrupt:
+                print("\n使用 'exit' 退出")
+            except Exception as e:
+                logger.error(f"命令执行错误: {e}")
+
+    def _print_console_help(self):
+        """打印控制台帮助"""
+        print("""
+📖 命令列表:
+  click/c <x> <y>        点击像素坐标
+  clickr/cr <x> <y>      点击比例坐标 (0.0-1.0)
+  swipe/s <x1> <y1> <x2> <y2>  像素坐标滑动
+  swiper/sr <x1> <y1> <x2> <y2>  比例坐标滑动
+  type/t <text>          输入文本
+  home                   返回桌面
+  back                   返回键
+  enter                  回车键
+  backspace [n]          退格键
+  screenshot/ss          截图
+  pick                   快速拾取坐标
+  list                   列出已保存的坐标点
+  test <name>            测试指定坐标点
+  help/h/?               显示帮助
+  exit/quit/q            退出
+""")
+
+    def _console_click(self, session: CalibrationSession, cmd: str):
+        """控制台点击命令"""
+        parts = cmd.split()
+        if len(parts) < 3:
+            print("❌ 用法: click <x> <y> 或 clickr <x_ratio> <y_ratio>")
+            return
+
+        mode = parts[0].lower()
+        x, y = float(parts[1]), float(parts[2])
+
+        if mode in ['clickr', 'cr']:
+            x_ratio, y_ratio = x, y
+            x_px = int(x_ratio * session.profile.screen_width)
+            y_px = int(y_ratio * session.profile.screen_height)
+            print(f"🎯 点击比例: ({x_ratio:.4f}, {y_ratio:.4f}) -> 像素: ({x_px}, {y_px})")
+        else:
+            x_px, y_px = int(x), int(y)
+            x_ratio = x_px / session.profile.screen_width
+            y_ratio = y_px / session.profile.screen_height
+            print(f"🎯 点击像素: ({x_px}, {y_px}) -> 比例: ({x_ratio:.4f}, {y_ratio:.4f})")
+
+        if session.ch9329.click(x_ratio, y_ratio):
+            print("✓ 点击成功")
+        else:
+            print("❌ 点击失败")
+
+    def _console_swipe(self, session: CalibrationSession, cmd: str):
+        """控制台滑动命令"""
+        parts = cmd.split()
+        if len(parts) < 5:
+            print("❌ 用法: swipe <x1> <y1> <x2> <y2> 或 swiper <x1_ratio> <y1_ratio> <x2_ratio> <y2_ratio>")
+            return
+
+        mode = parts[0].lower()
+        x1, y1, x2, y2 = float(parts[1]), float(parts[2]), float(parts[3]), float(parts[4])
+
+        if mode in ['swiper', 'sr']:
+            print(f"📱 比例滑动: ({x1:.4f}, {y1:.4f}) -> ({x2:.4f}, {y2:.4f})")
+            success = session.ch9329.swipe(x1, y1, x2, y2)
+        else:
+            x1_r = int(x1) / session.profile.screen_width
+            y1_r = int(y1) / session.profile.screen_height
+            x2_r = int(x2) / session.profile.screen_width
+            y2_r = int(y2) / session.profile.screen_height
+            print(f"📱 像素滑动: ({int(x1)}, {int(y1)}) -> ({int(x2)}, {int(y2)})")
+            success = session.ch9329.swipe(x1_r, y1_r, x2_r, y2_r)
+
+        if success:
+            print("✓ 滑动成功")
+        else:
+            print("❌ 滑动失败")
+
+    def _console_type(self, session: CalibrationSession, cmd: str):
+        """控制台输入命令"""
+        text = cmd.split(maxsplit=1)
+        if len(text) < 2:
+            print("❌ 用法: type <text>")
+            return
+
+        text = text[1]
+        print(f"⌨️  输入文本: {text}")
+        session.ch9329.write_text(text)
+        print("✓ 输入成功")
+
+    def _console_list_points(self, session: CalibrationSession):
+        """列出所有坐标点"""
+        points = list(session.profile.points.values())
+        if not points:
+            print("暂无保存的坐标点")
+            return
+
+        print(f"\n已保存的坐标点 (共 {len(points)} 个):")
+        print("-" * 80)
+        print(f"{'名称':<30} {'坐标':<15} {'比例':<20} {'描述':<20}")
+        print("-" * 80)
+
+        for point in points:
+            coords = f"({point.x}, {point.y})"
+            ratio = f"({point.x_ratio:.4f}, {point.y_ratio:.4f})"
+            desc = point.description[:20] if point.description else ""
+            print(f"{point.name:<30} {coords:<15} {ratio:<20} {desc:<20}")
+
+    def launch_interactive_gui(self, phone_id: str, profile_name: str = "default") -> None:
+        """
+        拉起可视化的物理手机投屏与 CH9329 联调校准工作台 GUI。
+        通过独立子进程异步拉起，绝不阻塞当前 Python 主控制流。
+
+        Args:
+            phone_id: 物理手机的 ID 标识 (例如 vivo_v2199a_001)
+            profile_name: 语义配置文件名称 (默认为 'default')
+        """
+        project_root = Path(__file__).resolve().parents[4]
+        script_path = project_root / "scripts" / "ch9329_visual_debug.py"
+
+        if not script_path.exists():
+            message = f"Visual debugger unavailable: expected script at {script_path}"
+            logger.error(message)
+            raise FileNotFoundError(message)
+
+        logger.info(f"Launching CH9329 Visual Calibration Workbench for {phone_id} (profile: {profile_name})...")
+
+        # 组装 CLI 启动命令并附带设备和配置绑定
+        cmd = [
+            sys.executable,
+            str(script_path),
+            "--phone_id", phone_id,
+            "--profile", profile_name
+        ]
+
+        # 使用 subprocess.Popen 异步拉起子进程，独立运行，绝不阻塞当前线程
+        subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+            start_new_session=True
+        )
+        logger.success("CH9329 Visual Calibration Workbench GUI launched successfully as a background subprocess.")
 
     def _get_session(self, phone_id: str) -> CalibrationSession:
         """Get active session or raise error."""

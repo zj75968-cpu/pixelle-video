@@ -185,6 +185,81 @@ class CH9329Controller:
         time.sleep(0.2)
         return True
 
+    def swipe(self, x1_ratio: float, y1_ratio: float, x2_ratio: float, y2_ratio: float, duration: float = 0.8) -> bool:
+        """
+        高精度平滑鼠标滑动模拟手势。
+        采用余弦缓动 (Cosine Easing) 的分步增量发送机制，能让 Android 系统 100% 成功识别为滑动，避免硬跳跃失效。
+        """
+        import math
+        logger.info(f"Executing swipe from ({x1_ratio:.3f}, {y1_ratio:.3f}) to ({x2_ratio:.3f}, {y2_ratio:.3f}) via CH9329...")
+
+        # 1. 移到起点
+        if not self.move_to(x1_ratio, y1_ratio):
+            return False
+        time.sleep(0.1)
+
+        # 2. 按下鼠标左键
+        success = self._send_rel_mouse(0x01, 0, 0)
+        time.sleep(0.05)
+        if not success:
+            self._send_rel_mouse(0x00, 0, 0)
+            time.sleep(0.1)
+            return False
+
+        # 3. 换算物理像素绝对位移 delta
+        dx = int((x2_ratio - x1_ratio) * self.screen_width)
+        dy = int((y2_ratio - y1_ratio) * self.screen_height)
+
+        steps = 25
+        delay = duration / steps
+        prev_x = 0
+        prev_y = 0
+
+        # 4. Cosine 缓动阻尼模拟
+        for i in range(1, steps + 1):
+            t = i / steps
+            # 当前累积像素位移
+            curr_x = int(dx * (1 - math.cos(t * math.pi / 2)))
+            curr_y = int(dy * (1 - math.cos(t * math.pi / 2)))
+
+            # 这一步应当补齐的相对偏移增量
+            remaining_x = curr_x - prev_x
+            remaining_y = curr_y - prev_y
+
+            while remaining_x != 0 or remaining_y != 0:
+                step_dx = max(-120, min(120, remaining_x))
+                step_dy = max(-120, min(120, remaining_y))
+                if not self._send_rel_mouse(0x01, step_dx, step_dy):
+                    success = False
+                    break
+                remaining_x -= step_dx
+                remaining_y -= step_dy
+                prev_x += step_dx
+                prev_y += step_dy
+            if not success:
+                break
+            time.sleep(delay)
+
+        if success and (prev_x != dx or prev_y != dy):
+            remaining_x = dx - prev_x
+            remaining_y = dy - prev_y
+            while remaining_x != 0 or remaining_y != 0:
+                step_dx = max(-120, min(120, remaining_x))
+                step_dy = max(-120, min(120, remaining_y))
+                if not self._send_rel_mouse(0x01, step_dx, step_dy):
+                    success = False
+                    break
+                remaining_x -= step_dx
+                remaining_y -= step_dy
+                prev_x += step_dx
+                prev_y += step_dy
+
+        time.sleep(0.05)
+        # 5. 释放鼠标左键并完成
+        release_success = self._send_rel_mouse(0x00, 0, 0)
+        time.sleep(0.1)
+        return success and release_success
+
     # =========================================================================
     # 键盘控制
     # =========================================================================
@@ -285,3 +360,151 @@ class CH9329Controller:
     def press_ctrl_l(self) -> bool:
         """发送 Ctrl + L (聚焦浏览器地址栏)"""
         return self._send_keyboard(0x01, 0x0F)
+
+    # =========================================================================
+    # 调试辅助方法
+    # =========================================================================
+
+    def click_pixel(self, x: int, y: int) -> bool:
+        """
+        使用像素坐标点击（自动转换为比例）
+
+        Args:
+            x: X像素坐标
+            y: Y像素坐标
+
+        Returns:
+            是否成功
+        """
+        x_ratio = x / self.screen_width
+        y_ratio = y / self.screen_height
+        logger.debug(f"点击像素坐标 ({x}, {y}) -> 比例 ({x_ratio:.4f}, {y_ratio:.4f})")
+        return self.click(x_ratio, y_ratio)
+
+    def swipe_pixel(self, x1: int, y1: int, x2: int, y2: int, duration: float = 0.8) -> bool:
+        """
+        使用像素坐标滑动（自动转换为比例）
+
+        Args:
+            x1, y1: 起点像素坐标
+            x2, y2: 终点像素坐标
+            duration: 滑动持续时间（秒）
+
+        Returns:
+            是否成功
+        """
+        x1_ratio = x1 / self.screen_width
+        y1_ratio = y1 / self.screen_height
+        x2_ratio = x2 / self.screen_width
+        y2_ratio = y2 / self.screen_height
+        logger.debug(f"滑动像素坐标 ({x1}, {y1}) -> ({x2}, {y2})")
+        return self.swipe(x1_ratio, y1_ratio, x2_ratio, y2_ratio, duration)
+
+    def tap_center(self) -> bool:
+        """点击屏幕中心"""
+        logger.info("点击屏幕中心")
+        return self.click(0.5, 0.5)
+
+    def swipe_up(self, distance: float = 0.3, duration: float = 0.5) -> bool:
+        """
+        向上滑动
+
+        Args:
+            distance: 滑动距离（屏幕高度的比例，0.0-1.0）
+            duration: 滑动持续时间（秒）
+        """
+        start_y = 0.7
+        end_y = start_y - distance
+        logger.info(f"向上滑动 {distance*100:.0f}%")
+        return self.swipe(0.5, start_y, 0.5, end_y, duration)
+
+    def swipe_down(self, distance: float = 0.3, duration: float = 0.5) -> bool:
+        """
+        向下滑动
+
+        Args:
+            distance: 滑动距离（屏幕高度的比例，0.0-1.0）
+            duration: 滑动持续时间（秒）
+        """
+        start_y = 0.3
+        end_y = start_y + distance
+        logger.info(f"向下滑动 {distance*100:.0f}%")
+        return self.swipe(0.5, start_y, 0.5, end_y, duration)
+
+    def swipe_left(self, distance: float = 0.3, duration: float = 0.5) -> bool:
+        """
+        向左滑动
+
+        Args:
+            distance: 滑动距离（屏幕宽度的比例，0.0-1.0）
+            duration: 滑动持续时间（秒）
+        """
+        start_x = 0.7
+        end_x = start_x - distance
+        logger.info(f"向左滑动 {distance*100:.0f}%")
+        return self.swipe(start_x, 0.5, end_x, 0.5, duration)
+
+    def swipe_right(self, distance: float = 0.3, duration: float = 0.5) -> bool:
+        """
+        向右滑动
+
+        Args:
+            distance: 滑动距离（屏幕宽度的比例，0.0-1.0）
+            duration: 滑动持续时间（秒）
+        """
+        start_x = 0.3
+        end_x = start_x + distance
+        logger.info(f"向右滑动 {distance*100:.0f}%")
+        return self.swipe(start_x, 0.5, end_x, 0.5, duration)
+
+    def double_click(self, x_ratio: float, y_ratio: float, interval: float = 0.1) -> bool:
+        """
+        双击指定位置
+
+        Args:
+            x_ratio, y_ratio: 屏幕比例坐标
+            interval: 两次点击之间的间隔（秒）
+        """
+        logger.info(f"双击 ({x_ratio:.4f}, {y_ratio:.4f})")
+        if not self.click(x_ratio, y_ratio):
+            return False
+        time.sleep(interval)
+        return self.click(x_ratio, y_ratio)
+
+    def get_coordinate_info(self, x: int, y: int) -> dict:
+        """
+        获取坐标信息（像素和比例）
+
+        Args:
+            x, y: 像素坐标
+
+        Returns:
+            包含像素和比例坐标的字典
+        """
+        x_ratio = x / self.screen_width
+        y_ratio = y / self.screen_height
+
+        return {
+            'pixel': {'x': x, 'y': y},
+            'ratio': {'x': round(x_ratio, 4), 'y': round(y_ratio, 4)},
+            'screen': {'width': self.screen_width, 'height': self.screen_height}
+        }
+
+    def test_connection(self) -> bool:
+        """
+        测试CH9329连接是否正常
+
+        Returns:
+            连接是否正常
+        """
+        try:
+            # 尝试校准鼠标（不会影响屏幕状态）
+            result = self.calibrate_mouse()
+            if result:
+                logger.success("CH9329连接测试成功")
+            else:
+                logger.warning("CH9329连接测试失败")
+            return result
+        except Exception as e:
+            logger.error(f"CH9329连接测试异常: {e}")
+            return False

@@ -69,6 +69,15 @@ def _wifi_connect_hint(adb_msg: str) -> str:
     )
 
 
+def get_ch9329_visual_debug_command(repo_root: Path | None = None) -> str | None:
+    """Return the visual debugger launch command when the script is available."""
+    root = repo_root or _project_root
+    script_path = root / "scripts" / "ch9329_visual_debug.py"
+    if not script_path.exists():
+        return None
+    return "python scripts/ch9329_visual_debug.py"
+
+
 def get_device_manager():
     from pixelle_video.services.device_manager import device_manager
     # Apply saved ADB server config on first use
@@ -484,6 +493,30 @@ def render_devices_tab():
     """Render device management UI."""
     st.subheader("📱 设备列表")
 
+    # ── Visual Debugger Tool Suggestion Banner ──
+    visual_debug_command = get_ch9329_visual_debug_command()
+    if visual_debug_command:
+        st.markdown(
+            f"""
+            <div style="background: rgba(255, 75, 75, 0.08); border-left: 4px solid #ff4b4b; border-radius: 6px; padding: 15px; margin-bottom: 20px;">
+                <h5 style="color: #ff4b4b; margin: 0 0 8px 0; font-weight: bold;">⚡ 极客推荐：物理投屏与 CH9329 键鼠可视化校准联调工具</h5>
+                <p style="color: #dddddd; font-size: 14px; margin: 0 0 10px 0; line-height: 1.5;">
+                    我们已在您的本地环境中实现了一个<b>极高生产力的手机实时投屏与 CH9329 物理校准调试器</b>。
+                    只需将手机和 CH9329 接入电脑，在终端双击或运行以下命令即可启动该桌面 GUI 工作台：
+                </p>
+                <code style="background: #252526; color: #00ff66; padding: 6px 12px; border-radius: 4px; font-family: Consolas, monospace; font-size: 13px; display: block; border: 1px solid rgba(255, 255, 255, 0.05); margin-bottom: 8px;">
+                    {visual_debug_command}
+                </code>
+                <ul style="color: #aaaaaa; font-size: 13px; margin: 0; padding-left: 20px;">
+                    <li><b>实时鼠标坐标获取</b>：鼠标在电脑上的手机投屏上悬停，实时算出物理 X, Y 像素和比例，彻底免去手动换算痛点！</li>
+                    <li><b>双向物理控制</b>：在投屏上用鼠标直接点击或长按，即刻通过 CH9329 模拟物理点击。拖拽鼠标即刻触发<b>平滑的缓动滑动手势</b>。</li>
+                    <li><b>一键语义点校准</b>：在截图上选中任何按钮后，一键输入名称即可追加写入设备 Profile (YAML)，大幅提升物理手机注册与校准效率！</li>
+                </ul>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
     dm = get_device_manager()
     adb_ok = dm.check_adb_available()
 
@@ -669,7 +702,6 @@ def render_publish_tab():
     _xhs_cfg = _cm.config.xhs_publish
 
     scheduler = get_publish_scheduler()
-    dm = get_device_manager()
     _init_publish_form_defaults()
 
 
@@ -1002,8 +1034,6 @@ def render_client_agent_tab():
     st.subheader("💻 客户端代理模式 (多端拉取)")
     st.caption("适合多用户协作：其他发布人员在他们自己的电脑上运行代理，控制自己电脑上连接的本地发布设备进行自动发布。")
 
-    from pixelle_video.config import config_manager
-    
     # 1. Distribution Mode Selector
     from pixelle_video.services.android_device_dispatcher import DistributionAdapter
     current_mode = DistributionAdapter.get_mode()

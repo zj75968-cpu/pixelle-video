@@ -36,6 +36,11 @@ env/
 .cursorignore
 .kiro/
 
+# Local assistant/editor/tool state
+.claude/
+.cursor/
+.codegraph/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -45,9 +50,23 @@ config.yaml
 config.yaml.bak
 *.yaml.bak
 .env
+config/devices.yaml
+config/calibration_profiles/*.yaml
+
+scratch/
+
+# Local external checkouts / deployment drafts
+cc-connect/
+deploy/
 
 # Logs
 *.log
+*.out
+*_out.txt
+*_err.txt
+output*.txt
+api_log.txt
+api_err.txt
 
 # Test outputs
 test_outputs/
@@ -63,6 +82,13 @@ temp/
 tmp/
 .cache/
 ffmpeg-temp/
+runtime/
+
+# Generated local screenshots / publish artifacts
+temp_e2e_photo*.png
+cf_debug.png
+local_agent.exe
+local_agent.spec
 
 # MkDocs build output
 site/
@@ -74,15 +100,9 @@ plans/
 examples/
 repositories/
 
-*.out
-
 # Local ffmpeg artifacts
 ffmpeg-temp/
 ffmpeg-release-essentials.zip
-
-# Runtime API logs
-api_log.txt
-api_err.txt
 
 # Local Android platform-tools (downloaded binaries)
 packaging/windows/platform-tools/

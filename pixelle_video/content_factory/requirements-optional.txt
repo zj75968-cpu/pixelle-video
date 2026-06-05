@@ -1,0 +1,4 @@
+# Optional: only required for the real HDMI vision closed-loop (simulate=False).
+# All cv2/numpy usage is lazy-imported; the pipeline runs without these.
+opencv-python>=4.8
+numpy>=1.24
